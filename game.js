@@ -3,8 +3,8 @@
  */
 
 const SAVE_KEY = 'starport-save-v1';
-const GAME_VERSION = '1.1.0';
-const GAME_CODENAME = '星港初啼';
+const GAME_VERSION = '1.3.0';
+const GAME_CODENAME = '烽火外交';
 
 // 版本历史：
 // v1.0 - 基础循环：8资源/12建筑/人口/评级/胜利
@@ -40,6 +40,13 @@ class Game {
     this.scenario = new ScenarioManager();  // v1.2
     this.achievements = new AchievementManager(this);
     this.help = new HelpManager(this);
+    // v1.3 新系统
+    this.diplomacy = new DiplomacyManager();
+    this.military = new MilitaryManager();
+    this.policy = new PolicyManager();
+    this.disasters13 = new DisasterPack13();
+    this._allyAidWave = -1;  // 已为哪一波袭击呼叫过盟友
+    this._allyAidCalled = false;
 
     // 注入引用
     this.builder.techTree = this.tech;
@@ -79,6 +86,10 @@ class Game {
     this.bindUI();
     this.tutorial.bindUI();
     this.help.bindUI();
+    // v1.3 系统 UI
+    if (this.diplomacy && this.diplomacy.bindUI) this.diplomacy.bindUI(this);
+    if (this.military && this.military.bindUI) this.military.bindUI(this);
+    if (this.policy && this.policy.bindUI) this.policy.bindUI(this);
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
     this.lastFrame = Date.now();
@@ -100,6 +111,11 @@ class Game {
         disaster: this.disaster.serialize(Date.now()),
         trucks: this.logistics.serialize(),
         stats: this.stats.serialize(),
+        // v1.3
+        diplomacy: this.diplomacy ? this.diplomacy.save() : null,
+        military: this.military ? this.military.save() : null,
+        policy: this.policy ? this.policy.save() : null,
+        disasters13: this.disasters13 ? this.disasters13.save() : null,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch (e) { /* 忽略 */ }
@@ -124,6 +140,11 @@ class Game {
       if (data.disaster) this.disaster.deserialize(data.disaster, Date.now());
       if (data.trucks) this.logistics.deserialize(data.trucks, this.map, this.builder);
       if (data.stats) this.stats.deserialize(data.stats);
+      // v1.3
+      if (data.diplomacy && this.diplomacy) this.diplomacy.load(data.diplomacy, this);
+      if (data.military && this.military) this.military.load(data.military);
+      if (data.policy && this.policy) this.policy.load(data.policy);
+      if (data.disasters13 && this.disasters13) this.disasters13.load(data.disasters13);
       return true;
     } catch (e) { return false; }
   }
@@ -944,6 +965,20 @@ class Game {
       this.tradeShip.onEvent = (type, data) => this.onTradeShipEvent(type, data);
       this.tradeShip.update(now, this);
     }
+
+    // v1.3：外交 / 军事 / 政策 / 新灾难
+    if (this.diplomacy) this.diplomacy.update(now, this);
+    if (this.military) {
+      this.military.update(now, dt, this);
+      // 袭击开始时呼叫盟友援军（每波一次）
+      if (this.military.raidActive && this.diplomacy && !this._allyAidCalled) {
+        this._allyAidCalled = true;
+        if (this.diplomacy.onRaidStart) this.diplomacy.onRaidStart(this);
+      }
+      if (!this.military.raidActive) this._allyAidCalled = false;
+    }
+    if (this.policy) this.policy.upkeepTick(this, dt);
+    if (this.disasters13) this.disasters13.update(now, this);
 
     // 成就检查
     this.achievements.update(now);
