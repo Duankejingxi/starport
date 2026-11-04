@@ -35,6 +35,12 @@
   <!-- 地图 -->
   <div id="map-wrap">
     <canvas id="map" width="660" height="660"></canvas>
+    <div id="zoom-ctrl">
+      <button id="zoom-in" aria-label="放大">＋</button>
+      <span id="zoom-level">1x</span>
+      <button id="zoom-out" aria-label="缩小">－</button>
+      <button id="zoom-reset" aria-label="重置视角">🎯</button>
+    </div>
     <div id="toast" class="hidden"></div>
     <!-- 建筑详情面板 -->
     <div id="building-panel" class="hidden">
@@ -133,6 +139,7 @@
     <button id="btn-achieve" class="tool-btn">🏆<small>成就</small></button>
     <button id="btn-stats" class="tool-btn">📊<small>统计</small></button>
     <button id="btn-help" class="tool-btn">❓<small>帮助</small></button>
+    <button id="btn-v15-menu" class="tool-btn">🌟<small>新纪元</small></button>
     <button id="btn-speed" class="tool-btn">⏩<small>1x</small></button>
     <button id="btn-sound" class="tool-btn">🔊<small>声音</small></button>
     <button class="tool-btn" data-build="habitat">🏠<small>居住舱</small></button>
@@ -159,6 +166,7 @@
     <button id="btn-reset" class="tool-btn danger">🗑️<small>重开</small></button>
   </footer>
   <div id="build-info" class="hidden"></div>
+  <div id="v15-panel" class="hidden"></div>
   <div id="hint">点建筑查看/升级/维修 · 点迷雾扇区解锁（铁×50）· WASD/点击移动 · E/空格采集 · 🔬科技树别忘了</div>
 </div>
 
@@ -186,6 +194,34 @@
 <script src="orbital.js"></script>
 <script src="deep_space.js"></script>
 <script src="content_v14.js"></script>
+<script src="camera.js"></script>
+<script src="underground.js"></script>
+<script src="ocean.js"></script>
+<script src="governor.js"></script>
+<script src="buildings_v15.js"></script>
+<script src="campaign.js"></script>
+<script src="content_v15.js"></script>
+<script src="v15_ui.js"></script>
+<script src="v15_integration.js"></script>
+<script src="v15_manual.js"></script>
+<script src="v15_events.js"></script>
+<script src="v15_achievements.js"></script>
+<script src="v15_balance.js"></script>
+<script src="changelog.js"></script>
+<script src="sky.js"></script>
+<script src="robots.js"></script>
+<script src="buildings_v16.js"></script>
+<script src="content_v16.js"></script>
+<script src="quantum.js"></script>
+<script src="bio.js"></script>
+<script src="content_v17.js"></script>
+<script src="buildings_v18.js"></script>
+<script src="content_v18.js"></script>
+<script src="v18_integration.js"></script>
+<script src="v18_endgame.js"></script>
+<script src="hall_of_fame.js"></script>
+<script src="game_guide.js"></script>
+<script src="settings.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

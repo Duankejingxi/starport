@@ -3,12 +3,19 @@
  */
 
 const SAVE_KEY = 'starport-save-v1';
-const GAME_VERSION = '1.4.0';
-const GAME_CODENAME = '星海远征';
+const GAME_VERSION = '1.8.0';
+const GAME_CODENAME = '星海无垠';
 
 // 版本历史：
 // v1.0 - 基础循环：8资源/12建筑/人口/评级/胜利
 // v1.1 - 交通/科技/灾难/音效/教程/成就/统计/帮助（5000行里程碑）
+// v1.2 - 大地图50×50/铀矿/12新建筑/科技60/成就67（6582行）
+// v1.3 - 外交/军事/政策/8军事建筑（10170行）
+// v1.4 - 轨道站/深空/5奇观/科技100/成就127（15000行）
+// v1.5 - 地下城/海洋/总督/战役/15新建筑/镜头缩放/科技140/成就177（25000行）
+// v1.6 - 天空城/机器人革命/20新建筑/科技190/成就217（35000行）
+// v1.7 - 量子/生物系统/科技250/成就277/5奇观（43000行）
+// v1.8 - 25终极建筑/科技310/成就337/5奇观/第五胜利（50000行）
 
 // 贸易配方：贸易站点击后可选
 const TRADE_OFFERS = [
@@ -49,6 +56,30 @@ class Game {
     this._allyAidCalled = false;
     // v1.4 新系统（orbital 自集成，其余手动）
     this.deepSpace = new DeepSpaceManager();
+    // v1.5 新系统（防御性实例化：类不存在时跳过，保证旧存档/缺文件不崩）
+    this.camera = (typeof Camera !== 'undefined') ? new Camera(this.map.size) : null;
+    this.underground = (typeof UndergroundManager !== 'undefined') ? new UndergroundManager() : null;
+    this.ocean = (typeof OceanManager !== 'undefined') ? new OceanManager() : null;
+    this.campaign = (typeof CampaignManager !== 'undefined') ? new CampaignManager() : null;
+    // v1.6 新系统
+    this.sky = (typeof SkyManager !== 'undefined') ? new SkyManager() : null;
+    this.robots = (typeof RobotManager !== 'undefined') ? new RobotManager() : null;
+    // v1.7 新系统
+    this.quantum = (typeof QuantumManager !== 'undefined') ? new QuantumManager() : null;
+    this.bio = (typeof BioManager !== 'undefined') ? new BioManager() : null;
+    // v1.6-v1.8 内容合并
+    try { if (typeof mergeBuildingsV16 === 'function') mergeBuildingsV16(); } catch (e) {}
+    try { if (typeof mergeBuildingsV18 === 'function') mergeBuildingsV18(); } catch (e) {}
+    try { if (typeof TECH_V16 !== 'undefined' && this.tech && this.tech.addBatch) this.tech.addBatch(TECH_V16); } catch (e) {}
+    try { if (typeof TECH_V17 !== 'undefined' && this.tech && this.tech.addBatch) this.tech.addBatch(TECH_V17); } catch (e) {}
+    try { if (typeof ACH_V16 !== 'undefined' && this.achievements && this.achievements.addBatch) this.achievements.addBatch(ACH_V16); } catch (e) {}
+    try { if (typeof ACH_V17 !== 'undefined' && this.achievements && this.achievements.addBatch) this.achievements.addBatch(ACH_V17); } catch (e) {}
+    // 总督需要回调，延迟到 bindInput 后初始化
+    this.governor = null;
+    // v1.5 内容包：合并建筑/科技/成就/灾难/奇观配置
+    try { if (typeof mergeBuildingsV15 === 'function') mergeBuildingsV15(); } catch (e) {}
+    try { if (typeof TECH_V15 !== 'undefined' && this.tech && this.tech.addBatch) this.tech.addBatch(TECH_V15); } catch (e) {}
+    try { if (typeof ACH_V15 !== 'undefined' && this.achievements && this.achievements.addBatch) this.achievements.addBatch(ACH_V15); } catch (e) {}
 
     // 注入引用
     this.builder.techTree = this.tech;
@@ -94,6 +125,46 @@ class Game {
     if (this.policy && this.policy.bindUI) this.policy.bindUI(this);
     // v1.4
     if (this.deepSpace && this.deepSpace.bindUI) this.deepSpace.bindUI(this);
+    // v1.5：总督（需要建造回调）
+    try {
+      if (typeof GovernorManager !== 'undefined') {
+        this.governor = new GovernorManager({
+          canBuild: (id, x, y) => {
+            const chk = this.builder.canPlace(id, x, y, this.player.inv, this.pop.count);
+            return chk.ok;
+          },
+          doBuild: (id, x, y) => {
+            const chk = this.builder.canPlace(id, x, y, this.player.inv, this.pop.count);
+            if (chk.ok) this.builder.place(id, x, y, this.player.inv);
+            return chk.ok;
+          },
+          getState: () => ({ buildings: this.builder.buildings, inv: this.player.inv, pop: this.pop.count }),
+        });
+      }
+    } catch (e) {}
+    // v1.5：UI 集成
+    try {
+      if (typeof registerV15Resources === 'function') registerV15Resources();
+      if (this.player && this.player.inv && typeof v15NewInventorySlots === 'function') v15NewInventorySlots(this.player.inv);
+    } catch (e) {}
+    try {
+      if (typeof V15UIManager !== 'undefined') {
+        this.v15ui = new V15UIManager(this);
+        if (typeof injectV15CSS === 'function') injectV15CSS();
+      }
+    } catch (e) {}
+    try {
+      if (typeof mergeV15Content === 'function') mergeV15Content(this);
+    } catch (e) {}
+    // v1.5：镜头手势绑定
+    try {
+      if (this.camera && typeof bindCameraGestures === 'function') {
+        this._detachCam = bindCameraGestures(this.canvas, this.camera, {
+          onTap: (tx, ty, e) => this.onCameraTap(tx, ty, e),
+          onZoom: () => this.updateZoomUI(),
+        });
+      }
+    } catch (e) {}
     // content_v14 可选接入（防御性）
     try { if (typeof StargateVictory !== 'undefined' && StargateVictory.attach) StargateVictory.attach(this); } catch (e) {}
     try { if (typeof OrbitalHazards !== 'undefined') { this.orbitalHazards = new OrbitalHazards(); if (this.orbitalHazards.attach) this.orbitalHazards.attach(this); } } catch (e) {}
@@ -362,7 +433,6 @@ class Game {
     };
     this.canvas.addEventListener('click', onTap);
     this.canvas.addEventListener('touchstart', onTap, { passive: false });
-
     const keys = {
       w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
       arrowup: [0, -1], arrowdown: [0, 1], arrowleft: [-1, 0], arrowright: [1, 0],
@@ -397,7 +467,79 @@ class Game {
     });
   }
 
+  // v1.5：镜头点按（带 44px 容错）
+  onCameraTap(tx, ty, e) {
+    this.sound.ensure();
+    const tilePx = this.camera ? this.camera.tilePx(this.canvas.width) : this.tile;
+    const radiusTiles = Math.max(1.5, 44 / tilePx);
+    let fx = Math.floor(tx), fy = Math.floor(ty);
+    if (typeof findNearestInteractable === 'function') {
+      const near = findNearestInteractable(tx, ty, radiusTiles, this.map, this.builder);
+      if (near) { fx = near.x; fy = near.y; }
+    }
+    if (!this.map.inBounds(fx, fy)) return;
+    this._tutorialMoved = true;
+    this._handleTileTap(fx, fy);
+  }
+
+  // v1.5：格点按核心逻辑（供镜头/普通点击复用）
+  _handleTileTap(x, y) {
+    if (this.truckAssignMode && this.selectedTruck) {
+      const r = this.logistics.assignTruck(this.selectedTruck, x, y, this.map, this.builder);
+      if (r.ok) {
+        this.toast(`\u{1F69A} 运输车出发！`);
+        this.sound.truck();
+      } else { this.toast(r.reason); this.sound.error(); }
+      this.truckAssignMode = false;
+      this.updateTruckUI();
+      return;
+    }
+    if (this.selectedBuild) {
+      const chk = this.builder.canPlace(this.selectedBuild, x, y, this.player.inv, this.pop.count);
+      if (!chk.ok) { this.toast(chk.reason); this.sound.error(); return; }
+      this.builder.place(this.selectedBuild, x, y, this.player.inv);
+      this.sound.build();
+      this.stats.record('build');
+      this.selectBuild(null);
+      this.updateHUD();
+      this.save();
+      return;
+    }
+    const b = this.builder.at(x, y);
+    if (b) {
+      this.selectedBuilding = b;
+      this.showBuildingPanel(b);
+      this.sound.click();
+      return;
+    }
+    this.selectedBuilding = null;
+    this.hideBuildingPanel();
+    if (!this.map.isUnlocked(x, y)) {
+      const { sx, sy } = this.map.sectorOf(x, y);
+      const r = this.map.unlockSector(sx, sy, this.player.inv);
+      this.toast(r.ok ? `扇区解锁！` : r.reason);
+      if (r.ok) { this.updateHUD(); this.save(); this.sound.upgrade(); }
+      else this.sound.error();
+      return;
+    }
+    this.player.setTarget(x, y);
+  }
+
+  // v1.5：更新缩放按钮 UI
+  updateZoomUI() {
+    const el = document.getElementById('zoom-level');
+    if (el && this.camera) el.textContent = this.camera.zoom + 'x';
+  }
+
   bindUI() {
+    // v1.5：镜头缩放按钮
+    const zi = document.getElementById('zoom-in');
+    if (zi) zi.addEventListener('click', () => { if (this.camera && this.camera.zoomIn()) { this.updateZoomUI(); this.sound.click(); } });
+    const zo = document.getElementById('zoom-out');
+    if (zo) zo.addEventListener('click', () => { if (this.camera && this.camera.zoomOut()) { this.updateZoomUI(); this.sound.click(); } });
+    const zr = document.getElementById('zoom-reset');
+    if (zr) zr.addEventListener('click', () => { if (this.camera) { this.camera.reset(); this.updateZoomUI(); this.sound.click(); } });
+    try { if (this.v15ui) this.v15ui.bindMenu(); } catch (e) {}
     document.getElementById('btn-harvest').addEventListener('click', () => this.doHarvest());
     for (const btn of document.querySelectorAll('[data-build]')) {
       btn.addEventListener('click', () => {
@@ -994,6 +1136,49 @@ class Game {
     if (this.disasters13) this.disasters13.update(now, this);
     // v1.4
     if (this.deepSpace) this.deepSpace.update(now, this);
+    // v1.5 新系统
+    if (this.underground) this.underground.update(dt);
+    if (this.ocean) {
+      this.ocean.update(dt, this);
+      const op = this.ocean.produce(dt);
+      if (op) {
+        if (op.water) this.player.inv.water = Math.min(this.player.inv.water + op.water, 9999);
+        if (op.food) this.player.inv.food = Math.min(this.player.inv.food + op.food, 9999);
+      }
+    }
+    if (this.governor) this.governor.tick(dt);
+    if (this.campaign) this.campaign.update && this.campaign.update(now);
+    // v1.5 集成 tick
+    try { if (typeof v15Tick === 'function') v15Tick(this, dt, now); } catch (e) {}
+    // v1.6-v1.8 新系统
+    try { if (this.sky && this.sky.update) this.sky.update(dt, this); } catch (e) {}
+    try { if (this.robots && this.robots.update) this.robots.update(dt, this); } catch (e) {}
+    try { if (this.quantum && this.quantum.update) this.quantum.update(dt, this); } catch (e) {}
+    try { if (this.bio && this.bio.update) this.bio.update(dt, this); } catch (e) {}
+    // v1.8 集成 tick
+    try { if (typeof v18Tick === 'function') v18Tick(this, dt, now); } catch (e) {}
+    // v1.5 成就检查（每 10 秒）
+    try {
+      if (!this._v15achT || now - this._v15achT > 10000) {
+        this._v15achT = now;
+        if (typeof checkV15Achievements === 'function') {
+          const newly = checkV15Achievements(this);
+          for (const id of newly) {
+            const meta = (typeof ACH_V15_META !== 'undefined' && ACH_V15_META[id]) || [id, '🏆', id];
+            this.toast(`${meta[1]} 成就：${meta[0]}！`);
+            if (this.sound) this.sound.achievement();
+          }
+        }
+      }
+    } catch (e) {}
+    // v1.5 动态事件（每 30 秒检查）
+    try {
+      if (!this.v15events && typeof V15EventManager !== 'undefined') this.v15events = new V15EventManager();
+      if (this.v15events && (!this._v15evT || now - this._v15evT > 30000)) {
+        this._v15evT = now;
+        this.v15events.check(now, this);
+      }
+    } catch (e) {}
     if (this.orbitalHazards) this.orbitalHazards.update(now, this);
 
     // 成就检查
@@ -1066,10 +1251,22 @@ class Game {
   // 渲染
   render(now) {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.map.render(this.ctx, this.tile);
-    this.builder.render(this.ctx, this.tile);
-    this.logistics.render(this.ctx, this.tile);
-    this.player.render(this.ctx, this.tile);
+    // v1.5 镜头：缩放时应用变换
+    const cam = this.camera;
+    let effTile = this.tile;
+    if (cam && cam.zoom > 1) {
+      const cvs = this.canvas.width;
+      effTile = cam.tilePx(cvs);
+      const viewW = cam.viewTiles();
+      const left = cam.cx - viewW / 2;
+      const top = cam.cy - viewW / 2;
+      this.ctx.save();
+      this.ctx.translate(-left * effTile, -top * effTile);
+    }
+    this.map.render(this.ctx, effTile);
+    this.builder.render(this.ctx, effTile);
+    this.logistics.render(this.ctx, effTile);
+    this.player.render(this.ctx, effTile);
 
     // 陨石预警标记
     if (this._meteorMark && now < this._meteorMark.until) {
@@ -1143,13 +1340,15 @@ class Game {
       }
     }
 
+    // 恢复镜头变换
+    if (cam && cam.zoom > 1) this.ctx.restore();
+
     // 小地图（每 30 帧更新一次）
     if (!this._mmFrame || (this._mmFrame = (this._mmFrame + 1) % 30) === 0) {
       this.renderMinimap(now);
     }
   }
 
-  // 小地图渲染
   renderMinimap(now) {
     const mm = document.getElementById('minimap');
     if (!mm) return;

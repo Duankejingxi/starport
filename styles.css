@@ -627,3 +627,48 @@ html, body {
   margin-bottom: 4px;
   flex-wrap: wrap;
 }
+
+/* v1.5：镜头缩放控件（移动端优先，触屏目标 ≥44px） */
+#zoom-ctrl {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+}
+#zoom-ctrl button {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  font-size: 22px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.2);
+  background: rgba(20,24,40,.85);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+#zoom-ctrl button:active { transform: scale(.94); }
+#zoom-level {
+  text-align: center;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(20,24,40,.85);
+  border-radius: 8px;
+  padding: 4px 0;
+  min-height: 24px;
+}
+/* v1.5：所有按钮触屏目标 ≥44px */
+button {
+  min-height: 44px;
+  min-width: 44px;
+}
+#building-panel button, #tech-panel button, #truck-panel button,
+#trade-panel button, #achieve-panel button, #stats-panel button,
+#help-panel button {
+  min-height: 44px;
+  padding: 10px 14px;
+}
