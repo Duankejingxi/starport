@@ -254,3 +254,376 @@ html, body {
   background: #120d0b;
   text-align: center;
 }
+
+/* ============ v1.1 新增：通用面板 ============ */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.panel-header button {
+  background: #2a2a35;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  width: 40px;
+  height: 36px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* 科技树 */
+#tech-panel {
+  position: absolute;
+  inset: 8px;
+  background: rgba(12, 10, 14, 0.97);
+  border: 1px solid #7dd3fc;
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 25;
+  overflow-y: auto;
+}
+
+.tech-stats {
+  font-size: 13px;
+  margin-bottom: 10px;
+  color: #facc15;
+}
+
+.tech-branch {
+  margin-bottom: 14px;
+}
+
+.tech-branch-title {
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.tech-card {
+  background: #1a1620;
+  border: 1px solid #3a3a4a;
+  border-radius: 10px;
+  padding: 8px 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.tech-card:active { transform: scale(0.96); }
+
+.tech-card.unlocked {
+  border-color: #4ade80;
+  background: #14201a;
+}
+
+.tech-card.available {
+  border-color: #facc15;
+  box-shadow: 0 0 6px rgba(250, 204, 21, 0.3);
+}
+
+.tech-card.locked {
+  opacity: 0.5;
+}
+
+.tech-icon { font-size: 24px; }
+.tech-name { font-size: 12px; font-weight: bold; margin: 4px 0 2px; }
+.tech-cost { font-size: 11px; color: #f0abfc; }
+.tech-state { font-size: 10px; opacity: 0.7; margin-top: 2px; }
+
+/* 运输车 */
+#truck-panel {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  background: rgba(20, 14, 10, 0.95);
+  border: 1px solid #facc15;
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 15;
+  max-height: 45%;
+  overflow-y: auto;
+}
+
+.truck-stats {
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: #facc15;
+}
+
+.truck-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background: #241a14;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.truck-row button {
+  background: #e07b39;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#btn-build-truck {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 44px;
+  background: #e07b39;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#btn-build-truck:disabled {
+  background: #4a3a30;
+  color: #888;
+}
+
+/* 贸易 */
+#trade-panel {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  background: rgba(20, 14, 10, 0.95);
+  border: 1px solid #38bdf8;
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 15;
+}
+
+.trade-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 8px;
+  background: #241a14;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.trade-row button {
+  background: #38bdf8;
+  color: #0a0a12;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.trade-row button:disabled {
+  background: #3a3a4a;
+  color: #888;
+}
+
+/* 教程 */
+#tutorial {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  background: rgba(20, 14, 20, 0.95);
+  border: 2px solid #facc15;
+  border-radius: 12px;
+  padding: 14px;
+  z-index: 28;
+}
+
+#tut-progress {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+#tut-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #facc15;
+  margin-bottom: 6px;
+}
+
+#tut-text {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+#tut-hint {
+  font-size: 13px;
+  color: #7dd3fc;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+#tut-btns {
+  display: flex;
+  gap: 8px;
+}
+
+#tut-btns button {
+  flex: 1;
+  min-height: 44px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#btn-tut-next {
+  background: #e07b39;
+  color: #fff;
+}
+
+#btn-tut-prev {
+  background: #2a2a35;
+  color: #fff;
+}
+
+/* 成就 / 统计 */
+#achieve-panel, #stats-panel {
+  position: absolute;
+  inset: 8px;
+  background: rgba(12, 10, 14, 0.97);
+  border: 1px solid #facc15;
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 25;
+  overflow-y: auto;
+}
+
+#stats-panel {
+  border-color: #38bdf8;
+}
+
+#achieve-list .tech-grid {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px;
+  border-bottom: 1px solid #2a2a35;
+  font-size: 13px;
+}
+
+.stat-row b {
+  color: #facc15;
+}
+
+/* 帮助 */
+#help-panel {
+  position: absolute;
+  inset: 8px;
+  background: rgba(12, 10, 14, 0.97);
+  border: 1px solid #4ade80;
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 25;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#help-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.help-tab {
+  background: #1a1620;
+  color: #f5e8dc;
+  border: 1px solid #3a3a4a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.help-tab.active {
+  border-color: #4ade80;
+  background: #14201a;
+  font-weight: bold;
+}
+
+#help-content {
+  font-size: 13px;
+  line-height: 1.8;
+  flex: 1;
+  overflow-y: auto;
+}
+
+#help-content b {
+  color: #facc15;
+}
+
+/* 拆除按钮 */
+#btn-demolish {
+  background: #5a2a2a;
+  color: #ffb4b4;
+}
+
+#btn-demolish.danger {
+  border: 1px solid #ef4444;
+}
+
+/* 小地图 */
+#minimap {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 120px;
+  height: 120px;
+  border: 1px solid #4a352a;
+  border-radius: 8px;
+  background: #0a0a12;
+  z-index: 10;
+  opacity: 0.9;
+}
+
+/* 灾难指示 */
+#disaster-ind {
+  font-size: 12px;
+  color: #ef4444;
+  font-weight: bold;
+}
+
+#tech-count {
+  font-size: 12px;
+  color: #f0abfc;
+}
+
+#city-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}

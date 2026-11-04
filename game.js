@@ -1,6 +1,26 @@
-/* 星港 — game.js：主循环 / 输入 / UI / 存档 */
+/* 星港 — game.js：主循环 / 输入 / UI / 存档
+ * v1.1：集成科技树 / 灾难 / 物流 / 音效 / 教程 / 成就 / 统计 / 帮助
+ */
 
 const SAVE_KEY = 'starport-save-v1';
+const GAME_VERSION = '1.1.0';
+const GAME_CODENAME = '星港初啼';
+
+// 版本历史：
+// v1.0 - 基础循环：8资源/12建筑/人口/评级/胜利
+// v1.1 - 交通/科技/灾难/音效/教程/成就/统计/帮助（5000行里程碑）
+
+// 贸易配方：贸易站点击后可选
+const TRADE_OFFERS = [
+  { id: 't1', give: { iron: 20 }, get: { rare: 6 }, name: '铁矿→稀土' },
+  { id: 't2', give: { ice: 20 }, get: { iron: 8 }, name: '冰水→铁矿' },
+  { id: 't3', give: { steel: 10 }, get: { tech: 3 }, name: '钢材→科技' },
+  { id: 't4', give: { food: 15 }, get: { water: 15 }, name: '食物→水' },
+  { id: 't5', give: { rare: 10 }, get: { steel: 8 }, name: '稀土→钢材' },
+  { id: 't6', give: { water: 30 }, get: { food: 20 }, name: '水→食物' },
+  { id: 't7', give: { iron: 50 }, get: { steel: 12 }, name: '铁矿→钢材（大宗）' },
+  { id: 't8', give: { tech: 5 }, get: { rare: 15 }, name: '科技→稀土' },
+];
 
 class Game {
   constructor() {
@@ -9,9 +29,25 @@ class Game {
     this.builder = new BuildManager(this.map);
     this.pop = new Population();
     this.city = new City();
+    // v1.1 新系统
+    this.tech = new TechTree();
+    this.disaster = new DisasterManager();
+    this.logistics = new LogisticsManager();
+    this.sound = new SoundManager();
+    this.tutorial = new TutorialManager(this);
+    this.stats = new StatsManager();
+    this.achievements = new AchievementManager(this);
+    this.help = new HelpManager(this);
+
+    // 注入引用
+    this.builder.techTree = this.tech;
+    this.builder.disaster = this.disaster;
+    this.pop.techTree = this.tech;
 
     this.selectedBuild = null;
     this.selectedBuilding = null;  // 已放置的建筑（用于升级）
+    this.selectedTruck = null;     // 选中的运输车
+    this.truckAssignMode = false;  // 运输车指派模式
 
     this.canvas = document.getElementById('map');
     this.ctx = this.canvas.getContext('2d');
@@ -20,9 +56,27 @@ class Game {
 
     this.toastTimer = null;
     this.winShown = false;
+    this._tutorialMoved = false;
+    this._lastNeedWarn = 0;
+    this._lastStorageWarn = 0;
+    // 游戏速度：1x / 2x / 暂停
+    this.speedMode = 1; // 1=正常，2=双倍，0=暂停
+    this._accumDt = 0;
+    // 建造预览位置
+    this.hoverTile = null;
+    this.canvas.addEventListener('mousemove', (e) => {
+      const { x, y } = this.canvasPos(e);
+      this.hoverTile = this.map.inBounds(x, y) ? { x, y } : null;
+    });
+    this.canvas.addEventListener('mouseleave', () => { this.hoverTile = null; });
+
+    // 灾难事件 → UI/音效
+    this.disaster.onEvent = (type, data) => this.onDisaster(type, data);
 
     this.bindInput();
     this.bindUI();
+    this.tutorial.bindUI();
+    this.help.bindUI();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
     this.lastFrame = Date.now();
@@ -40,6 +94,10 @@ class Game {
         buildings: this.builder.buildings,
         sectors: this.map.sectors,
         won: this.city.won,
+        tech: this.tech.serialize(),
+        disaster: this.disaster.serialize(Date.now()),
+        trucks: this.logistics.serialize(),
+        stats: this.stats.serialize(),
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch (e) { /* 忽略 */ }
@@ -53,10 +111,17 @@ class Game {
       this.player.inv = Object.assign(newInventory(), data.inv);
       this.pop.count = data.pop || POP_START;
       this.builder.buildings = data.buildings || [];
-      for (const b of this.builder.buildings) b.lastProduce = Date.now();
+      for (const b of this.builder.buildings) {
+        b.lastProduce = Date.now();
+        if (!b.builtAt) b.builtAt = Date.now();
+      }
       if (data.sectors) this.map.sectors = data.sectors;
       this.city.won = !!data.won;
       if (this.city.won) this.winShown = true;
+      if (data.tech) this.tech.deserialize(data.tech);
+      if (data.disaster) this.disaster.deserialize(data.disaster, Date.now());
+      if (data.trucks) this.logistics.deserialize(data.trucks, this.map, this.builder);
+      if (data.stats) this.stats.deserialize(data.stats);
       return true;
     } catch (e) { return false; }
   }
@@ -64,6 +129,73 @@ class Game {
   reset() {
     try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
     location.reload();
+  }
+
+  // ---------- 灾难事件 ----------
+  onDisaster(type, data) {
+    const now = Date.now();
+    switch (type) {
+      case 'sandstorm-warn':
+        this.toast(`⛈️ 沙尘暴预警！${Math.round(data.warnMs / 1000)}秒后到达，太阳能减产`);
+        this.sound.meteorWarn();
+        break;
+      case 'sandstorm-start':
+        this.toast('⛈️ 沙尘暴来了！太阳能 -50%');
+        this.sound.sandstorm();
+        break;
+      case 'sandstorm-end':
+        this.toast('🌤️ 沙尘暴过去了');
+        this.sound.calm();
+        break;
+      case 'meteor-warn':
+        this.toast(`☄️ 陨石预警！${Math.round(data.warnMs / 1000)}秒后撞击 (${data.x},${data.y})`);
+        this.sound.meteorWarn();
+        this._meteorMark = { x: data.x, y: data.y, until: now + data.warnMs };
+        break;
+      case 'meteor-hit':
+        this.toast(`💥 陨石击中了${BUILDINGS[data.building].name}！需要维修`);
+        this.sound.meteorHit();
+        this._meteorMark = null;
+        break;
+      case 'meteor-immune':
+        this.toast('🛡️ 坚固结构挡住了陨石！');
+        this.sound.calm();
+        this._meteorMark = null;
+        break;
+      case 'meteor-dodge':
+        this.toast('🍀 应急协议生效，陨石偏离了！');
+        this._meteorMark = null;
+        break;
+      case 'meteor-miss':
+        this.toast('☄️ 陨石砸在了空地上，有惊无险');
+        this._meteorMark = null;
+        break;
+      case 'flare-warn':
+        this.toast(`🌞 太阳风暴预警！${Math.round(data.warnMs / 1000)}秒后到达，电子设备将停工`);
+        this.sound.meteorWarn();
+        break;
+      case 'flare-start':
+        this.toast('🌞 太阳风暴！实验室/指挥中心/气象站停工');
+        this.sound.sandstorm();
+        break;
+      case 'flare-end':
+        this.toast('🌤️ 太阳风暴过去了，设备恢复');
+        this.sound.calm();
+        break;
+      case 'devil-warn':
+        this.toast(`🌪️ 尘卷风预警！${Math.round(data.warnMs / 1000)}秒后登陆`);
+        this.sound.meteorWarn();
+        break;
+      case 'devil-start':
+        this.toast('🌪️ 尘卷风登陆！路径上的太阳能板失效');
+        this.sound.sandstorm();
+        break;
+      case 'devil-end':
+        this.toast('🌤️ 尘卷风消散了');
+        this.sound.calm();
+        break;
+    }
+    this.updateHUD();
   }
 
   // ---------- 输入 ----------
@@ -81,26 +213,46 @@ class Game {
   bindInput() {
     const onTap = (e) => {
       e.preventDefault();
+      this.sound.ensure(); // 解锁音频
       const { x, y } = this.canvasPos(e);
       if (!this.map.inBounds(x, y)) return;
+      this._tutorialMoved = true;
+
+      // 运输车指派模式：点资源点
+      if (this.truckAssignMode && this.selectedTruck) {
+        const r = this.logistics.assignTruck(this.selectedTruck, x, y, this.map, this.builder);
+        if (r.ok) {
+          this.toast(`🚚 运输车出发！自动采集${RES_DEFS[this.map.resource[y][x]].name}`);
+          this.sound.truck();
+        } else {
+          this.toast(r.reason);
+          this.sound.error();
+        }
+        this.truckAssignMode = false;
+        this.updateTruckUI();
+        return;
+      }
 
       // 建造模式
       if (this.selectedBuild) {
         const chk = this.builder.canPlace(this.selectedBuild, x, y, this.player.inv, this.pop.count);
-        if (!chk.ok) { this.toast(chk.reason); return; }
+        if (!chk.ok) { this.toast(chk.reason); this.sound.error(); return; }
         this.builder.place(this.selectedBuild, x, y, this.player.inv);
         this.toast(`${BUILDINGS[this.selectedBuild].icon} ${BUILDINGS[this.selectedBuild].name} 建造完成`);
+        this.sound.build();
+        this.stats.record('build');
         this.selectBuild(null);
         this.updateHUD();
         this.save();
         return;
       }
 
-      // 点已有建筑 → 显示信息 + 升级选项
+      // 点已有建筑 → 显示信息 + 升级/维修/特殊选项
       const b = this.builder.at(x, y);
       if (b) {
         this.selectedBuilding = b;
         this.showBuildingPanel(b);
+        this.sound.click();
         return;
       }
       this.selectedBuilding = null;
@@ -111,7 +263,8 @@ class Game {
         const { sx, sy } = this.map.sectorOf(x, y);
         const r = this.map.unlockSector(sx, sy, this.player.inv);
         this.toast(r.ok ? `扇区 (${sx},${sy}) 解锁！` : r.reason);
-        if (r.ok) { this.updateHUD(); this.save(); }
+        if (r.ok) { this.updateHUD(); this.save(); this.sound.upgrade(); }
+        else this.sound.error();
         return;
       }
 
@@ -127,9 +280,31 @@ class Game {
     };
     document.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
-      if (keys[k]) { e.preventDefault(); this.player.step(keys[k][0], keys[k][1]); }
+      if (keys[k]) { e.preventDefault(); this.player.step(keys[k][0], keys[k][1]); this._tutorialMoved = true; }
       if (k === 'e' || k === ' ') { e.preventDefault(); this.doHarvest(); }
-      if (k === 'escape') { this.selectBuild(null); this.hideBuildingPanel(); }
+      if (k === 'escape') { this.selectBuild(null); this.hideBuildingPanel(); this.hideTechPanel(); }
+      // 快捷键：T 科技，R 运输车，H 帮助，M 成就，N 统计，P 暂停/继续
+      if (k === 't') this.toggleTechPanel();
+      if (k === 'r') this.toggleTruckPanel();
+      if (k === 'h') { this.help.toggle(); this._helpOpened = true; }
+      if (k === 'm') this.toggleAchievePanel();
+      if (k === 'n') this.toggleStatsPanel();
+      if (k === 'p') {
+        this.speedMode = this.speedMode === 0 ? 1 : 0;
+        const speedBtn = document.getElementById('btn-speed');
+        const labels = { 0: '⏸️<small>暂停</small>', 1: '⏩<small>1x</small>', 2: '⏩⏩<small>2x</small>' };
+        if (speedBtn) speedBtn.innerHTML = labels[this.speedMode];
+      }
+      // 数字键 1-9 快速选择建筑
+      const numKeys = ['habitat', 'solar', 'miner', 'pump', 'smelter', 'greenhouse', 'waterplant', 'lab', 'road'];
+      if (k >= '1' && k <= '9') {
+        const idx = parseInt(k) - 1;
+        if (numKeys[idx]) {
+          this.hideBuildingPanel();
+          this.selectBuild(this.selectedBuild === numKeys[idx] ? null : numKeys[idx]);
+          this.sound.click();
+        }
+      }
     });
   }
 
@@ -138,15 +313,87 @@ class Game {
     for (const btn of document.querySelectorAll('[data-build]')) {
       btn.addEventListener('click', () => {
         const id = btn.dataset.build;
+        // 科技锁定检查
+        const lv = BUILDINGS[id].levels[1];
+        if (lv.needTech && !this.tech.buildingUnlocked(id)) {
+          this.toast(`🔒 需要科技解锁（科技树→${id === 'nuclear' ? '生产系' : id === 'dome' ? '建造/生存系' : id === 'trade' ? '生存系' : '生存系'}）`);
+          this.sound.error();
+          return;
+        }
         this.hideBuildingPanel();
         this.selectBuild(this.selectedBuild === id ? null : id);
+        this.sound.click();
       });
     }
     document.getElementById('btn-upgrade').addEventListener('click', () => this.doUpgrade());
+    document.getElementById('btn-repair').addEventListener('click', () => this.doRepair());
+    document.getElementById('btn-demolish').addEventListener('click', () => this.doDemolish());
     document.getElementById('btn-close-panel').addEventListener('click', () => this.hideBuildingPanel());
     document.getElementById('btn-reset').addEventListener('click', () => {
       if (confirm('重开？存档会清空！')) this.reset();
     });
+    // 科技树
+    document.getElementById('btn-tech').addEventListener('click', () => {
+      this.toggleTechPanel();
+      this.sound.click();
+    });
+    document.getElementById('btn-close-tech').addEventListener('click', () => this.hideTechPanel());
+    // 音效开关
+    const sndBtn = document.getElementById('btn-sound');
+    const refreshSnd = () => { sndBtn.textContent = this.sound.enabled ? '🔊' : '🔇'; };
+    sndBtn.addEventListener('click', () => {
+      this.sound.toggle();
+      refreshSnd();
+      this.sound.click();
+    });
+    refreshSnd();
+    // 运输车
+    document.getElementById('btn-truck').addEventListener('click', () => this.toggleTruckPanel());
+    document.getElementById('btn-close-truck').addEventListener('click', () => this.hideTruckPanel());
+    document.getElementById('btn-build-truck').addEventListener('click', () => this.doBuildTruck());
+    // 贸易
+    document.getElementById('btn-close-trade').addEventListener('click', () => this.hideTradePanel());
+    // 成就
+    document.getElementById('btn-achieve').addEventListener('click', () => {
+      this.toggleAchievePanel();
+      this.sound.click();
+    });
+    document.getElementById('btn-close-achieve').addEventListener('click', () => this.hideAchievePanel());
+    // 统计
+    document.getElementById('btn-stats').addEventListener('click', () => {
+      this.toggleStatsPanel();
+      this.sound.click();
+    });
+    document.getElementById('btn-close-stats').addEventListener('click', () => this.hideStatsPanel());
+    // 帮助
+    document.getElementById('btn-help').addEventListener('click', () => {
+      this.help.toggle();
+      this._helpOpened = true;
+      this.sound.click();
+    });
+    // 版本号显示（点击城市评级）
+    document.getElementById('city-rank').addEventListener('click', () => {
+      this.toast(`🚀 星港 Starport v${GAME_VERSION}「${GAME_CODENAME}」`);
+      this.sound.click();
+    });
+    document.getElementById('city-rank').style.cursor = 'pointer';
+    // 速度控制
+    const speedBtn = document.getElementById('btn-speed');
+    const speedLabels = { 0: '⏸️<small>暂停</small>', 1: '⏩<small>1x</small>', 2: '⏩⏩<small>2x</small>' };
+    speedBtn.addEventListener('click', () => {
+      this.speedMode = this.speedMode === 1 ? 2 : (this.speedMode === 2 ? 0 : 1);
+      speedBtn.innerHTML = speedLabels[this.speedMode];
+      this.toast(this.speedMode === 0 ? '⏸️ 已暂停' : this.speedMode === 2 ? '⏩⏩ 双倍速' : '⏩ 正常速度');
+      this.sound.click();
+    });
+    // 胜利继续
+    const contBtn = document.getElementById('btn-continue');
+    if (contBtn) {
+      contBtn.addEventListener('click', () => {
+        document.getElementById('victory').classList.add('hidden');
+        this.sound.click();
+      });
+    }
   }
 
   selectBuild(id) {
@@ -158,8 +405,11 @@ class Game {
     if (id) {
       const d = BUILDINGS[id];
       const lv = d.levels[1];
-      const costStr = Object.entries(lv.cost).map(([k, v]) => `${RES_DEFS[k].icon}${v}`).join(' ');
-      info.innerHTML = `<b>${d.icon} ${d.name}</b>　${d.desc}　<span style="opacity:.7">${costStr}｜点空地放置</span>`;
+      const cost = this.builder.effCost(lv.cost, false);
+      const costStr = Object.entries(cost).map(([k, v]) => `${RES_DEFS[k].icon}${v}`).join(' ');
+      let lock = '';
+      if (lv.needTech && !this.tech.buildingUnlocked(id)) lock = ' 🔒需科技';
+      info.innerHTML = `<b>${d.icon} ${d.name}</b>　${d.desc}　<span style="opacity:.7">${costStr}｜点空地放置${lock}</span>`;
       info.classList.remove('hidden');
     } else {
       info.classList.add('hidden');
@@ -171,12 +421,31 @@ class Game {
     document.getElementById('bp-title').textContent =
       `${BUILDINGS[b.id].icon} ${BUILDINGS[b.id].name} Lv${b.level}`;
     document.getElementById('bp-desc').textContent = this.builder.describe(b);
+    // 升级按钮
     const upBtn = document.getElementById('btn-upgrade');
     const chk = this.builder.canUpgrade(b, this.player.inv, this.pop.count);
     upBtn.disabled = !chk.ok;
     upBtn.textContent = chk.ok
       ? `⬆️ 升级 (Lv${b.level + 1})`
       : `⬆️ ${chk.reason}`;
+    // 维修按钮
+    const rpBtn = document.getElementById('btn-repair');
+    const rchk = this.builder.canRepair(b, this.player.inv);
+    rpBtn.style.display = (b.damaged || this.builder.agingEff(b) < 0.99) ? '' : 'none';
+    rpBtn.disabled = !rchk.ok;
+    rpBtn.textContent = rchk.ok ? `🔧 维修` : `🔧 ${rchk.reason}`;
+    // 特殊：运输站 → 造车按钮；贸易站 → 交易按钮
+    const extraBtn = document.getElementById('btn-building-extra');
+    extraBtn.style.display = 'none';
+    if (b.id === 'depot') {
+      extraBtn.style.display = '';
+      extraBtn.textContent = `🚚 造运输车 (铁×20 稀土×10)`;
+      extraBtn.onclick = () => this.doBuildTruckAt(b);
+    } else if (b.id === 'trade') {
+      extraBtn.style.display = '';
+      extraBtn.textContent = `🤝 打开交易`;
+      extraBtn.onclick = () => this.showTradePanel();
+    }
     panel.classList.remove('hidden');
   }
 
@@ -189,22 +458,284 @@ class Game {
     const b = this.selectedBuilding;
     if (!b) return;
     const chk = this.builder.canUpgrade(b, this.player.inv, this.pop.count);
-    if (!chk.ok) { this.toast(chk.reason); return; }
+    if (!chk.ok) { this.toast(chk.reason); this.sound.error(); return; }
     this.builder.upgrade(b, this.player.inv);
     this.toast(`${BUILDINGS[b.id].icon} 升到 Lv${b.level}！`);
+    this.sound.upgrade();
+    this.stats.record('upgrade');
     this.showBuildingPanel(b);
     this.updateHUD();
     this.save();
   }
 
+  doRepair() {
+    const b = this.selectedBuilding;
+    if (!b) return;
+    const chk = this.builder.canRepair(b, this.player.inv);
+    if (!chk.ok) { this.toast(chk.reason); this.sound.error(); return; }
+    this.builder.repair(b, this.player.inv);
+    this.toast(`🔧 ${BUILDINGS[b.id].name} 维修完成！`);
+    this.sound.repair();
+    this.stats.record('repair', { wasMeteor: b.damaged });
+    this.showBuildingPanel(b);
+    this.updateHUD();
+    this.save();
+  }
+
+  doDemolish() {
+    const b = this.selectedBuilding;
+    if (!b) return;
+    const def = BUILDINGS[b.id];
+    if (!confirm(`拆除${def.icon}${def.name} Lv${b.level}？返还 50% 建造成本。`)) return;
+    const refund = this.builder.demolish(b, this.player.inv);
+    if (refund) {
+      const refundStr = Object.entries(refund).map(([k, v]) => `${RES_DEFS[k].icon}${v}`).join(' ');
+      this.toast(`💥 已拆除，返还 ${refundStr}`);
+      this.sound.demolish();
+      this.stats.record('demolish');
+      this.hideBuildingPanel();
+      this.updateHUD();
+      this.save();
+    }
+  }
+
   doHarvest() {
     const res = this.player.tryHarvest(Date.now());
     if (res) {
-      this.toast(`+${this.player.HARVEST_YIELD} ${RES_DEFS[res].name}`);
+      // 科技：采集加成（tryHarvest 已加基础，这里补加成部分）
+      const bonus = this.tech.sum('harvestBonus');
+      if (bonus > 0) {
+        this.player.inv[res] = (this.player.inv[res] || 0) + bonus;
+      }
+      const yield_ = this.player.HARVEST_YIELD + bonus;
+      this.toast(`+${yield_} ${RES_DEFS[res].name}`);
+      this.sound.harvest();
+      this.stats.record('harvest', { amount: yield_ });
       this.updateHUD();
     } else if (!this.player.canHarvest()) {
       this.toast('这里没有资源，走到发光的格子上去');
     }
+  }
+
+  // ---------- 科技树 UI ----------
+  toggleTechPanel() {
+    const el = document.getElementById('tech-panel');
+    if (el.classList.contains('hidden')) this.showTechPanel();
+    else this.hideTechPanel();
+  }
+
+  showTechPanel() {
+    this.renderTechTree();
+    document.getElementById('tech-panel').classList.remove('hidden');
+  }
+
+  hideTechPanel() {
+    document.getElementById('tech-panel').classList.add('hidden');
+  }
+
+  renderTechTree() {
+    const wrap = document.getElementById('tech-tree');
+    const counts = this.tech.countByBranch();
+    let html = `<div class="tech-stats">已解锁 ${this.tech.totalUnlocked()}/30 ｜ ` +
+      `🏗️${counts.build} ⚙️${counts.prod} 💚${counts.surv} ｜ 🔬科技点：${this.player.inv.tech || 0}</div>`;
+    for (const branch of ['build', 'prod', 'surv']) {
+      const b = TECH_BRANCHES[branch];
+      html += `<div class="tech-branch"><div class="tech-branch-title" style="color:${b.color}">${b.icon} ${b.name}系</div><div class="tech-grid">`;
+      for (const id of TECH_ORDER) {
+        const def = TECH_DEFS[id];
+        if (def.branch !== branch) continue;
+        const unlocked = this.tech.has(id);
+        const chk = this.tech.canUnlock(id, this.player.inv.tech || 0);
+        const cls = unlocked ? 'unlocked' : (chk.ok ? 'available' : 'locked');
+        const needs = def.needs.map(n => TECH_DEFS[n].name).join('、');
+        html += `<div class="tech-card ${cls}" data-tech="${id}" title="${def.desc}">` +
+          `<div class="tech-icon">${def.icon}</div>` +
+          `<div class="tech-name">${def.name}</div>` +
+          `<div class="tech-cost">🔬${def.cost}</div>` +
+          (unlocked ? `<div class="tech-state">✅</div>` :
+            chk.ok ? `<div class="tech-state">可解锁</div>` :
+            `<div class="tech-state">${def.needs.length ? '需:' + needs : chk.reason}</div>`) +
+          `</div>`;
+      }
+      html += `</div></div>`;
+    }
+    wrap.innerHTML = html;
+    // 绑定点击
+    for (const card of wrap.querySelectorAll('[data-tech]')) {
+      card.addEventListener('click', () => {
+        const id = card.dataset.tech;
+        const chk = this.tech.canUnlock(id, this.player.inv.tech || 0);
+        if (!chk.ok) { this.toast(chk.reason); this.sound.error(); return; }
+        this.tech.unlock(id, this.player.inv);
+        this.toast(`${TECH_DEFS[id].icon} 解锁「${TECH_DEFS[id].name}」！`);
+        this.sound.tech();
+        this.stats.record('tech');
+        this.renderTechTree();
+        this.updateHUD();
+        this.save();
+      });
+    }
+  }
+
+  // ---------- 运输车 UI ----------
+  toggleTruckPanel() {
+    const el = document.getElementById('truck-panel');
+    if (el.classList.contains('hidden')) this.showTruckPanel();
+    else this.hideTruckPanel();
+  }
+
+  showTruckPanel() {
+    this.updateTruckUI();
+    document.getElementById('truck-panel').classList.remove('hidden');
+  }
+
+  hideTruckPanel() {
+    document.getElementById('truck-panel').classList.add('hidden');
+    this.truckAssignMode = false;
+  }
+
+  updateTruckUI() {
+    const cap = this.logistics.truckCap(this.builder);
+    const list = document.getElementById('truck-list');
+    let html = `<div class="truck-stats">🚚 ${this.logistics.trucks.length}/${cap} ｜ ` +
+      `运输站×${this.builder.count('depot')} 物流中心×${this.builder.count('logistics')}</div>`;
+    if (this.logistics.trucks.length === 0) {
+      html += `<div style="opacity:.6;font-size:13px">还没有运输车。建造「运输站」后点击「造车」。</div>`;
+    }
+    this.logistics.trucks.forEach((t, i) => {
+      const stateName = { idle: '待命', toRes: '去采集…', loading: '装货…', toDepot: '返程…' }[t.state] || t.state;
+      const resName = t.resType ? RES_DEFS[t.resType].name : '—';
+      html += `<div class="truck-row">` +
+        `<span>🚚 #${t.id}（${stateName}·${resName}）</span>` +
+        `<button data-truck-assign="${i}">指派</button>` +
+        `</div>`;
+    });
+    list.innerHTML = html;
+    for (const btn of list.querySelectorAll('[data-truck-assign]')) {
+      btn.addEventListener('click', () => {
+        const t = this.logistics.trucks[+btn.dataset.truckAssign];
+        if (!t) return;
+        this.selectedTruck = t;
+        this.truckAssignMode = true;
+        this.hideTruckPanel();
+        this.toast('👆 点击地图上的资源点，指派运输车');
+        this.sound.click();
+      });
+    }
+    document.getElementById('btn-build-truck').disabled =
+      this.logistics.trucks.length >= cap || this.builder.count('depot') === 0;
+  }
+
+  doBuildTruck() {
+    // 找一座运输站
+    const depot = this.builder.buildings.find(b => b.id === 'depot');
+    if (!depot) { this.toast('先建造运输站！'); this.sound.error(); return; }
+    this.doBuildTruckAt(depot);
+  }
+
+  doBuildTruckAt(depot) {
+    const cap = this.logistics.truckCap(this.builder);
+    if (this.logistics.trucks.length >= cap) {
+      this.toast('运输车已达上限（建更多运输站/物流中心）');
+      this.sound.error();
+      return;
+    }
+    const r = this.logistics.buildTruck(depot, this.player.inv);
+    if (!r.ok) { this.toast(r.reason); this.sound.error(); return; }
+    this.toast('🚚 运输车建造完成！去指派它采集资源');
+    this.sound.build();
+    this.stats.record('truck');
+    this.updateHUD();
+    this.updateTruckUI();
+    this.save();
+  }
+
+  // ---------- 贸易 UI ----------
+  showTradePanel() {
+    const wrap = document.getElementById('trade-list');
+    const tradeMul = this.tech.mul('tradeMul');
+    let html = '';
+    for (const offer of TRADE_OFFERS) {
+      const giveStr = Object.entries(offer.give).map(([k, v]) => `${RES_DEFS[k].icon}${v}`).join('');
+      const getEntries = Object.entries(offer.get).map(([k, v]) => {
+        const bv = Math.floor(v * tradeMul);
+        return `${RES_DEFS[k].icon}${bv}`;
+      }).join('');
+      const ok = canAfford(this.player.inv, offer.give);
+      html += `<div class="trade-row">` +
+        `<span>${giveStr} → ${getEntries}</span>` +
+        `<button data-trade="${offer.id}" ${ok ? '' : 'disabled'}>交易</button>` +
+        `</div>`;
+    }
+    wrap.innerHTML = html;
+    for (const btn of wrap.querySelectorAll('[data-trade]')) {
+      btn.addEventListener('click', () => {
+        const offer = TRADE_OFFERS.find(o => o.id === btn.dataset.trade);
+        if (!offer || !canAfford(this.player.inv, offer.give)) return;
+        spendRes(this.player.inv, offer.give);
+        for (const k in offer.get) {
+          const bv = Math.floor(offer.get[k] * tradeMul);
+          this.player.inv[k] = (this.player.inv[k] || 0) + bv;
+        }
+        this.toast(`🤝 交易完成！`);
+        this.sound.trade();
+        this.stats.record('trade');
+        this.showTradePanel();
+        this.updateHUD();
+        this.save();
+      });
+    }
+    document.getElementById('trade-panel').classList.remove('hidden');
+  }
+
+  hideTradePanel() {
+    document.getElementById('trade-panel').classList.add('hidden');
+  }
+
+  // ---------- 成就 UI ----------
+  toggleAchievePanel() {
+    const el = document.getElementById('achieve-panel');
+    if (el.classList.contains('hidden')) {
+      this.renderAchievements();
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  }
+
+  hideAchievePanel() {
+    document.getElementById('achieve-panel').classList.add('hidden');
+  }
+
+  renderAchievements() {
+    document.getElementById('achieve-stats').textContent =
+      `已解锁 ${this.achievements.count()}/${this.achievements.total()}`;
+    let html = '<div class="tech-grid">';
+    for (const def of ACHIEVEMENT_DEFS) {
+      const un = this.achievements.unlocked.has(def.id);
+      html += `<div class="tech-card ${un ? 'unlocked' : 'locked'}">` +
+        `<div class="tech-icon">${def.icon}</div>` +
+        `<div class="tech-name">${def.name}</div>` +
+        `<div class="tech-state">${un ? '✅' : def.desc}</div>` +
+        `</div>`;
+    }
+    html += '</div>';
+    document.getElementById('achieve-list').innerHTML = html;
+  }
+
+  // ---------- 统计 UI ----------
+  toggleStatsPanel() {
+    const el = document.getElementById('stats-panel');
+    if (el.classList.contains('hidden')) {
+      document.getElementById('stats-list').innerHTML = this.stats.renderHTML();
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  }
+
+  hideStatsPanel() {
+    document.getElementById('stats-panel').classList.add('hidden');
   }
 
   // ---------- UI ----------
@@ -239,27 +770,77 @@ class Game {
     // 扇区
     document.getElementById('sector-count').textContent =
       `🗺️ ${this.map.unlockedCount()}/9`;
+
+    // 灾难指示
+    const now = Date.now();
+    const dEl = document.getElementById('disaster-ind');
+    if (dEl) {
+      if (this.disaster.sandstormActive(now)) dEl.textContent = '⛈️ 沙尘暴中';
+      else if (this.disaster.sandstormWarning(now)) dEl.textContent = '⛈️ 预警';
+      else if (this._meteorMark) dEl.textContent = '☄️ 陨石预警';
+      else dEl.textContent = '';
+    }
+    // 科技数
+    const tEl = document.getElementById('tech-count');
+    if (tEl) tEl.textContent = `🔬${this.tech.totalUnlocked()}/30`;
   }
 
   showVictory() {
     const el = document.getElementById('victory');
     el.classList.remove('hidden');
+    this.sound.victory();
   }
 
   // ---------- 主循环 ----------
   loop() {
     const now = Date.now();
-    const dt = now - this.lastFrame;
+    const dt = Math.min(100, now - this.lastFrame);
     this.lastFrame = now;
 
+    // 暂停：只渲染
+    if (this.speedMode === 0) {
+      this.render(now);
+      requestAnimationFrame(this.loop);
+      return;
+    }
+
+    // 双倍速：逻辑跑两次
+    const iters = this.speedMode === 2 ? 2 : 1;
+    if (this.speedMode === 2) {
+      this.stats.speedTime += dt;
+    }
+    for (let i = 0; i < iters; i++) {
+      this.tick(now, dt);
+    }
+
+    // 渲染
+    this.render(now);
+    requestAnimationFrame(this.loop);
+  }
+
+  // 单步逻辑更新
+  tick(now, dt) {
     // 玩家移动（道路加速）
     const onRoad = this.builder.isRoad(this.player.x, this.player.y);
     this.player.update(now, dt, onRoad);
+
+    // 教程
+    this.tutorial.update();
+
+    // 灾难
+    this.disaster.update(now, this);
+
+    // 成就检查
+    this.achievements.update(now);
+
+    // 统计最高纪录
+    this.stats.updateMax(this.pop.count, this.builder.buildings.length);
 
     // 人口
     const popEvent = this.pop.update(now, this.player.inv, this.builder);
     if (popEvent && popEvent.event === 'grow') {
       this.updateHUD();
+      this.sound.popGrow();
     } else if (popEvent) {
       // starving/nopower：偶尔提示（避免刷屏）
       if (!this._lastNeedWarn || now - this._lastNeedWarn > 30000) {
@@ -268,8 +849,28 @@ class Game {
       }
     }
 
-    // 建筑生产
-    this.builder.update(now, this.player.inv, () => this.updateHUD());
+    // 建筑生产（太阳风暴时电子设备停工）
+    const electronicsDown = this.disaster.electronicsDown(now);
+    this.builder.update(now, this.player.inv, (ev, b, data) => {
+      if (ev === 'storage-full') {
+        if (!this._lastStorageWarn || now - this._lastStorageWarn > 30000) {
+          this._lastStorageWarn = now;
+          this.toast(`📦 ${RES_DEFS[data.res].name}存满了！建造仓库`);
+        }
+      } else if (ev === 'produce' || ev === 'convert') {
+        this.stats.record('produce', data);
+      }
+      this.updateHUD();
+    });
+
+    // 物流
+    this.logistics.update(now, dt, this.map, this.builder, this.player.inv, (ev, data) => {
+      if (ev === 'truck-deliver') {
+        this.updateHUD();
+      } else if (ev === 'truck-full') {
+        this.toast(`📦 ${RES_DEFS[data.type].name}存满了！`);
+      }
+    });
 
     // 胜利检查
     if (this.city.checkVictory(this.builder) && !this.winShown) {
@@ -277,28 +878,174 @@ class Game {
       this.showVictory();
       this.save();
     }
+  }
 
-    // 渲染
+  // 渲染
+  render(now) {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.map.render(this.ctx, this.tile);
     this.builder.render(this.ctx, this.tile);
+    this.logistics.render(this.ctx, this.tile);
     this.player.render(this.ctx, this.tile);
 
-    requestAnimationFrame(this.loop);
+    // 陨石预警标记
+    if (this._meteorMark && now < this._meteorMark.until) {
+      const mx = (this._meteorMark.x + 0.5) * this.tile;
+      const my = (this._meteorMark.y + 0.5) * this.tile;
+      const pulse = 0.5 + 0.5 * Math.sin(now / 200);
+      this.ctx.strokeStyle = `rgba(239,68,68,${0.5 + pulse * 0.5})`;
+      this.ctx.lineWidth = 3;
+      this.ctx.beginPath();
+      this.ctx.arc(mx, my, this.tile * (0.4 + pulse * 0.2), 0, Math.PI * 2);
+      this.ctx.stroke();
+      this.ctx.font = `${Math.max(12, this.tile * 0.5)}px sans-serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText('☄️', mx, my - this.tile * 0.3);
+      this.ctx.textAlign = 'left';
+    }
+
+    // 尘卷风渲染
+    if (this.disaster.devilActive(now)) {
+      const d = this.disaster.devil;
+      const dx = (d.x + 0.5) * this.tile;
+      const dy = (d.y + 0.5) * this.tile;
+      // 旋转的尘柱
+      const rot = (now / 300) % (Math.PI * 2);
+      this.ctx.strokeStyle = 'rgba(224,123,57,0.7)';
+      this.ctx.lineWidth = 4;
+      for (let i = 0; i < 3; i++) {
+        const r = this.tile * (0.3 + i * 0.15);
+        const a0 = rot + i * 2.1;
+        this.ctx.beginPath();
+        this.ctx.arc(dx, dy, r, a0, a0 + 1.5);
+        this.ctx.stroke();
+      }
+      this.ctx.font = `${Math.max(14, this.tile * 0.6)}px sans-serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText('🌪️', dx, dy - this.tile * 0.5);
+      this.ctx.textAlign = 'left';
+    }
+
+    // 沙尘暴视觉：橙色遮罩
+    if (this.disaster.sandstormActive(now)) {
+      this.ctx.fillStyle = 'rgba(224,123,57,0.12)';
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    // 太阳风暴视觉：紫色闪烁
+    if (this.disaster.flareActive(now)) {
+      const pulse = 0.05 + 0.05 * Math.sin(now / 500);
+      this.ctx.fillStyle = `rgba(168,85,247,${pulse})`;
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    // 建造预览：绿色/红色半透明方块
+    if (this.selectedBuild && this.hoverTile) {
+      const { x, y } = this.hoverTile;
+      const chk = this.builder.canPlace(this.selectedBuild, x, y, this.player.inv, this.pop.count);
+      this.ctx.fillStyle = chk.ok ? 'rgba(74,222,128,0.35)' : 'rgba(239,68,68,0.35)';
+      this.ctx.fillRect(x * this.tile, y * this.tile, this.tile, this.tile);
+      this.ctx.strokeStyle = chk.ok ? '#4ade80' : '#ef4444';
+      this.ctx.lineWidth = 2;
+      this.ctx.strokeRect(x * this.tile + 1, y * this.tile + 1, this.tile - 2, this.tile - 2);
+      // 显示建筑图标
+      const def = BUILDINGS[this.selectedBuild];
+      if (def) {
+        this.ctx.font = `${Math.max(12, this.tile * 0.5)}px sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.globalAlpha = 0.7;
+        this.ctx.fillText(def.icon, (x + 0.5) * this.tile, (y + 0.65) * this.tile);
+        this.ctx.globalAlpha = 1;
+        this.ctx.textAlign = 'left';
+      }
+    }
+
+    // 小地图（每 30 帧更新一次）
+    if (!this._mmFrame || (this._mmFrame = (this._mmFrame + 1) % 30) === 0) {
+      this.renderMinimap(now);
+    }
+  }
+
+  // 小地图渲染
+  renderMinimap(now) {
+    const mm = document.getElementById('minimap');
+    if (!mm) return;
+    const ctx = mm.getContext('2d');
+    const size = this.map.size;
+    const s = mm.width / size; // 每格像素
+    ctx.clearRect(0, 0, mm.width, mm.height);
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const unlocked = this.map.isUnlocked(x, y);
+        if (!unlocked) {
+          ctx.fillStyle = '#0a0a12';
+        } else {
+          const t = this.map.terrain[y][x];
+          if (t === 1) ctx.fillStyle = '#4a3226';      // 岩石
+          else if (t === 2) ctx.fillStyle = '#1e100a'; // 环形山
+          else ctx.fillStyle = '#5a2e1a';              // 平地
+          // 资源点
+          const res = this.map.resource[y][x];
+          if (res) {
+            ctx.fillStyle = RES_DEFS[res].color;
+          }
+        }
+        ctx.fillRect(x * s, y * s, Math.ceil(s), Math.ceil(s));
+      }
+    }
+
+    // 建筑
+    for (const b of this.builder.buildings) {
+      ctx.fillStyle = '#facc15';
+      ctx.fillRect(b.x * s, b.y * s, Math.ceil(s), Math.ceil(s));
+    }
+
+    // 玩家
+    ctx.fillStyle = '#7dd3fc';
+    ctx.beginPath();
+    ctx.arc((this.player.x + 0.5) * s, (this.player.y + 0.5) * s, s, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 运输车
+    ctx.fillStyle = '#4ade80';
+    for (const t of this.logistics.trucks) {
+      ctx.fillRect(t.px * s, t.py * s, Math.ceil(s), Math.ceil(s));
+    }
+
+    // 灾难标记
+    if (this._meteorMark && now < this._meteorMark.until) {
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc((this._meteorMark.x + 0.5) * s, (this._meteorMark.y + 0.5) * s, s * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (this.disaster.devilActive(now)) {
+      const d = this.disaster.devil;
+      ctx.fillStyle = '#e07b39';
+      ctx.beginPath();
+      ctx.arc((d.x + 0.5) * s, (d.y + 0.5) * s, s * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 
 // 启动
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
+    console.log(`🚀 星港 Starport v${GAME_VERSION}「${GAME_CODENAME}」启动`);
     const game = new Game();
     // 尝试读档
-    if (game.load()) {
+    const loaded = game.load();
+    if (loaded) {
       game.toast('存档已载入，继续建造！');
+    } else {
+      // 新游戏：启动教程
+      setTimeout(() => game.tutorial.start(), 500);
     }
     game.updateHUD();
     window.__starport = game;
   });
 }
 
-if (typeof module !== 'undefined') { module.exports = { Game, SAVE_KEY }; }
+if (typeof module !== 'undefined') { module.exports = { Game, SAVE_KEY, TRADE_OFFERS, GAME_VERSION, GAME_CODENAME }; }

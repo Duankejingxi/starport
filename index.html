@@ -13,6 +13,8 @@
     <div id="city-info">
       <span id="city-rank">🏕️ 聚落</span>
       <small id="city-next"></small>
+      <span id="disaster-ind"></span>
+      <span id="tech-count"></span>
     </div>
     <div id="res-bar">
       <div class="res"><span>🟤</span><span id="res-iron">0</span></div>
@@ -38,7 +40,75 @@
       <div id="bp-desc"></div>
       <div id="bp-btns">
         <button id="btn-upgrade">⬆️ 升级</button>
+        <button id="btn-repair" style="display:none">🔧 维修</button>
+        <button id="btn-demolish" class="danger">💥 拆除</button>
+        <button id="btn-building-extra" style="display:none"></button>
         <button id="btn-close-panel">✖</button>
+      </div>
+    </div>
+    <!-- 科技树面板 -->
+    <div id="tech-panel" class="hidden">
+      <div class="panel-header">
+        <b>🔬 科技树</b>
+        <button id="btn-close-tech">✖</button>
+      </div>
+      <div id="tech-tree"></div>
+    </div>
+    <!-- 运输车面板 -->
+    <div id="truck-panel" class="hidden">
+      <div class="panel-header">
+        <b>🚚 运输车队</b>
+        <button id="btn-close-truck">✖</button>
+      </div>
+      <div id="truck-list"></div>
+      <button id="btn-build-truck">🚚 建造运输车（铁×20 稀土×10）</button>
+    </div>
+    <!-- 贸易面板 -->
+    <div id="trade-panel" class="hidden">
+      <div class="panel-header">
+        <b>🤝 地球贸易</b>
+        <button id="btn-close-trade">✖</button>
+      </div>
+      <div id="trade-list"></div>
+      <div style="font-size:11px;opacity:.6;margin-top:8px">每 60 秒刷新一次价格（当前固定）</div>
+    </div>
+    <!-- 成就面板 -->
+    <div id="achieve-panel" class="hidden">
+      <div class="panel-header">
+        <b>🏆 成就</b>
+        <button id="btn-close-achieve">✖</button>
+      </div>
+      <div id="achieve-stats" class="tech-stats"></div>
+      <div id="achieve-list"></div>
+    </div>
+    <!-- 统计面板 -->
+    <div id="stats-panel" class="hidden">
+      <div class="panel-header">
+        <b>📊 统计</b>
+        <button id="btn-close-stats">✖</button>
+      </div>
+      <div id="stats-list"></div>
+    </div>
+    <!-- 帮助面板 -->
+    <div id="help-panel" class="hidden">
+      <div class="panel-header">
+        <b>❓ 帮助手册</b>
+        <button id="btn-close-help">✖</button>
+      </div>
+      <div id="help-nav"></div>
+      <div id="help-content"></div>
+    </div>
+    <!-- 小地图 -->
+    <canvas id="minimap" width="120" height="120"></canvas>
+    <!-- 教程 -->
+    <div id="tutorial" class="hidden">
+      <div id="tut-progress"></div>
+      <div id="tut-title"></div>
+      <div id="tut-text"></div>
+      <div id="tut-hint"></div>
+      <div id="tut-btns">
+        <button id="btn-tut-prev">◀ 上一步</button>
+        <button id="btn-tut-next">跳过教程</button>
       </div>
     </div>
     <!-- 胜利 -->
@@ -56,6 +126,13 @@
   <!-- 底栏：操作 -->
   <footer id="toolbar">
     <button id="btn-harvest" class="tool-btn">⛏️<small>采集</small></button>
+    <button id="btn-tech" class="tool-btn">🔬<small>科技</small></button>
+    <button id="btn-truck" class="tool-btn">🚚<small>运输</small></button>
+    <button id="btn-achieve" class="tool-btn">🏆<small>成就</small></button>
+    <button id="btn-stats" class="tool-btn">📊<small>统计</small></button>
+    <button id="btn-help" class="tool-btn">❓<small>帮助</small></button>
+    <button id="btn-speed" class="tool-btn">⏩<small>1x</small></button>
+    <button id="btn-sound" class="tool-btn">🔊<small>声音</small></button>
     <button class="tool-btn" data-build="habitat">🏠<small>居住舱</small></button>
     <button class="tool-btn" data-build="solar">🔆<small>太阳能</small></button>
     <button class="tool-btn" data-build="miner">🏭<small>采矿机</small></button>
@@ -66,12 +143,21 @@
     <button class="tool-btn" data-build="lab">🔬<small>实验室</small></button>
     <button class="tool-btn" data-build="road">🛤️<small>道路</small></button>
     <button class="tool-btn" data-build="hospital">🏥<small>医院</small></button>
+    <button class="tool-btn" data-build="nuclear">☢️<small>核电站</small></button>
+    <button class="tool-btn" data-build="school">🏫<small>学校</small></button>
+    <button class="tool-btn" data-build="trade">🏪<small>贸易站</small></button>
+    <button class="tool-btn" data-build="repair">🔧<small>维修站</small></button>
+    <button class="tool-btn" data-build="weather">📡<small>气象站</small></button>
+    <button class="tool-btn" data-build="dome">🌐<small>穹顶</small></button>
+    <button class="tool-btn" data-build="depot">🚚<small>运输站</small></button>
+    <button class="tool-btn" data-build="warehouse">📦<small>仓库</small></button>
+    <button class="tool-btn" data-build="logistics">🛰️<small>物流中心</small></button>
     <button class="tool-btn" data-build="command">🎛️<small>指挥中心</small></button>
     <button class="tool-btn victory-btn" data-build="launchpad">🚀<small>发射台</small></button>
     <button id="btn-reset" class="tool-btn danger">🗑️<small>重开</small></button>
   </footer>
   <div id="build-info" class="hidden"></div>
-  <div id="hint">点建筑查看/升级 · 点迷雾扇区解锁（铁×50）· WASD/点击移动 · E/空格采集</div>
+  <div id="hint">点建筑查看/升级/维修 · 点迷雾扇区解锁（铁×50）· WASD/点击移动 · E/空格采集 · 🔬科技树别忘了</div>
 </div>
 
 <script src="resources.js"></script>
@@ -79,6 +165,14 @@
 <script src="player.js"></script>
 <script src="pop.js"></script>
 <script src="city.js"></script>
+<script src="tech.js"></script>
+<script src="disaster.js"></script>
+<script src="logistics.js"></script>
+<script src="sound.js"></script>
+<script src="tutorial.js"></script>
+<script src="achievements.js"></script>
+<script src="stats.js"></script>
+<script src="help.js"></script>
 <script src="build.js"></script>
 <script src="game.js"></script>
 </body>
