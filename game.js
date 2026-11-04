@@ -24,7 +24,7 @@ const TRADE_OFFERS = [
 
 class Game {
   constructor() {
-    this.map = new GameMap(30);
+    this.map = new GameMap(50);  // v1.2：50×50 大地图
     this.player = new Player(this.map);
     this.builder = new BuildManager(this.map);
     this.pop = new Population();
@@ -36,6 +36,8 @@ class Game {
     this.sound = new SoundManager();
     this.tutorial = new TutorialManager(this);
     this.stats = new StatsManager();
+    this.tradeShip = new TradeShipManager();  // v1.2
+    this.scenario = new ScenarioManager();  // v1.2
     this.achievements = new AchievementManager(this);
     this.help = new HelpManager(this);
 
@@ -192,6 +194,59 @@ class Game {
         break;
       case 'devil-end':
         this.toast('🌤️ 尘卷风消散了');
+        this.sound.calm();
+        break;
+      // v1.2：新灾难
+      case 'flare2-warn':
+        this.toast(`☀️ 太阳耀斑预警！${Math.round(data.warnMs / 1000)}秒后爆发，将烧毁一栋电子建筑！`);
+        this.sound.meteorWarn();
+        break;
+      case 'flare2-hit':
+        this.toast(`🔥 太阳耀斑烧毁了${BUILDINGS[data.building].name}！`);
+        this.sound.meteorHit();
+        break;
+      case 'flare2-miss':
+        this.toast('☀️ 太阳耀斑掠过，没有建筑受损');
+        this.sound.calm();
+        break;
+      case 'icestorm-warn':
+        this.toast(`❄️ 冰尘暴预警！${Math.round(data.warnMs / 1000)}秒后到达，温室/水厂减产`);
+        this.sound.meteorWarn();
+        break;
+      case 'icestorm-start':
+        this.toast('❄️ 冰尘暴！温室 -80%，水厂 -50%');
+        this.sound.sandstorm();
+        break;
+      case 'icestorm-end':
+        this.toast('🌤️ 冰尘暴过去了');
+        this.sound.calm();
+        break;
+      case 'volcano-warn':
+        this.toast(`🌋 火山喷发预警！${Math.round(data.warnMs / 1000)}秒后喷发 (${data.x},${data.y})`);
+        this.sound.meteorWarn();
+        break;
+      case 'volcano-erupt':
+        this.toast(`🌋 火山喷发！${data.hitCount}栋建筑受损，周围出现新的稀土`);
+        this.sound.meteorHit();
+        break;
+      case 'revolt-start':
+        this.toast('⚠️ 食物/水短缺引发叛乱！生产 -50%，持续60秒');
+        this.sound.meteorWarn();
+        break;
+      case 'revolt-end':
+        this.toast(`⚠️ 叛乱平息，损失了${data.loss}人口`);
+        this.sound.calm();
+        break;
+      case 'aifault-warn':
+        this.toast(`🤖 AI故障预警！${Math.round(data.warnMs / 1000)}秒后自动化系统停机`);
+        this.sound.meteorWarn();
+        break;
+      case 'aifault-start':
+        this.toast('🤖 AI故障！采矿机/抽水机/铀矿机停机45秒');
+        this.sound.sandstorm();
+        break;
+      case 'aifault-end':
+        this.toast('✅ AI系统恢复');
         this.sound.calm();
         break;
     }
@@ -651,30 +706,61 @@ class Game {
   }
 
   // ---------- 贸易 UI ----------
+  // v1.2：合并基础配方 + v1.2 配方（含动态价格）
+  allTradeOffers() {
+    const base = TRADE_OFFERS.map(o => ({ ...o, dyn: false }));
+    const v12 = (typeof TRADE_OFFERS_V12 !== 'undefined' ? TRADE_OFFERS_V12 : [])
+      .map(o => ({ ...o, dyn: true }));
+    return [...base, ...v12];
+  }
+
   showTradePanel() {
     const wrap = document.getElementById('trade-list');
     const tradeMul = this.tech.mul('tradeMul');
+    const priceMul = this.tech.mul('tradePriceMul');  // v1.2：星际通讯
+    // v1.2：贸易船停靠时价格 +10%
+    const shipBonus = (this.tradeShip && this.tradeShip.shipDocked(Date.now())) ? 1.1 : 1;
     let html = '';
-    for (const offer of TRADE_OFFERS) {
+    // 贸易船状态
+    if (this.tradeShip) {
+      const now = Date.now();
+      if (this.tradeShip.shipDocked(now)) {
+        html += `<div class="trade-ship">🛸 贸易船停靠中！剩余${this.tradeShip.dockTimeLeft(now)}秒，价格+10%</div>`;
+      } else if (this.tradeShip.shipWarning(now)) {
+        html += `<div class="trade-ship">🛸 贸易船接近中…</div>`;
+      }
+    }
+    for (const offer of this.allTradeOffers()) {
       const giveStr = Object.entries(offer.give).map(([k, v]) => `${RES_DEFS[k].icon}${v}`).join('');
-      const getEntries = Object.entries(offer.get).map(([k, v]) => {
-        const bv = Math.floor(v * tradeMul);
-        return `${RES_DEFS[k].icon}${bv}`;
-      }).join('');
+      let getEntries, trendTxt = '';
+      if (offer.dyn && this.tradeShip) {
+        // v1.2：动态价格
+        const calc = this.tradeShip.priceEngine.calcOffer(offer, this.player.inv, tradeMul * priceMul * shipBonus);
+        getEntries = Object.entries(calc.get).map(([k, v]) => `${RES_DEFS[k].icon}${v}`).join('');
+        trendTxt = ` <small>${this.tradeShip.priceEngine.trendText(calc.rate)}</small>`;
+        offer._calcGet = calc.get;  // 暂存实际获得量
+      } else {
+        getEntries = Object.entries(offer.get).map(([k, v]) => {
+          const bv = Math.floor(v * tradeMul * priceMul * shipBonus);
+          return `${RES_DEFS[k].icon}${bv}`;
+        }).join('');
+      }
       const ok = canAfford(this.player.inv, offer.give);
       html += `<div class="trade-row">` +
-        `<span>${giveStr} → ${getEntries}</span>` +
+        `<span>${giveStr} → ${getEntries}${trendTxt}</span>` +
         `<button data-trade="${offer.id}" ${ok ? '' : 'disabled'}>交易</button>` +
         `</div>`;
     }
     wrap.innerHTML = html;
     for (const btn of wrap.querySelectorAll('[data-trade]')) {
       btn.addEventListener('click', () => {
-        const offer = TRADE_OFFERS.find(o => o.id === btn.dataset.trade);
+        const offer = this.allTradeOffers().find(o => o.id === btn.dataset.trade);
         if (!offer || !canAfford(this.player.inv, offer.give)) return;
         spendRes(this.player.inv, offer.give);
-        for (const k in offer.get) {
-          const bv = Math.floor(offer.get[k] * tradeMul);
+        // v1.2：动态价格用暂存值
+        const getObj = offer._calcGet || offer.get;
+        for (const k in getObj) {
+          const bv = offer._calcGet ? getObj[k] : Math.floor(getObj[k] * tradeMul * priceMul * shipBonus);
           this.player.inv[k] = (this.player.inv[k] || 0) + bv;
         }
         this.toast(`🤝 交易完成！`);
@@ -749,7 +835,7 @@ class Game {
 
   updateHUD() {
     const inv = this.player.inv;
-    for (const k of ['iron', 'ice', 'rare', 'water', 'food', 'steel', 'tech']) {
+    for (const k of ['iron', 'ice', 'rare', 'water', 'food', 'steel', 'tech', 'uranium', 'he3']) {
       const el = document.getElementById('res-' + k);
       if (el) el.textContent = inv[k] || 0;
     }
@@ -769,7 +855,7 @@ class Game {
 
     // 扇区
     document.getElementById('sector-count').textContent =
-      `🗺️ ${this.map.unlockedCount()}/9`;
+      `🗺️ ${this.map.unlockedCount()}/${this.map.totalSectors()}`;
 
     // 灾难指示
     const now = Date.now();
@@ -782,13 +868,33 @@ class Game {
     }
     // 科技数
     const tEl = document.getElementById('tech-count');
-    if (tEl) tEl.textContent = `🔬${this.tech.totalUnlocked()}/30`;
+    if (tEl) tEl.textContent = `🔬${this.tech.totalUnlocked()}/60`;  // v1.2
   }
 
-  showVictory() {
+  showVictory(type) {
     const el = document.getElementById('victory');
+    // v1.2：方舟胜利文案
+    if (type === 'ark') {
+      const title = el.querySelector('h2');
+      const desc = el.querySelector('p');
+      if (title) title.textContent = '🛳️ 方舟启程！';
+      if (desc) desc.textContent = '方舟载着 200 名火星公民启程，人类成为多行星物种！你可以继续自由建造。';
+    }
     el.classList.remove('hidden');
     this.sound.victory();
+  }
+
+  // v1.2：贸易船事件
+  onTradeShipEvent(type, data) {
+    if (type === 'ship-warn') {
+      this.toast(`🛸 地球贸易船接近中（${Math.ceil(data.warnMs / 1000)}秒后到达）`);
+      this.sound.notify();
+    } else if (type === 'ship-dock') {
+      this.toast(`🛸 贸易船已停靠！快去贸易站交易（60秒）`);
+      this.sound.notify();
+    } else if (type === 'ship-leave') {
+      this.toast(`🛸 贸易船离港`);
+    }
   }
 
   // ---------- 主循环 ----------
@@ -828,7 +934,16 @@ class Game {
     this.tutorial.update();
 
     // 灾难
-    this.disaster.update(now, this);
+    // v1.2：剧本无灾难规则
+    const noDisasters = this.scenario && this.scenario.rules.noDisasters;
+    if (!noDisasters) {
+      this.disaster.update(now, this);
+    }
+    // v1.2：贸易船
+    if (this.tradeShip) {
+      this.tradeShip.onEvent = (type, data) => this.onTradeShipEvent(type, data);
+      this.tradeShip.update(now, this);
+    }
 
     // 成就检查
     this.achievements.update(now);
@@ -873,6 +988,23 @@ class Game {
     });
 
     // 胜利检查
+    // v1.2：方舟胜利
+    if (this.city.checkArkVictory(this.builder, this.pop.count, this.player.inv.tech || 0) && !this.arkWinShown) {
+      this.arkWinShown = true;
+      this.showVictory('ark');
+    }
+    // v1.2：剧本胜利/失败检查
+    if (this.scenario) {
+      const scResult = this.scenario.check(this);
+      if (scResult && scResult.result === 'win' && !this._scWinShown) {
+        this._scWinShown = true;
+        this.toast(`🏆 剧本完成：${scResult.reason}`);
+        this.sound.victory();
+      } else if (scResult && scResult.result === 'fail' && !this._scFailShown) {
+        this._scFailShown = true;
+        this.toast(`💀 挑战失败：${scResult.reason}`);
+      }
+    }
     if (this.city.checkVictory(this.builder) && !this.winShown) {
       this.winShown = true;
       this.showVictory();
@@ -977,20 +1109,8 @@ class Game {
 
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        const unlocked = this.map.isUnlocked(x, y);
-        if (!unlocked) {
-          ctx.fillStyle = '#0a0a12';
-        } else {
-          const t = this.map.terrain[y][x];
-          if (t === 1) ctx.fillStyle = '#4a3226';      // 岩石
-          else if (t === 2) ctx.fillStyle = '#1e100a'; // 环形山
-          else ctx.fillStyle = '#5a2e1a';              // 平地
-          // 资源点
-          const res = this.map.resource[y][x];
-          if (res) {
-            ctx.fillStyle = RES_DEFS[res].color;
-          }
-        }
+        // v1.2：用地图的 minimapColor（含新地形）
+        ctx.fillStyle = this.map.minimapColor(x, y);
         ctx.fillRect(x * s, y * s, Math.ceil(s), Math.ceil(s));
       }
     }

@@ -267,7 +267,10 @@ class LogisticsManager {
 
   // 速度倍率 = 1 + 物流中心×0.25
   speedMul(builder) {
-    return 1 + builder.count('logistics') * TRUCK.SPEED_BONUS;
+    let m = 1 + builder.count('logistics') * TRUCK.SPEED_BONUS;
+    // v1.2：轨道电梯终极物流
+    if (builder.elevatorSpeedMul) m *= builder.elevatorSpeedMul();
+    return m;
   }
 
   // 存储上限

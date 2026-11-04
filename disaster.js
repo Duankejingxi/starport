@@ -46,6 +46,47 @@ const DUST_DEVIL = {
   // 效果：在地图上移动，路径上的太阳能板暂时失效
 };
 
+// ============ v1.2：5 种新灾难 ============
+// 太阳耀斑：比太阳风暴更强，直接烧毁一栋电子建筑
+const SOLAR_FLARE2 = {
+  FIRST_AT: 15 * 60 * 1000,
+  INTERVAL_MIN: 12 * 60 * 1000,
+  INTERVAL_MAX: 20 * 60 * 1000,
+  WARN_MS: 25 * 1000,
+};
+// 冰尘暴：极地风暴，温室-80%，水厂-50%
+const ICE_STORM = {
+  FIRST_AT: 10 * 60 * 1000,
+  INTERVAL_MIN: 8 * 60 * 1000,
+  INTERVAL_MAX: 14 * 60 * 1000,
+  DURATION: 90 * 1000,
+  WARN_MS: 20 * 1000,
+  GREENHOUSE_PENALTY: 0.2,  // 温室只剩 20%
+  WATERPLANT_PENALTY: 0.5,  // 水厂只剩 50%
+};
+// 火山喷发：火山 tile 喷发，半径 3 格内建筑损坏
+const VOLCANO_ERUPT = {
+  FIRST_AT: 18 * 60 * 1000,
+  INTERVAL_MIN: 15 * 60 * 1000,
+  INTERVAL_MAX: 25 * 60 * 1000,
+  WARN_MS: 30 * 1000,
+  RADIUS: 3,
+};
+// 叛乱：食物/水短缺时人口暴动
+const REVOLT = {
+  CHECK_INTERVAL: 60 * 1000,  // 每分钟检查一次
+  DURATION: 60 * 1000,
+  PROD_PENALTY: 0.5,  // 叛乱期间生产 -50%
+};
+// AI 故障：自动化建筑停机
+const AI_FAULT = {
+  FIRST_AT: 20 * 60 * 1000,
+  INTERVAL_MIN: 15 * 60 * 1000,
+  INTERVAL_MAX: 25 * 60 * 1000,
+  DURATION: 45 * 1000,
+  WARN_MS: 15 * 1000,
+};
+
 class DisasterManager {
   constructor() {
     const now = Date.now();
@@ -61,6 +102,17 @@ class DisasterManager {
     // 尘卷风：null / {x, y, dx, dy, until, warnUntil}
     this.devil = null;
     this.nextDevil = now + DUST_DEVIL.FIRST_AT;
+    // v1.2：新灾难
+    this.flare2 = null;  // 太阳耀斑
+    this.nextFlare2 = now + SOLAR_FLARE2.FIRST_AT;
+    this.iceStorm = null;  // 冰尘暴
+    this.nextIceStorm = now + ICE_STORM.FIRST_AT;
+    this.volcanoWarn = null;  // 火山喷发预警
+    this.nextVolcano = now + VOLCANO_ERUPT.FIRST_AT;
+    this.revolt = null;  // 叛乱
+    this.nextRevoltCheck = now + REVOLT.CHECK_INTERVAL;
+    this.aiFault = null;  // AI 故障
+    this.nextAiFault = now + AI_FAULT.FIRST_AT;
     // 回调：UI 提示用，game.js 设置
     this.onEvent = null;  // (type, data) => {}
   }
@@ -99,6 +151,33 @@ class DisasterManager {
   // 尘卷风是否活跃
   devilActive(now) {
     return this.devil && now >= this.devil.warnUntil && now < this.devil.until;
+  }
+
+  // v1.2：冰尘暴是否生效
+  iceStormActive(now) {
+    return this.iceStorm && now >= this.iceStorm.warnUntil && now < this.iceStorm.until;
+  }
+  iceStormWarning(now) {
+    return this.iceStorm && now < this.iceStorm.warnUntil;
+  }
+  // v1.2：温室/水厂倍率（冰尘暴期间）
+  iceStormGreenhouseMul(now, tech) {
+    if (!this.iceStormActive(now)) return 1;
+    const relief = tech ? tech.mul('iceStormMul') : 1;
+    return 1 - (1 - ICE_STORM.GREENHOUSE_PENALTY) * relief;
+  }
+  iceStormWaterplantMul(now, tech) {
+    if (!this.iceStormActive(now)) return 1;
+    const relief = tech ? tech.mul('iceStormMul') : 1;
+    return 1 - (1 - ICE_STORM.WATERPLANT_PENALTY) * relief;
+  }
+  // v1.2：AI 故障是否生效（自动化建筑停机）
+  aiFaultActive(now) {
+    return this.aiFault && now >= this.aiFault.warnUntil && now < this.aiFault.until;
+  }
+  // v1.2：叛乱是否生效
+  revoltActive(now) {
+    return this.revolt && now < this.revolt.until;
   }
 
   // 尘卷风是否影响指定位置（2 格内）
@@ -170,13 +249,17 @@ class DisasterManager {
           emit('meteor-immune', { x: m.x, y: m.y });
         } else {
           const dmgMul = tech ? tech.mul('meteorMul') : 1;
-          // meteorMul=0.5 → 50% 概率免伤
-          if (Math.random() < dmgMul) {
+          // v1.2：护盾闪避（取最高护盾）
+          const shieldDodge = game.builder ? game.builder.shieldDodge() : 0;
+          const techShield = tech ? (tech.mul('shieldMul') - 1) * 0.2 : 0;  // 科技额外+20%
+          const dodgeChance = Math.min(0.95, 1 - dmgMul + shieldDodge + techShield);
+          // meteorMul=0.5 → 50% 概率免伤；护盾直接加闪避
+          if (Math.random() < dodgeChance) {
+            emit('meteor-dodge', { x: m.x, y: m.y, shield: shieldDodge > 0 });
+          } else {
             m.building.damaged = true;
             m.building.damagedAt = now;
             emit('meteor-hit', { x: m.x, y: m.y, building: m.building.id });
-          } else {
-            emit('meteor-dodge', { x: m.x, y: m.y });
           }
         }
       } else {
@@ -248,6 +331,148 @@ class DisasterManager {
         emit('devil-end', {});
       }
     }
+
+    // ============ v1.2：新灾难 ============
+    const satBonus = game.builder ? game.builder.satelliteWarnBonus() : 0;
+
+    // ---- 太阳耀斑（烧毁电子建筑） ----
+    if (!this.flare2 && now >= this.nextFlare2) {
+      const warnMs = SOLAR_FLARE2.WARN_MS + this.warnBonus(hasWeather) + satBonus;
+      this.flare2 = { warnUntil: now + warnMs };
+      emit('flare2-warn', { warnMs });
+    }
+    if (this.flare2 && now >= this.flare2.warnUntil) {
+      this.flare2 = null;
+      const gap = SOLAR_FLARE2.INTERVAL_MIN +
+        Math.random() * (SOLAR_FLARE2.INTERVAL_MAX - SOLAR_FLARE2.INTERVAL_MIN);
+      this.nextFlare2 = now + gap;
+      // 烧毁一栋随机电子建筑
+      const elec = game.builder.buildings.filter(b =>
+        ['lab', 'command', 'weather', 'trade', 'antenna', 'satellite'].includes(b.id));
+      if (elec.length > 0) {
+        const target = elec[Math.floor(Math.random() * elec.length)];
+        target.damaged = true;
+        target.damagedAt = now;
+        emit('flare2-hit', { building: target.id, x: target.x, y: target.y });
+      } else {
+        emit('flare2-miss', {});
+      }
+    }
+
+    // ---- 冰尘暴 ----
+    if (!this.iceStorm && now >= this.nextIceStorm) {
+      const warnMs = ICE_STORM.WARN_MS + this.warnBonus(hasWeather) + satBonus;
+      this.iceStorm = {
+        warnUntil: now + warnMs,
+        until: now + warnMs + ICE_STORM.DURATION,
+      };
+      emit('icestorm-warn', { warnMs });
+    }
+    if (this.iceStorm) {
+      if (!this.iceStorm.warned && now >= this.iceStorm.warnUntil) {
+        this.iceStorm.warned = true;
+        emit('icestorm-start', {});
+      }
+      if (now >= this.iceStorm.until) {
+        this.iceStorm = null;
+        const gap = ICE_STORM.INTERVAL_MIN +
+          Math.random() * (ICE_STORM.INTERVAL_MAX - ICE_STORM.INTERVAL_MIN);
+        this.nextIceStorm = now + gap;
+        emit('icestorm-end', {});
+      }
+    }
+
+    // ---- 火山喷发 ----
+    if (!this.volcanoWarn && now >= this.nextVolcano) {
+      // 随机选一座火山
+      const vols = (game.map.volcanoes && game.map.volcanoes.length > 0)
+        ? game.map.volcanoes : [{ x: 10, y: 10 }];
+      const v = vols[Math.floor(Math.random() * vols.length)];
+      const warnMs = VOLCANO_ERUPT.WARN_MS + this.warnBonus(hasWeather) + satBonus;
+      this.volcanoWarn = { warnUntil: now + warnMs, x: v.x, y: v.y };
+      emit('volcano-warn', { x: v.x, y: v.y, warnMs });
+    }
+    if (this.volcanoWarn && now >= this.volcanoWarn.warnUntil) {
+      const vw = this.volcanoWarn;
+      this.volcanoWarn = null;
+      const gap = VOLCANO_ERUPT.INTERVAL_MIN +
+        Math.random() * (VOLCANO_ERUPT.INTERVAL_MAX - VOLCANO_ERUPT.INTERVAL_MIN);
+      this.nextVolcano = now + gap;
+      // 半径 R 内建筑损坏（科技减免）
+      const relief = tech ? tech.mul('volcanoMul') : 1;
+      let hitCount = 0;
+      for (const b of game.builder.buildings) {
+        const dist = Math.hypot(b.x - vw.x, b.y - vw.y);
+        if (dist <= VOLCANO_ERUPT.RADIUS && Math.random() < relief) {
+          b.damaged = true;
+          b.damagedAt = now;
+          hitCount++;
+        }
+      }
+      // 喷发后火山周围新增稀土
+      for (let i = 0; i < 4; i++) {
+        const x = vw.x + Math.floor(Math.random() * 7) - 3;
+        const y = vw.y + Math.floor(Math.random() * 7) - 3;
+        if (game.map.inBounds(x, y) && !game.map.resource[y][x] &&
+            game.map.terrain[y][x] !== 3) {
+          game.map.resource[y][x] = 'rare';
+        }
+      }
+      emit('volcano-erupt', { x: vw.x, y: vw.y, hitCount });
+    }
+
+    // ---- 叛乱（食物/水短缺时） ----
+    if (!this.revolt && now >= this.nextRevoltCheck) {
+      this.nextRevoltCheck = now + REVOLT.CHECK_INTERVAL;
+      const immune = tech && tech.flag('revoltImmune');
+      if (!immune) {
+        const inv = game.player.inv;
+        const pop = game.pop.count;
+        // 人口>10 且食物/水为 0 时可能叛乱
+        if (pop > 10 && ((inv.food || 0) <= 0 || (inv.water || 0) <= 0)) {
+          const revoltMul = tech ? tech.mul('revoltMul') : 1;
+          if (Math.random() < 0.5 * revoltMul) {
+            this.revolt = { until: now + REVOLT.DURATION };
+            emit('revolt-start', {});
+          }
+        }
+      }
+    }
+    if (this.revolt && now >= this.revolt.until) {
+      this.revolt = null;
+      // 叛乱结束：人口 -10%
+      const loss = Math.floor(game.pop.count * 0.1);
+      game.pop.count = Math.max(2, game.pop.count - loss);
+      emit('revolt-end', { loss });
+    }
+
+    // ---- AI 故障 ----
+    if (!this.aiFault && now >= this.nextAiFault) {
+      const warnMs = AI_FAULT.WARN_MS + this.warnBonus(hasWeather) + satBonus;
+      this.aiFault = {
+        warnUntil: now + warnMs,
+        until: now + warnMs + AI_FAULT.DURATION,
+      };
+      emit('aifault-warn', { warnMs });
+    }
+    if (this.aiFault) {
+      if (!this.aiFault.warned && now >= this.aiFault.warnUntil) {
+        this.aiFault.warned = true;
+        emit('aifault-start', {});
+      }
+      if (now >= this.aiFault.until) {
+        this.aiFault = null;
+        const gap = AI_FAULT.INTERVAL_MIN +
+          Math.random() * (AI_FAULT.INTERVAL_MAX - AI_FAULT.INTERVAL_MIN);
+        this.nextAiFault = now + gap;
+        emit('aifault-end', {});
+      }
+    }
+  }
+
+  // v1.2：叛乱生产惩罚
+  revoltProdMul(now) {
+    return this.revoltActive(now) ? REVOLT.PROD_PENALTY : 1;
   }
 
   // 选陨石目标：优先建筑（70%），否则随机空地
@@ -299,6 +524,10 @@ class DisasterManager {
       nextMeteorIn: Math.max(0, this.nextMeteor - now),
       nextFlareIn: Math.max(0, this.nextFlare - now),
       nextDevilIn: Math.max(0, this.nextDevil - now),
+      nextFlare2In: Math.max(0, this.nextFlare2 - now),
+      nextIceStormIn: Math.max(0, this.nextIceStorm - now),
+      nextVolcanoIn: Math.max(0, this.nextVolcano - now),
+      nextAiFaultIn: Math.max(0, this.nextAiFault - now),
     };
   }
   deserialize(data, now) {
@@ -308,13 +537,23 @@ class DisasterManager {
     this.nextMeteor = base + (data.nextMeteorIn || METEOR.FIRST_AT);
     this.nextFlare = base + (data.nextFlareIn || SOLAR_FLARE.FIRST_AT);
     this.nextDevil = base + (data.nextDevilIn || DUST_DEVIL.FIRST_AT);
+    this.nextFlare2 = base + (data.nextFlare2In || SOLAR_FLARE2.FIRST_AT);
+    this.nextIceStorm = base + (data.nextIceStormIn || ICE_STORM.FIRST_AT);
+    this.nextVolcano = base + (data.nextVolcanoIn || VOLCANO_ERUPT.FIRST_AT);
+    this.nextAiFault = base + (data.nextAiFaultIn || AI_FAULT.FIRST_AT);
+    this.nextRevoltCheck = base + REVOLT.CHECK_INTERVAL;
     this.sandstorm = null;
     this.meteor = null;
     this.flare = null;
     this.devil = null;
+    this.flare2 = null;
+    this.iceStorm = null;
+    this.volcanoWarn = null;
+    this.revolt = null;
+    this.aiFault = null;
   }
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { DisasterManager, SANDSTORM, METEOR, AGING, SOLAR_FLARE, DUST_DEVIL };
+  module.exports = { DisasterManager, SANDSTORM, METEOR, AGING, SOLAR_FLARE, DUST_DEVIL, SOLAR_FLARE2, ICE_STORM, VOLCANO_ERUPT, REVOLT, AI_FAULT };
 }

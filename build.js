@@ -193,11 +193,123 @@ const BUILDINGS = {
     ],
     desc: '运输车上限+2，速度+25%/座',
   },
+  // ---- v1.2 新增：12 种建筑 ----
+  uminer: {
+    id: 'uminer', name: '铀矿机', icon: '⛏️',
+    levels: [null,
+      { cost: { iron: 30, rare: 15 }, needPop: 8, powerUse: 2, produce: { uranium: 1 }, produceInterval: 20000 },
+      { cost: { steel: 40, rare: 30 }, needPop: 15, powerUse: 3, produce: { uranium: 3 }, produceInterval: 20000 },
+      { cost: { steel: 100, tech: 20 }, needPop: 25, powerUse: 4, produce: { uranium: 8 }, produceInterval: 20000 },
+    ],
+    desc: '自动生产铀矿（火山口附近效率×2）',
+  },
+  he3rig: {
+    id: 'he3rig', name: '氦3采集器', icon: '🌌',
+    levels: [null,
+      { cost: { steel: 60, tech: 15 }, needPop: 12, powerUse: 3, produce: { he3: 1 }, produceInterval: 40000 },
+      { cost: { steel: 150, tech: 35 }, needPop: 22, powerUse: 4, produce: { he3: 3 }, produceInterval: 40000 },
+      { cost: { steel: 300, tech: 80 }, needPop: 35, powerUse: 5, produce: { he3: 8 }, produceInterval: 40000 },
+    ],
+    desc: '从月壤/陨石坑提取氦3，极稀有',
+  },
+  fusion: {
+    id: 'fusion', name: '聚变电站', icon: '☀️',
+    levels: [null,
+      { cost: { steel: 100, uranium: 20, tech: 20 }, needPop: 30, power: 100, needTech: 'unlockFusion' },
+      { cost: { steel: 250, uranium: 50, tech: 50 }, needPop: 45, power: 250, needTech: 'unlockFusion' },
+      { cost: { steel: 500, uranium: 120, tech: 120 }, needPop: 60, power: 600, needTech: 'unlockFusion' },
+    ],
+    desc: '氘-氚聚变，巨量电力，需聚变科技',
+  },
+  spaceport: {
+    id: 'spaceport', name: '太空港', icon: '🛸',
+    levels: [null,
+      { cost: { steel: 150, tech: 30 }, needPop: 40, powerUse: 8 },
+      { cost: { steel: 350, tech: 70 }, needPop: 60, powerUse: 12 },
+      { cost: { steel: 700, tech: 150 }, needPop: 80, powerUse: 18 },
+    ],
+    desc: '解锁轨道建筑（电梯/卫星/天线）',
+  },
+  elevator: {
+    id: 'elevator', name: '轨道电梯', icon: '🗼',
+    levels: [null,
+      { cost: { steel: 200, he3: 10, tech: 50 }, needPop: 50, powerUse: 10, needSpaceport: true },
+      { cost: { steel: 500, he3: 25, tech: 120 }, needPop: 70, powerUse: 15, needSpaceport: true },
+      { cost: { steel: 1000, he3: 60, tech: 250 }, needPop: 90, powerUse: 20, needSpaceport: true },
+    ],
+    desc: '终极物流：运输车速度×3，需太空港',
+  },
+  clone: {
+    id: 'clone', name: '克隆中心', icon: '🧬',
+    levels: [null,
+      { cost: { steel: 120, tech: 40 }, needPop: 35, powerUse: 8, growthBonus: 2.0 },
+      { cost: { steel: 300, tech: 90 }, needPop: 50, powerUse: 12, growthBonus: 4.0 },
+      { cost: { steel: 600, tech: 200 }, needPop: 70, powerUse: 18, growthBonus: 8.0 },
+    ],
+    desc: '人口增长×3/×5/×9',
+  },
+  shield: {
+    id: 'shield', name: '护盾发生器', icon: '🛡️',
+    levels: [null,
+      { cost: { steel: 80, tech: 25 }, needPop: 25, powerUse: 6, shieldDodge: 0.3 },
+      { cost: { steel: 200, tech: 60 }, needPop: 40, powerUse: 10, shieldDodge: 0.55 },
+      { cost: { steel: 400, tech: 140 }, needPop: 55, powerUse: 15, shieldDodge: 0.8 },
+    ],
+    desc: '能量护盾，陨石闪避率提升',
+  },
+  satellite: {
+    id: 'satellite', name: '气象卫星', icon: '🛰️',
+    levels: [null,
+      { cost: { steel: 100, tech: 40 }, needPop: 30, powerUse: 4, warnBonus: 10000, needSpaceport: true },
+      { cost: { steel: 250, tech: 90 }, needPop: 45, powerUse: 6, warnBonus: 20000, needSpaceport: true },
+      { cost: { steel: 500, tech: 180 }, needPop: 60, powerUse: 8, warnBonus: 35000, needSpaceport: true },
+    ],
+    desc: '灾难预警延长，需太空港',
+  },
+  antenna: {
+    id: 'antenna', name: '深空天线', icon: '📡',
+    levels: [null,
+      { cost: { steel: 120, tech: 50 }, needPop: 35, powerUse: 6, labBonus: 1.0, needSpaceport: true },
+      { cost: { steel: 300, tech: 110 }, needPop: 50, powerUse: 9, labBonus: 2.0, needSpaceport: true },
+      { cost: { steel: 600, tech: 220 }, needPop: 65, powerUse: 12, labBonus: 4.0, needSpaceport: true },
+    ],
+    desc: '接收深空信号，实验室产量×2/×3/×5，需太空港',
+  },
+  nanofactory: {
+    id: 'nanofactory', name: '纳米工厂', icon: '⚛️',
+    levels: [null,
+      { cost: { steel: 150, tech: 60 }, needPop: 40, powerUse: 10, smelterBonus: 1.0 },
+      { cost: { steel: 350, tech: 130 }, needPop: 55, powerUse: 15, smelterBonus: 2.0 },
+      { cost: { steel: 700, tech: 260 }, needPop: 75, powerUse: 20, smelterBonus: 4.0 },
+    ],
+    desc: '分子组装，冶炼厂产量×2/×3/×5',
+  },
+  ecocircle: {
+    id: 'ecocircle', name: '生态圈', icon: '🌍',
+    levels: [null,
+      { cost: { steel: 130, tech: 45 }, needPop: 38, powerUse: 8, greenhouseBonus: 2.0 },
+      { cost: { steel: 320, tech: 100 }, needPop: 52, powerUse: 12, greenhouseBonus: 4.0 },
+      { cost: { steel: 650, tech: 210 }, needPop: 68, powerUse: 16, greenhouseBonus: 8.0 },
+    ],
+    desc: '全封闭生态，温室产量×3/×5/×9',
+  },
+  ark: {
+    id: 'ark', name: '方舟', icon: '🛳️',
+    levels: [null,
+      { cost: { steel: 500, he3: 30, tech: 100 }, needPop: 200, powerUse: 0, needSpaceport: true },
+    ],
+    desc: '第二胜利：人口200+科技100，建成即通关！需太空港',
+  },
 };
+
+// v1.2 建筑顺序（UI 用）
+const BUILD_ORDER_V12 = ['uminer', 'he3rig', 'fusion', 'spaceport', 'elevator', 'clone', 'shield', 'satellite', 'antenna', 'nanofactory', 'ecocircle', 'ark'];
+
 
 // 建筑顺序（UI 用）
 const BUILD_ORDER = ['habitat', 'solar', 'miner', 'pump', 'smelter', 'greenhouse', 'waterplant', 'lab', 'road', 'hospital', 'command', 'launchpad',
-  'nuclear', 'school', 'trade', 'repair', 'weather', 'dome', 'depot', 'warehouse', 'logistics'];
+  'nuclear', 'school', 'trade', 'repair', 'weather', 'dome', 'depot', 'warehouse', 'logistics',
+  'uminer', 'he3rig', 'fusion', 'spaceport', 'elevator', 'clone', 'shield', 'satellite', 'antenna', 'nanofactory', 'ecocircle', 'ark'];
 
 class BuildManager {
   constructor(map) {
@@ -240,6 +352,10 @@ class BuildManager {
     // 科技解锁检查
     if (lv.needTech && this.techTree && !this.techTree.buildingUnlocked(id)) {
       return { ok: false, reason: `需要科技解锁` };
+    }
+    // v1.2：太空港解锁检查
+    if (lv.needSpaceport && !this.hasSpaceport()) {
+      return { ok: false, reason: '先建造太空港' };
     }
     if (id === 'road') {
       // 道路可以铺在平地上（覆盖资源点不行）
@@ -364,6 +480,61 @@ class BuildManager {
     return this.buildings.some(b => b.id === 'launchpad');
   }
 
+  // v1.2
+  hasSpaceport() {
+    return this.buildings.some(b => b.id === 'spaceport');
+  }
+  hasArk() {
+    return this.buildings.some(b => b.id === 'ark');
+  }
+  // v1.2：护盾总闪避（取最高）
+  shieldDodge() {
+    let best = 0;
+    for (const b of this.buildings) {
+      if (b.id !== 'shield' || b.damaged) continue;
+      const lv = this.levelDef(b);
+      const eff = this.agingEff(b);
+      best = Math.max(best, (lv.shieldDodge || 0) * eff);
+    }
+    return best;
+  }
+  // v1.2：卫星预警加成（毫秒）
+  satelliteWarnBonus() {
+    let s = 0;
+    for (const b of this.buildings) {
+      if (b.id !== 'satellite' || b.damaged) continue;
+      const lv = this.levelDef(b);
+      s += (lv.warnBonus || 0) * this.agingEff(b);
+    }
+    return Math.floor(s);
+  }
+  // v1.2：轨道电梯运输车速度倍率
+  elevatorSpeedMul() {
+    let m = 1;
+    for (const b of this.buildings) {
+      if (b.id !== 'elevator' || b.damaged) continue;
+      m *= (b.level >= 3 ? 3 : (b.level === 2 ? 2 : 1.5)) * this.agingEff(b);
+    }
+    return m;
+  }
+  // v1.2：纳米工厂冶炼加成 / 生态圈温室加成（加法叠加到倍率）
+  smelterBonus2() {
+    let s = 0;
+    for (const b of this.buildings) {
+      if (b.id !== 'nanofactory' || b.damaged) continue;
+      s += (this.levelDef(b).smelterBonus || 0) * this.agingEff(b);
+    }
+    return s;
+  }
+  greenhouseBonus2() {
+    let s = 0;
+    for (const b of this.buildings) {
+      if (b.id !== 'ecocircle' || b.damaged) continue;
+      s += (this.levelDef(b).greenhouseBonus || 0) * this.agingEff(b);
+    }
+    return s;
+  }
+
   // 统计（含科技加成）
   totalPopCap() {
     let s = this.buildings.reduce((acc, b) => acc + (this.levelDef(b).popCap || 0), 0);
@@ -389,12 +560,18 @@ class BuildManager {
         if (this.disaster.devilAffects(b.x, b.y, Date.now())) p = 0;
       }
       // 核电站不受沙尘暴影响
+      // v1.2：聚变电站科技加成
+      if (b.id === 'fusion') p *= this.techMul('fusionMul');
       // 老化
       p *= this.agingEff(b);
       // 损坏减半
       if (b.damaged) p *= 0.5;
       return sum + p;
     }, 0);
+    // v1.2：轨道太阳能科技（无视沙尘暴）
+    if (this.techTree && this.techTree.flag('orbitalPower')) {
+      s += 50;
+    }
     return Math.floor(s);
   }
   totalPowerUse() {
@@ -435,11 +612,19 @@ class BuildManager {
     // 维修站 Lv2+ 自动缓慢维修（每分钟回一点老化）
     const autoRepair = this.buildings.some(b => b.id === 'repair' && b.level >= 2);
 
+    // v1.2：叛乱生产惩罚
+    const revoltMul = this.disaster ? this.disaster.revoltProdMul(now) : 1;
+    // v1.2：AI 故障时自动化建筑停机
+    const aiDown = this.disaster ? this.disaster.aiFaultActive(now) : 1;
+    const AI_AUTOMATED = ['miner', 'uminer', 'he3rig', 'pump'];
+
     for (const b of this.buildings) {
       const lv = this.levelDef(b);
       // 太阳风暴：电子设备停工
       if (flareDown && ELECTRONICS.includes(b.id)) continue;
-      const eff = this.agingEff(b) * (b.damaged ? 0.5 : 1);
+      // v1.2：AI 故障：自动化建筑停机
+      if (aiDown && AI_AUTOMATED.includes(b.id)) continue;
+      const eff = this.agingEff(b) * (b.damaged ? 0.5 : 1) * revoltMul;
 
       // 直接生产
       if (lv.produce && now - b.lastProduce >= lv.produceInterval) {
@@ -450,8 +635,20 @@ class BuildManager {
           // 科技加成
           if (b.id === 'miner') amount *= this.techMul('minerMul');
           if (b.id === 'pump') amount *= this.techMul('pumpMul');
-          if (b.id === 'greenhouse') amount *= this.techMul('greenhouseMul');
+          if (b.id === 'greenhouse') {
+            amount *= (this.techMul('greenhouseMul') * (1 + this.greenhouseBonus2()));
+            // v1.2：冰尘暴
+            if (this.disaster) amount *= this.disaster.iceStormGreenhouseMul(now, this.techTree);
+          }
           if (b.id === 'lab') amount *= this.techMul('labMul') * (1 + this.labBonus());
+          if (b.id === 'uminer') {
+            amount *= this.techMul('uminerMul');
+            // v1.2：火山地形铀矿机效率×2
+            try {
+              if (this.map.terrain[b.y][b.x] === 5) amount *= 2;
+            } catch (e) {}
+          }
+          if (b.id === 'he3rig') amount *= this.techMul('he3Mul');
           amount *= this.techMul('allProdMul');
           amount = Math.floor(amount * 10) / 10;
           // 存储上限检查
@@ -473,8 +670,12 @@ class BuildManager {
           spendRes(inv, lv.convert.in);
           for (const k in lv.convert.out) {
             let amount = lv.convert.out[k] * eff;
-            if (b.id === 'smelter') amount *= this.techMul('smelterMul');
-            if (b.id === 'waterplant') amount *= this.techMul('waterplantMul');
+            if (b.id === 'smelter') amount *= (this.techMul('smelterMul') * (1 + this.smelterBonus2()));
+            if (b.id === 'waterplant') {
+              amount *= this.techMul('waterplantMul');
+              // v1.2：冰尘暴
+              if (this.disaster) amount *= this.disaster.iceStormWaterplantMul(now, this.techTree);
+            }
             amount *= this.techMul('allProdMul');
             amount = Math.floor(amount * 10) / 10;
             const newVal = (inv[k] || 0) + amount;
@@ -512,6 +713,14 @@ class BuildManager {
       s += `｜${inp}→${out}`;
     }
     if (lv.labBonus) s += `｜实验室产量+${Math.round(lv.labBonus * 100)}%`;
+    // v1.2
+    if (lv.shieldDodge) s += `｜陨石闪避+${Math.round(lv.shieldDodge * 100)}%`;
+    if (lv.warnBonus) s += `｜预警+${lv.warnBonus / 1000}秒`;
+    if (lv.growthBonus && b.id === 'clone') s += `｜人口增长×${1 + lv.growthBonus}`;
+    if (lv.smelterBonus) s += `｜冶炼产量×${1 + lv.smelterBonus}`;
+    if (lv.greenhouseBonus) s += `｜温室产量×${1 + lv.greenhouseBonus}`;
+    if (b.id === 'elevator') s += `｜运输车速度×${b.level >= 3 ? 3 : (b.level === 2 ? 2 : 1.5)}`;
+    if (b.id === 'fusion') s += `｜聚变能源`;
     if (b.id === 'warehouse') s += `｜存储上限+${STORAGE_PER_WAREHOUSE}`;
     try {
       if (b.id === 'depot' && typeof TRUCK !== 'undefined') s += `｜运输车上限+${TRUCK.PER_DEPOT}`;
@@ -804,7 +1013,149 @@ class BuildManager {
         for (const r of [0.3, 0.38]) {
           ctx.beginPath(); ctx.arc(cx + tile * 0.25, cy - tile * 0.4, tile * r, 0, Math.PI * 2); ctx.stroke();
         }
+      } else if (b.id === 'uminer') {
+        // v1.2 铀矿机：钻机+辐射
+        ctx.fillStyle = '#3a4a2a';
+        ctx.fillRect(px + tile * 0.18, py + tile * 0.45, tile * 0.64, tile * 0.35);
+        ctx.fillStyle = '#84cc16';
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.3, tile * 0.12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#1a1a2a';
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.3, tile * 0.05, 0, Math.PI * 2); ctx.fill();
+        // 辐射波纹
+        ctx.strokeStyle = 'rgba(132,204,22,0.5)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.3, tile * 0.2, 0, Math.PI * 2); ctx.stroke();
+      } else if (b.id === 'he3rig') {
+        // v1.2 氦3采集器：穹顶+星光
+        ctx.fillStyle = 'rgba(165,180,252,0.3)';
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.7, tile * 0.35, Math.PI, 0); ctx.fill();
+        ctx.strokeStyle = '#a5b4fc'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.7, tile * 0.35, Math.PI, 0); ctx.stroke();
+        ctx.fillStyle = '#fef08a';
+        for (const [sx, sy] of [[-0.15, 0.35], [0.12, 0.42], [0, 0.25]]) {
+          ctx.beginPath(); ctx.arc(cx + sx * tile, py + sy * tile, 2, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (b.id === 'fusion') {
+        // v1.2 聚变电站：太阳核心
+        ctx.fillStyle = '#4a3a1a';
+        ctx.beginPath(); ctx.arc(cx, cy, tile * 0.35, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath(); ctx.arc(cx, cy, tile * 0.22, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx, cy, tile * 0.1, 0, Math.PI * 2); ctx.fill();
+        // 磁约束环
+        ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, tile * 0.3, 0.3, Math.PI * 2 - 0.3); ctx.stroke();
+      } else if (b.id === 'spaceport') {
+        // v1.2 太空港：发射架
+        ctx.fillStyle = '#3a3a4a';
+        ctx.fillRect(px + tile * 0.15, py + tile * 0.2, tile * 0.12, tile * 0.6);
+        ctx.fillRect(px + tile * 0.73, py + tile * 0.2, tile * 0.12, tile * 0.6);
+        ctx.fillStyle = '#e8e8f0';
+        ctx.beginPath();
+        ctx.moveTo(cx, py + tile * 0.05);
+        ctx.lineTo(cx - tile * 0.1, py + tile * 0.4);
+        ctx.lineTo(cx + tile * 0.1, py + tile * 0.4);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#7dd3fc';
+        ctx.fillRect(px + tile * 0.15, py + tile * 0.75, tile * 0.7, tile * 0.08);
+      } else if (b.id === 'elevator') {
+        // v1.2 轨道电梯：通天塔
+        ctx.fillStyle = '#5a5a7a';
+        ctx.fillRect(cx - 3, py + tile * 0.05, 6, tile * 0.75);
+        ctx.fillStyle = '#2a2a3a';
+        ctx.fillRect(px + tile * 0.2, py + tile * 0.65, tile * 0.6, tile * 0.2);
+        // 爬升舱
+        const liftY = py + tile * 0.65 - ((Date.now() / 20) % (tile * 0.55));
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(cx - 5, liftY, 10, 8);
+        // 顶部
+        ctx.fillStyle = '#7dd3fc';
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.05, 5, 0, Math.PI * 2); ctx.fill();
+      } else if (b.id === 'clone') {
+        // v1.2 克隆中心：培养舱
+        ctx.fillStyle = '#2a4a5a';
+        ctx.fillRect(px + tile * 0.15, py + tile * 0.2, tile * 0.7, tile * 0.6);
+        ctx.fillStyle = 'rgba(125,211,252,0.4)';
+        for (const ox of [-0.18, 0.05, 0.28]) {
+          ctx.beginPath(); ctx.arc(cx + ox * tile, cy, tile * 0.11, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = '#4ade80';
+        for (const ox of [-0.18, 0.05, 0.28]) {
+          ctx.fillRect(cx + ox * tile - 2, cy - 4, 4, 8);
+        }
+      } else if (b.id === 'shield') {
+        // v1.2 护盾发生器：穹顶护盾
+        ctx.fillStyle = '#3a2a5a';
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.75, tile * 0.25, Math.PI, 0); ctx.fill();
+        ctx.strokeStyle = 'rgba(185,103,255,0.7)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.75, tile * 0.4, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+        ctx.fillStyle = '#b967ff';
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.5, 4, 0, Math.PI * 2); ctx.fill();
+      } else if (b.id === 'satellite') {
+        // v1.2 气象卫星：地面站+信号
+        ctx.fillStyle = '#3a4a5a';
+        ctx.fillRect(cx - 3, py + tile * 0.4, 6, tile * 0.4);
+        ctx.fillStyle = '#7dd3fc';
+        ctx.save();
+        ctx.translate(cx, py + tile * 0.35); ctx.rotate(0.5);
+        ctx.fillRect(-tile * 0.25, -4, tile * 0.5, 8);
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(125,211,252,0.5)';
+        for (const r of [0.35, 0.45]) {
+          ctx.beginPath(); ctx.arc(cx, py + tile * 0.2, tile * r, -0.5, 0.5); ctx.stroke();
+        }
+      } else if (b.id === 'antenna') {
+        // v1.2 深空天线：大锅
+        ctx.fillStyle = '#4a4a5a';
+        ctx.fillRect(cx - 3, py + tile * 0.5, 6, tile * 0.3);
+        ctx.fillStyle = '#6a6a7a';
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.45, tile * 0.3, Math.PI * 1.15, Math.PI * 1.85); ctx.fill();
+        ctx.strokeStyle = '#f0abfc'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, py + tile * 0.2);
+        ctx.lineTo(cx + tile * 0.3, py - tile * 0.1);
+        ctx.stroke();
+      } else if (b.id === 'nanofactory') {
+        // v1.2 纳米工厂：六边形
+        ctx.fillStyle = '#2a3a4a';
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 3 * i - Math.PI / 6;
+          const vx = cx + Math.cos(a) * tile * 0.32, vy = cy + Math.sin(a) * tile * 0.32;
+          i === 0 ? ctx.moveTo(vx, vy) : ctx.lineTo(vx, vy);
+        }
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#f0abfc';
+        ctx.beginPath(); ctx.arc(cx, cy, tile * 0.1, 0, Math.PI * 2); ctx.fill();
+      } else if (b.id === 'ecocircle') {
+        // v1.2 生态圈：多层穹顶
+        for (const [r, col] of [[0.42, 'rgba(125,211,252,0.2)'], [0.3, 'rgba(74,222,128,0.3)'], [0.18, 'rgba(250,204,21,0.3)']]) {
+          ctx.fillStyle = col;
+          ctx.beginPath(); ctx.arc(cx, py + tile * 0.78, tile * r, Math.PI, 0); ctx.fill();
+        }
+        ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.78, tile * 0.42, Math.PI, 0); ctx.stroke();
+      } else if (b.id === 'ark') {
+        // v1.2 方舟：巨舰
+        ctx.fillStyle = '#3a3a5a';
+        ctx.beginPath();
+        ctx.moveTo(px + tile * 0.1, py + tile * 0.6);
+        ctx.lineTo(px + tile * 0.9, py + tile * 0.6);
+        ctx.lineTo(px + tile * 0.75, py + tile * 0.85);
+        ctx.lineTo(px + tile * 0.25, py + tile * 0.85);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#5a5a7a';
+        ctx.fillRect(px + tile * 0.3, py + tile * 0.3, tile * 0.4, tile * 0.3);
+        ctx.fillStyle = '#ffe9a3';
+        for (const wx of [0.35, 0.5, 0.65]) {
+          ctx.fillRect(px + tile * wx, py + tile * 0.4, tile * 0.08, tile * 0.08);
+        }
+        // 光环
+        ctx.strokeStyle = 'rgba(250,204,21,0.6)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, py + tile * 0.55, tile * 0.45, 0, Math.PI * 2); ctx.stroke();
       }
+
       // 损坏标记
       if (b.damaged) {
         ctx.fillStyle = 'rgba(239,68,68,0.9)';

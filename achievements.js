@@ -1,4 +1,4 @@
-/* 星港 — achievements.js：成就系统（32 项）
+/* 星港 — achievements.js：成就系统（67 项）
  * 条件成就，达成时 toast + 音效，localStorage 持久化
  */
 
@@ -103,6 +103,75 @@ const ACHIEVEMENT_DEFS = [
     check: (g) => g.logistics.trucks.length >= 10 },
   { id: 'rich', name: '富可敌国', icon: '💰', desc: '同时拥有铁/钢各 200',
     check: (g) => (g.player.inv.iron || 0) >= 200 && (g.player.inv.steel || 0) >= 200 },
+
+  // ============ v1.2：新纪元成就（30 项） ============
+  // ---- 大地图 ----
+  { id: 'sector-16', name: '火星之王', icon: '👑', desc: '解锁全部 16 个扇区',
+    check: (g) => g.map.unlockedCount() >= 16 },
+  { id: 'visit-polar', name: '极地探险', icon: '❄️', desc: '踏上极地',
+    check: (g) => g._visitedPolar === true },
+  { id: 'visit-volcano', name: '火山口', icon: '🌋', desc: '接近火山',
+    check: (g) => g._visitedVolcano === true },
+  { id: 'cross-canyon', name: '飞跃峡谷', icon: '🏔️', desc: '拥有横跨峡谷两侧的建筑',
+    check: (g) => g._crossCanyon === true },
+
+  // ---- 新资源 ----
+  { id: 'uranium-1', name: '核时代', icon: '☢️', desc: '获得第一块铀矿',
+    check: (g) => (g.player.inv.uranium || 0) >= 1 || (g.stats.uraniumMined || 0) >= 1 },
+  { id: 'uranium-50', name: '铀矿大亨', icon: '☢️', desc: '铀矿存量 50',
+    check: (g) => (g.player.inv.uranium || 0) >= 50 },
+  { id: 'he3-1', name: '月壤之光', icon: '🌌', desc: '获得第一份氦3',
+    check: (g) => (g.player.inv.he3 || 0) >= 1 || (g.stats.he3Mined || 0) >= 1 },
+  { id: 'he3-10', name: '聚变燃料', icon: '🌌', desc: '氦3存量 10',
+    check: (g) => (g.player.inv.he3 || 0) >= 10 },
+
+  // ---- 新建筑 ----
+  { id: 'build-fusion', name: '人造太阳', icon: '☀️', desc: '建造聚变电站',
+    check: (g) => g.builder.count('fusion') >= 1 },
+  { id: 'build-spaceport', name: '星门', icon: '🛸', desc: '建造太空港',
+    check: (g) => g.builder.count('spaceport') >= 1 },
+  { id: 'build-elevator', name: '通天塔', icon: '🗼', desc: '建造轨道电梯',
+    check: (g) => g.builder.count('elevator') >= 1 },
+  { id: 'build-shield', name: '能量护盾', icon: '🛡️', desc: '建造护盾发生器',
+    check: (g) => g.builder.count('shield') >= 1 },
+  { id: 'build-clone', name: '复制人', icon: '🧬', desc: '建造克隆中心',
+    check: (g) => g.builder.count('clone') >= 1 },
+  { id: 'build-ark', name: '诺亚方舟', icon: '🛳️', desc: '建造方舟',
+    check: (g) => g.builder.count('ark') >= 1 },
+  { id: 'build-40', name: '超级都市', icon: '🌆', desc: '拥有 40 座建筑',
+    check: (g) => g.builder.buildings.length >= 40 },
+
+  // ---- 科技 ----
+  { id: 'tech-orbital', name: '太空时代', icon: '🛰️', desc: '解锁第一个轨道科技',
+    check: (g) => { const c = g.tech.countByBranch(); return (c.orbital || 0) >= 1; } },
+  { id: 'tech-40', name: '博学', icon: '🎓', desc: '解锁 40 项科技',
+    check: (g) => g.tech.totalUnlocked() >= 40 },
+  { id: 'tech-60', name: '全知', icon: '🧠', desc: '解锁全部 60 项科技',
+    check: (g) => g.tech.totalUnlocked() >= 60 },
+
+  // ---- 灾难 ----
+  { id: 'survive-flare2', name: '硬抗耀斑', icon: '☀️', desc: '在太阳耀斑中存活',
+    check: (g) => (g.stats.flare2Survived || 0) >= 1 },
+  { id: 'survive-volcano', name: '火山幸存者', icon: '🌋', desc: '在火山喷发中存活',
+    check: (g) => (g.stats.volcanoSurvived || 0) >= 1 },
+  { id: 'survive-revolt', name: '平息叛乱', icon: '⚠️', desc: '平息一次叛乱',
+    check: (g) => (g.stats.revoltSurvived || 0) >= 1 },
+  { id: 'shield-save', name: '护盾立功', icon: '🛡️', desc: '护盾挡住一次陨石',
+    check: (g) => (g.stats.shieldSaves || 0) >= 1 },
+
+  // ---- 贸易 ----
+  { id: 'ship-1', name: '第一桶金', icon: '🛸', desc: '迎接第一艘贸易船',
+    check: (g) => (g.tradeShip && g.tradeShip.visitCount >= 1) },
+  { id: 'ship-5', name: '贸易枢纽', icon: '🏪', desc: '迎接 5 艘贸易船',
+    check: (g) => (g.tradeShip && g.tradeShip.visitCount >= 5) },
+  { id: 'trade-dyn', name: '精明商人', icon: '💹', desc: '完成一次动态价格交易',
+    check: (g) => (g.stats.dynTrades || 0) >= 1 },
+
+  // ---- 胜利 ----
+  { id: 'win-ark', name: '星辰大海', icon: '🛳️', desc: '方舟胜利：人类成为多行星物种',
+    check: (g) => g.city.arkWon === true },
+  { id: 'pop-200', name: '人山人海', icon: '👥', desc: '人口达到 200',
+    check: (g) => g.pop.count >= 200 },
 ];
 
 class AchievementManager {

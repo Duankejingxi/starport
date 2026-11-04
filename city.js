@@ -31,6 +31,8 @@ class City {
   constructor() {
     this.won = false;
     this.winTime = null;
+    this.arkWon = false;  // v1.2：方舟胜利
+    this.arkWinTime = null;
   }
 
   rank(pop) {
@@ -45,6 +47,21 @@ class City {
       return true;
     }
     return false;
+  }
+
+  // v1.2：方舟胜利：方舟建成 + 人口200 + 科技100
+  checkArkVictory(builder, popCount, techPoints) {
+    if (!this.arkWon && builder.hasArk() && popCount >= 200 && techPoints >= 100) {
+      this.arkWon = true;
+      this.arkWinTime = Date.now();
+      return true;
+    }
+    return false;
+  }
+
+  // 任一胜利
+  anyVictory() {
+    return this.won || this.arkWon;
   }
 }
 

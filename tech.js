@@ -5,6 +5,7 @@ const TECH_BRANCHES = {
   build: { name: '建造', icon: '🏗️', color: '#e07b39' },
   prod:  { name: '生产', icon: '⚙️', color: '#38bdf8' },
   surv:  { name: '生存', icon: '💚', color: '#4ade80' },
+  orbital: { name: '轨道', icon: '🛰️', color: '#a5b4fc' },  // v1.2
 };
 
 // 科技定义：cost = 科技点；needs = 前置科技 id；fx = 效果键值
@@ -192,6 +193,164 @@ const TECH_DEFS = {
     desc: '第一代火星出生者，人口上限 +20。',
     fx: { popCapAdd: 20 },
   },
+
+  // ============ v1.2：建造系 +5 ============
+  't-build-11': {
+    name: '深空施工', icon: '🌌', branch: 'build', cost: 45, needs: ['t-build-10'],
+    desc: '真空焊接技术，太空港建造成本 -20%。',
+    fx: { spaceportCostMul: 0.8 },
+  },
+  't-build-12': {
+    name: '轨道组装', icon: '🛰️', branch: 'build', cost: 60, needs: ['t-build-11'],
+    desc: '轨道船坞预制，轨道电梯/卫星/天线成本 -20%。',
+    fx: { orbitalCostMul: 0.8 },
+  },
+  't-build-13': {
+    name: '护盾矩阵', icon: '🛡️', branch: 'build', cost: 55, needs: ['t-build-4'],
+    desc: '护盾发生器效率 +50%（闪避率提升）。',
+    fx: { shieldMul: 1.5 },
+  },
+  't-build-14': {
+    name: '方舟工程学', icon: '🛳️', branch: 'build', cost: 80, needs: ['t-build-12'],
+    desc: '巨舰建造经验，方舟成本 -25%。',
+    fx: { arkCostMul: 0.75 },
+  },
+  't-build-15': {
+    name: '戴森雏形', icon: '☀️', branch: 'build', cost: 100, needs: ['t-build-14'],
+    desc: '恒星能源梦想，所有发电建筑 +25%。',
+    fx: { allPowerMul: 1.25 },
+  },
+
+  // ============ v1.2：生产系 +5 ============
+  't-prod-11': {
+    name: '聚变点火', icon: '☀️', branch: 'prod', cost: 45, needs: ['t-prod-5'],
+    desc: '实现氘氚聚变，解锁聚变电站。',
+    fx: { unlockFusion: 1 },
+  },
+  't-prod-12': {
+    name: '铀浓缩', icon: '☢️', branch: 'prod', cost: 40, needs: ['t-prod-11'],
+    desc: '离心机级联，铀矿机产量 +100%。',
+    fx: { uminerMul: 2.0 },
+  },
+  't-prod-13': {
+    name: '氦3精炼', icon: '🌌', branch: 'prod', cost: 60, needs: ['t-prod-12'],
+    desc: '月壤加热提取，氦3采集器产量 +100%。',
+    fx: { he3Mul: 2.0 },
+  },
+  't-prod-14': {
+    name: '纳米复制', icon: '⚛️', branch: 'prod', cost: 70, needs: ['t-prod-7'],
+    desc: '自我复制纳米机器人，纳米工厂效果 +50%。',
+    fx: { nanoMul: 1.5 },
+  },
+  't-prod-15': {
+    name: '生态穹顶II', icon: '🌍', branch: 'prod', cost: 65, needs: ['t-prod-8'],
+    desc: '多层生态循环，生态圈效果 +50%。',
+    fx: { ecoMul: 1.5 },
+  },
+
+  // ============ v1.2：生存系 +5 ============
+  't-surv-11': {
+    name: '辐射医疗', icon: '☢️', branch: 'surv', cost: 40, needs: ['t-surv-1'],
+    desc: '抗辐射药物，火山喷发伤害 -50%。',
+    fx: { volcanoMul: 0.5 },
+  },
+  't-surv-12': {
+    name: '防寒服', icon: '🧥', branch: 'surv', cost: 35, needs: ['t-surv-4'],
+    desc: '加热宇航服，冰尘暴影响 -50%。',
+    fx: { iceStormMul: 0.5 },
+  },
+  't-surv-13': {
+    name: '心理辅导', icon: '🧠', branch: 'surv', cost: 45, needs: ['t-surv-1'],
+    desc: '驻站心理医生，叛乱概率 -50%。',
+    fx: { revoltMul: 0.5 },
+  },
+  't-surv-14': {
+    name: 'AI防火墙', icon: '🔥', branch: 'surv', cost: 50, needs: ['t-surv-5'],
+    desc: '隔离关键系统，AI故障影响 -50%。',
+    fx: { aiFaultMul: 0.5 },
+  },
+  't-surv-15': {
+    name: '火星公民', icon: '🗳️', branch: 'surv', cost: 60, needs: ['t-surv-10', 't-surv-13'],
+    desc: '火星宪法，人口上限 +30，叛乱免疫。',
+    fx: { popCapAdd: 30, revoltImmune: 1 },
+  },
+
+  // ============ v1.2：轨道系（15 项） ============
+  't-orb-1': {
+    name: '轨道力学', icon: '🛰️', branch: 'orbital', cost: 30, needs: [],
+    desc: '霍曼转移轨道计算，解锁太空港建造。',
+    fx: { unlockSpaceport: 1 },
+  },
+  't-orb-2': {
+    name: '电梯缆绳', icon: '🗼', branch: 'orbital', cost: 50, needs: ['t-orb-1'],
+    desc: '碳纳米管缆绳，解锁轨道电梯。',
+    fx: { unlockElevator: 1 },
+  },
+  't-orb-3': {
+    name: '气象星座', icon: '🌤️', branch: 'orbital', cost: 40, needs: ['t-orb-1'],
+    desc: '12 颗气象卫星组网，解锁气象卫星，预警 +5 秒。',
+    fx: { unlockSatellite: 1, warnAdd: 5000 },
+  },
+  't-orb-4': {
+    name: '深空网络', icon: '📡', branch: 'orbital', cost: 45, needs: ['t-orb-1'],
+    desc: 'DSN 深空网，解锁深空天线。',
+    fx: { unlockAntenna: 1 },
+  },
+  't-orb-5': {
+    name: '轨道船坞', icon: '🏗️', branch: 'orbital', cost: 60, needs: ['t-orb-2'],
+    desc: '轨道建造能力，太空建筑成本 -15%。',
+    fx: { orbitalCostMul: 0.85 },
+  },
+  't-orb-6': {
+    name: '太阳帆', icon: '⛵', branch: 'orbital', cost: 55, needs: ['t-orb-3'],
+    desc: '光压推进，贸易船来访间隔 -20%。',
+    fx: { tradeShipMul: 0.8 },
+  },
+  't-orb-7': {
+    name: '小行星采矿', icon: '☄️', branch: 'orbital', cost: 70, needs: ['t-orb-2'],
+    desc: '捕获近地小行星，每分钟 +5 铁矿 +2 稀土。',
+    fx: { asteroidMining: 1 },
+  },
+  't-orb-8': {
+    name: '轨道太阳能', icon: '🔆', branch: 'orbital', cost: 65, needs: ['t-orb-5'],
+    desc: '同步轨道电站，+50 电力（无视沙尘暴）。',
+    fx: { orbitalPower: 50 },
+  },
+  't-orb-9': {
+    name: '星际通讯', icon: '📻', branch: 'orbital', cost: 60, needs: ['t-orb-4'],
+    desc: '量子纠缠通讯，贸易价格 +15%。',
+    fx: { tradePriceMul: 1.15 },
+  },
+  't-orb-10': {
+    name: '重力模拟', icon: '🌀', branch: 'orbital', cost: 75, needs: ['t-orb-5'],
+    desc: '旋转重力舱，人口增长 +50%。',
+    fx: { popGrowthMul: 1.5 },
+  },
+  't-orb-11': {
+    name: '轨道防御', icon: '🛡️', branch: 'orbital', cost: 80, needs: ['t-orb-5'],
+    desc: '动能拦截器，陨石闪避 +20%。',
+    fx: { shieldMul: 1.2 },
+  },
+  't-orb-12': {
+    name: '氦3聚变', icon: '🌌', branch: 'orbital', cost: 90, needs: ['t-orb-2', 't-prod-13'],
+    desc: '清洁聚变，聚变电站电力 +50%。',
+    fx: { fusionMul: 1.5 },
+  },
+  't-orb-13': {
+    name: '星门理论', icon: '🌀', branch: 'orbital', cost: 100, needs: ['t-orb-10'],
+    desc: '虫洞物理，贸易船载货 +100%。',
+    fx: { tradeShipMul: 0.7 },
+  },
+  't-orb-14': {
+    name: '方舟蓝图', icon: '🛳️', branch: 'orbital', cost: 120, needs: ['t-orb-12'],
+    desc: '世代飞船设计，方舟成本 -20%。',
+    fx: { arkCostMul: 0.8 },
+  },
+  't-orb-15': {
+    name: '新纪元', icon: '🌟', branch: 'orbital', cost: 150, needs: ['t-orb-13', 't-orb-14'],
+    desc: '人类多行星物种，所有生产 +20%，人口上限 +50。',
+    fx: { allProdMul: 1.2, popCapAdd: 50 },
+  },
 };
 
 // 科技顺序（UI 展示用，按分支分组）
@@ -205,6 +364,15 @@ const TECH_ORDER = [
   // 生存系
   't-surv-1', 't-surv-2', 't-surv-3', 't-surv-4', 't-surv-5',
   't-surv-6', 't-surv-7', 't-surv-8', 't-surv-9', 't-surv-10',
+  't-surv-11', 't-surv-12', 't-surv-13', 't-surv-14', 't-surv-15',
+  // 建造系 v1.2
+  't-build-11', 't-build-12', 't-build-13', 't-build-14', 't-build-15',
+  // 生产系 v1.2
+  't-prod-11', 't-prod-12', 't-prod-13', 't-prod-14', 't-prod-15',
+  // 轨道系 v1.2
+  't-orb-1', 't-orb-2', 't-orb-3', 't-orb-4', 't-orb-5',
+  't-orb-6', 't-orb-7', 't-orb-8', 't-orb-9', 't-orb-10',
+  't-orb-11', 't-orb-12', 't-orb-13', 't-orb-14', 't-orb-15',
 ];
 
 class TechTree {
@@ -284,13 +452,18 @@ class TechTree {
       case 'dome': return this.flag('unlockDome');
       case 'trade': return this.flag('unlockTrade');
       case 'weather': return this.flag('unlockWeather');
+      case 'fusion': return this.flag('unlockFusion');  // v1.2
+      case 'spaceport': return this.flag('unlockSpaceport');  // v1.2
+      case 'elevator': return this.flag('unlockElevator');  // v1.2
+      case 'satellite': return this.flag('unlockSatellite');  // v1.2
+      case 'antenna': return this.flag('unlockAntenna');  // v1.2
       default: return true;
     }
   }
 
   // 按分支统计解锁数
   countByBranch() {
-    const c = { build: 0, prod: 0, surv: 0 };
+    const c = { build: 0, prod: 0, surv: 0, orbital: 0 };
     for (const id of this.unlocked) {
       const b = TECH_DEFS[id].branch;
       if (c[b] !== undefined) c[b]++;
