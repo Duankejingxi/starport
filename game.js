@@ -3,8 +3,8 @@
  */
 
 const SAVE_KEY = 'starport-save-v1';
-const GAME_VERSION = '1.3.0';
-const GAME_CODENAME = '烽火外交';
+const GAME_VERSION = '1.4.0';
+const GAME_CODENAME = '星海远征';
 
 // 版本历史：
 // v1.0 - 基础循环：8资源/12建筑/人口/评级/胜利
@@ -47,6 +47,8 @@ class Game {
     this.disasters13 = new DisasterPack13();
     this._allyAidWave = -1;  // 已为哪一波袭击呼叫过盟友
     this._allyAidCalled = false;
+    // v1.4 新系统（orbital 自集成，其余手动）
+    this.deepSpace = new DeepSpaceManager();
 
     // 注入引用
     this.builder.techTree = this.tech;
@@ -90,6 +92,11 @@ class Game {
     if (this.diplomacy && this.diplomacy.bindUI) this.diplomacy.bindUI(this);
     if (this.military && this.military.bindUI) this.military.bindUI(this);
     if (this.policy && this.policy.bindUI) this.policy.bindUI(this);
+    // v1.4
+    if (this.deepSpace && this.deepSpace.bindUI) this.deepSpace.bindUI(this);
+    // content_v14 可选接入（防御性）
+    try { if (typeof StargateVictory !== 'undefined' && StargateVictory.attach) StargateVictory.attach(this); } catch (e) {}
+    try { if (typeof OrbitalHazards !== 'undefined') { this.orbitalHazards = new OrbitalHazards(); if (this.orbitalHazards.attach) this.orbitalHazards.attach(this); } } catch (e) {}
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
     this.lastFrame = Date.now();
@@ -116,6 +123,9 @@ class Game {
         military: this.military ? this.military.save() : null,
         policy: this.policy ? this.policy.save() : null,
         disasters13: this.disasters13 ? this.disasters13.save() : null,
+        // v1.4
+        deepSpace: this.deepSpace ? this.deepSpace.save() : null,
+        orbitalHazards: this.orbitalHazards ? this.orbitalHazards.save() : null,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch (e) { /* 忽略 */ }
@@ -145,6 +155,9 @@ class Game {
       if (data.military && this.military) this.military.load(data.military);
       if (data.policy && this.policy) this.policy.load(data.policy);
       if (data.disasters13 && this.disasters13) this.disasters13.load(data.disasters13);
+      // v1.4
+      if (data.deepSpace && this.deepSpace) this.deepSpace.load(data.deepSpace);
+      if (data.orbitalHazards && this.orbitalHazards) this.orbitalHazards.load(data.orbitalHazards);
       return true;
     } catch (e) { return false; }
   }
@@ -979,6 +992,9 @@ class Game {
     }
     if (this.policy) this.policy.upkeepTick(this, dt);
     if (this.disasters13) this.disasters13.update(now, this);
+    // v1.4
+    if (this.deepSpace) this.deepSpace.update(now, this);
+    if (this.orbitalHazards) this.orbitalHazards.update(now, this);
 
     // 成就检查
     this.achievements.update(now);
