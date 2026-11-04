@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>星港 Starport — 火星城市建造</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <!-- 顶栏：资源 -->
+  <header id="topbar">
+    <div class="res"><span class="res-icon iron"></span><span id="res-iron">0</span></div>
+    <div class="res"><span class="res-icon ice"></span><span id="res-ice">0</span></div>
+    <div class="res"><span class="res-icon rare"></span><span id="res-rare">0</span></div>
+    <div class="res"><span>👥</span><span id="res-pop">2/2</span></div>
+    <div class="res"><span>⚡</span><span id="res-power">0</span></div>
+  </header>
+
+  <!-- 地图 -->
+  <div id="map-wrap">
+    <canvas id="map" width="640" height="640"></canvas>
+    <div id="toast" class="hidden"></div>
+  </div>
+
+  <!-- 底栏：操作 -->
+  <footer id="toolbar">
+    <button id="btn-harvest" class="tool-btn">⛏️<small>采集</small></button>
+    <button id="btn-habitat" class="tool-btn" data-build="habitat">🏠<small>居住舱</small></button>
+    <button id="btn-solar" class="tool-btn" data-build="solar">🔆<small>太阳能板</small></button>
+    <button id="btn-miner" class="tool-btn" data-build="miner">🏭<small>采矿机</small></button>
+  </footer>
+  <div id="build-info" class="hidden"></div>
+</div>
+
+<script src="map.js"></script>
+<script src="player.js"></script>
+<script src="build.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

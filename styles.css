@@ -1,0 +1,121 @@
+/* 星港 Starport — 火星主题 */
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #0a0a12;
+  color: #e8d5c4;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+/* 顶栏 */
+#topbar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 10px 8px;
+  background: linear-gradient(180deg, #1a0f0a, #120906);
+  border-bottom: 1px solid #4a2c1a;
+  font-size: 15px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.res { display: flex; align-items: center; gap: 5px; }
+.res-icon {
+  width: 14px; height: 14px; border-radius: 3px; display: inline-block;
+}
+.res-icon.iron { background: #e07b39; }
+.res-icon.ice { background: #7dd3fc; }
+.res-icon.rare { background: #c084fc; }
+
+/* 地图 */
+#map-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, #1a0d08 0%, #0a0a12 70%);
+  overflow: hidden;
+  min-height: 0;
+}
+#map {
+  max-width: 100%;
+  max-height: 100%;
+  touch-action: none;
+  border: 2px solid #4a2c1a;
+  border-radius: 8px;
+  background: #2a140c;
+}
+#toast {
+  position: absolute;
+  top: 16px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 10, 6, 0.92);
+  border: 1px solid #e07b39;
+  color: #ffd9b3;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+  z-index: 10;
+}
+#toast.hidden { opacity: 0; }
+
+/* 底栏 */
+#toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  background: linear-gradient(0deg, #1a0f0a, #120906);
+  border-top: 1px solid #4a2c1a;
+  flex-shrink: 0;
+}
+.tool-btn {
+  flex: 1;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 22px;
+  background: #241510;
+  color: #e8d5c4;
+  border: 1px solid #4a2c1a;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.tool-btn small { font-size: 11px; color: #c9a37e; }
+.tool-btn:active { background: #3a2115; transform: scale(0.96); }
+.tool-btn.selected {
+  border-color: #e07b39;
+  background: #3a2115;
+  box-shadow: 0 0 12px rgba(224, 123, 57, 0.4);
+}
+.tool-btn:disabled { opacity: 0.4; }
+
+#build-info {
+  padding: 8px 12px;
+  background: #1a0f0a;
+  border-top: 1px solid #2a1a10;
+  font-size: 13px;
+  color: #c9a37e;
+  text-align: center;
+  flex-shrink: 0;
+}
+#build-info.hidden { display: none; }
+#build-info b { color: #ffd9b3; }
