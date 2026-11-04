@@ -8,33 +8,77 @@
 </head>
 <body>
 <div id="app">
-  <!-- 顶栏：资源 -->
+  <!-- 顶栏：城市评级 + 资源 -->
   <header id="topbar">
-    <div class="res"><span class="res-icon iron"></span><span id="res-iron">0</span></div>
-    <div class="res"><span class="res-icon ice"></span><span id="res-ice">0</span></div>
-    <div class="res"><span class="res-icon rare"></span><span id="res-rare">0</span></div>
-    <div class="res"><span>👥</span><span id="res-pop">2/2</span></div>
-    <div class="res"><span>⚡</span><span id="res-power">0</span></div>
+    <div id="city-info">
+      <span id="city-rank">🏕️ 聚落</span>
+      <small id="city-next"></small>
+    </div>
+    <div id="res-bar">
+      <div class="res"><span>🟤</span><span id="res-iron">0</span></div>
+      <div class="res"><span>🧊</span><span id="res-ice">0</span></div>
+      <div class="res"><span>🟣</span><span id="res-rare">0</span></div>
+      <div class="res"><span>💧</span><span id="res-water">0</span></div>
+      <div class="res"><span>🌾</span><span id="res-food">0</span></div>
+      <div class="res"><span>🔩</span><span id="res-steel">0</span></div>
+      <div class="res"><span>🔬</span><span id="res-tech">0</span></div>
+      <div class="res"><span>👥</span><span id="res-pop">2/2</span></div>
+      <div class="res"><span>⚡</span><span id="res-power">0/0</span></div>
+      <div class="res"><span id="sector-count">🗺️ 1/9</span></div>
+    </div>
   </header>
 
   <!-- 地图 -->
   <div id="map-wrap">
-    <canvas id="map" width="640" height="640"></canvas>
+    <canvas id="map" width="660" height="660"></canvas>
     <div id="toast" class="hidden"></div>
+    <!-- 建筑详情面板 -->
+    <div id="building-panel" class="hidden">
+      <div id="bp-title"></div>
+      <div id="bp-desc"></div>
+      <div id="bp-btns">
+        <button id="btn-upgrade">⬆️ 升级</button>
+        <button id="btn-close-panel">✖</button>
+      </div>
+    </div>
+    <!-- 胜利 -->
+    <div id="victory" class="hidden">
+      <div id="victory-inner">
+        <div style="font-size:48px">🚀</div>
+        <h2>发射成功！</h2>
+        <p>你的城市建成了发射台，<br>第一艘飞船离开了火星。</p>
+        <p style="opacity:.7">可以继续自由建造，冲击「星港」评级！</p>
+        <button id="btn-continue">继续建造</button>
+      </div>
+    </div>
   </div>
 
   <!-- 底栏：操作 -->
   <footer id="toolbar">
     <button id="btn-harvest" class="tool-btn">⛏️<small>采集</small></button>
-    <button id="btn-habitat" class="tool-btn" data-build="habitat">🏠<small>居住舱</small></button>
-    <button id="btn-solar" class="tool-btn" data-build="solar">🔆<small>太阳能板</small></button>
-    <button id="btn-miner" class="tool-btn" data-build="miner">🏭<small>采矿机</small></button>
+    <button class="tool-btn" data-build="habitat">🏠<small>居住舱</small></button>
+    <button class="tool-btn" data-build="solar">🔆<small>太阳能</small></button>
+    <button class="tool-btn" data-build="miner">🏭<small>采矿机</small></button>
+    <button class="tool-btn" data-build="pump">💧<small>抽水机</small></button>
+    <button class="tool-btn" data-build="smelter">🔥<small>冶炼厂</small></button>
+    <button class="tool-btn" data-build="greenhouse">🌾<small>温室</small></button>
+    <button class="tool-btn" data-build="waterplant">🚰<small>水厂</small></button>
+    <button class="tool-btn" data-build="lab">🔬<small>实验室</small></button>
+    <button class="tool-btn" data-build="road">🛤️<small>道路</small></button>
+    <button class="tool-btn" data-build="hospital">🏥<small>医院</small></button>
+    <button class="tool-btn" data-build="command">🎛️<small>指挥中心</small></button>
+    <button class="tool-btn victory-btn" data-build="launchpad">🚀<small>发射台</small></button>
+    <button id="btn-reset" class="tool-btn danger">🗑️<small>重开</small></button>
   </footer>
   <div id="build-info" class="hidden"></div>
+  <div id="hint">点建筑查看/升级 · 点迷雾扇区解锁（铁×50）· WASD/点击移动 · E/空格采集</div>
 </div>
 
+<script src="resources.js"></script>
 <script src="map.js"></script>
 <script src="player.js"></script>
+<script src="pop.js"></script>
+<script src="city.js"></script>
 <script src="build.js"></script>
 <script src="game.js"></script>
 </body>
