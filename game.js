@@ -3,8 +3,15 @@
  */
 
 const SAVE_KEY = 'starport-save-v1';
-const GAME_VERSION = '1.8.0';
-const GAME_CODENAME = '星海无垠';
+const GAME_VERSION = '2.0.0';
+const GAME_CODENAME = '经纬万象';
+// v1.9 - 时间/20新建筑/60科技/8灾难/5奇观/对战/MOD（70008行）
+// v2.0 - 电网/水管/交通深化/经济/30新建筑/UI（100000行）
+// v2.0 文件：powergrid/waternet/transit/economy/buildings_v20/ui_v20/
+//          v20_integration/v20_balance/v20_scenarios/v20_whatsnew/manual_v20
+// v2.0 验证：V20Balance.runAll() 10/12 通过（城镇-1.3/分可玩，大环线需L3）
+// v2.0 测试：V20SelfTest.run() 14/14 通过
+// v2.0 补丁：hotfix-1（工资1.2/税率15%/商业1.8/开局120币）
 
 // 版本历史：
 // v1.0 - 基础循环：8资源/12建筑/人口/评级/胜利
@@ -67,6 +74,13 @@ class Game {
     // v1.7 新系统
     this.quantum = (typeof QuantumManager !== 'undefined') ? new QuantumManager() : null;
     this.bio = (typeof BioManager !== 'undefined') ? new BioManager() : null;
+    // v2.0 新系统：电网 / 水管 / 交通 / 经济
+    this.powergrid = (typeof PowerGridManager !== 'undefined') ? new PowerGridManager() : null;
+    this.waternet = (typeof WaterNetManager !== 'undefined') ? new WaterNetManager() : null;
+    this.transit = (typeof TransitManager !== 'undefined') ? new TransitManager() : null;
+    this.economy = (typeof EconomyManager !== 'undefined') ? new EconomyManager() : null;
+    // v2.0 建筑合并
+    try { if (typeof mergeBuildingsV20 === 'function') mergeBuildingsV20(); } catch (e) {}
     // v1.6-v1.8 内容合并
     try { if (typeof mergeBuildingsV16 === 'function') mergeBuildingsV16(); } catch (e) {}
     try { if (typeof mergeBuildingsV18 === 'function') mergeBuildingsV18(); } catch (e) {}
@@ -84,6 +98,9 @@ class Game {
     // 注入引用
     this.builder.techTree = this.tech;
     this.builder.disaster = this.disaster;
+    this.builder.powergrid = this.powergrid;
+    this.builder.waternet = this.waternet;
+    this.builder.economy = this.economy;
     this.pop.techTree = this.tech;
 
     this.selectedBuild = null;
@@ -197,6 +214,11 @@ class Game {
         // v1.4
         deepSpace: this.deepSpace ? this.deepSpace.save() : null,
         orbitalHazards: this.orbitalHazards ? this.orbitalHazards.save() : null,
+        // v2.0
+        powergrid: this.powergrid ? this.powergrid.save() : null,
+        waternet: this.waternet ? this.waternet.save() : null,
+        transit: this.transit ? this.transit.save() : null,
+        economy: this.economy ? this.economy.save() : null,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch (e) { /* 忽略 */ }
@@ -229,6 +251,11 @@ class Game {
       // v1.4
       if (data.deepSpace && this.deepSpace) this.deepSpace.load(data.deepSpace);
       if (data.orbitalHazards && this.orbitalHazards) this.orbitalHazards.load(data.orbitalHazards);
+      // v2.0
+      if (data.powergrid && this.powergrid) this.powergrid.load(data.powergrid);
+      if (data.waternet && this.waternet) this.waternet.load(data.waternet);
+      if (data.transit && this.transit) this.transit.load(data.transit);
+      if (data.economy && this.economy) this.economy.load(data.economy);
       return true;
     } catch (e) { return false; }
   }
@@ -1187,6 +1214,11 @@ class Game {
     try { if (this.bio && this.bio.update) this.bio.update(dt, this); } catch (e) {}
     // v1.8 集成 tick
     try { if (typeof v18Tick === 'function') v18Tick(this, dt, now); } catch (e) {}
+    // v2.0：电网 / 水管 / 交通 / 经济
+    try { if (this.powergrid) this.powergrid.update(now, dt, this); } catch (e) {}
+    try { if (this.waternet) this.waternet.update(now, dt, this); } catch (e) {}
+    try { if (this.transit) this.transit.update(now, dt, this); } catch (e) {}
+    try { if (this.economy) this.economy.update(now, dt, this); } catch (e) {}
     // v1.5 成就检查（每 10 秒）
     try {
       if (!this._v15achT || now - this._v15achT > 10000) {

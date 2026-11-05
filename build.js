@@ -628,7 +628,15 @@ class BuildManager {
 
       // 直接生产
       if (lv.produce && now - b.lastProduce >= lv.produceInterval) {
-        if (!ok && lv.powerUse > 0) continue;  // 缺电停工
+        if (!ok && lv.powerUse > 0) continue;  // 缺电停工（旧全局逻辑）
+        // v2.0：电网精细供电（玩家铺了电缆后启用，未铺沿用旧逻辑）
+        if (this.powergrid && this.powergrid.cables && this.powergrid.cables.size > 0 && lv.powerUse > 0) {
+          try { if (!this.powergrid.isPowered(b.x, b.y)) continue; } catch (e) {}
+        }
+        // v2.0：水压不足停工（仅 waterUse 建筑）
+        if (this.waternet && lv.waterUse) {
+          try { if (this.waternet.getPressure(b.x, b.y) < 20) continue; } catch (e) {}
+        }
         b.lastProduce = now;
         for (const k in lv.produce) {
           let amount = lv.produce[k] * eff;
@@ -665,6 +673,12 @@ class BuildManager {
       // 转换生产（冶炼厂/水厂）
       if (lv.convert && now - b.lastProduce >= lv.convertInterval) {
         if (!ok && lv.powerUse > 0) continue;
+        if (this.powergrid && this.powergrid.cables && this.powergrid.cables.size > 0 && lv.powerUse > 0) {
+          try { if (!this.powergrid.isPowered(b.x, b.y)) continue; } catch (e) {}
+        }
+        if (this.waternet && lv.waterUse) {
+          try { if (this.waternet.getPressure(b.x, b.y) < 20) continue; } catch (e) {}
+        }
         if (canAfford(inv, lv.convert.in)) {
           b.lastProduce = now;
           spendRes(inv, lv.convert.in);
