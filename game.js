@@ -431,8 +431,16 @@ class Game {
       // 否则移动
       this.player.setTarget(x, y);
     };
-    this.canvas.addEventListener('click', onTap);
-    this.canvas.addEventListener('touchstart', onTap, { passive: false });
+    // v1.9-fix：画布点按统一走镜头手势系统（bindCameraGestures → onCameraTap，
+    // 带 44px 容错）。镜头手势绑定成功时不再绑 click/touchstart，避免移动端一次
+    // 点按触发 2-3 次（touchstart→旧onTap、pointerup→onCameraTap、click→旧onTap），
+    // 导致解锁扇区先成功 toast 紧接着"已解锁"报错等重复执行问题。
+    // 桌面端点按同样走 pointer 事件。若镜头绑定失败则回退到旧处理器。
+    if (!this._detachCam) {
+      this.canvas.addEventListener('click', onTap);
+      this.canvas.addEventListener('touchstart', onTap, { passive: false });
+    }
+    this._canvasTapHandler = onTap; // 保留引用供调试/测试
     const keys = {
       w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
       arrowup: [0, -1], arrowdown: [0, 1], arrowleft: [-1, 0], arrowright: [1, 0],
@@ -1042,9 +1050,31 @@ class Game {
       else if (this._meteorMark) dEl.textContent = '☄️ 陨石预警';
       else dEl.textContent = '';
     }
-    // 科技数
+    // v1.9：放下第一栋建筑后，底部 hint 条自动隐藏（省空间）
+    try {
+      if (this.builder.buildings.length > 0) {
+        const hint = document.getElementById('hint');
+        if (hint) hint.style.display = 'none';
+      }
+    } catch (e) {}
+    // 科技数（v1.9-fix：动态总数，不再硬编码/60）
     const tEl = document.getElementById('tech-count');
-    if (tEl) tEl.textContent = `🔬${this.tech.totalUnlocked()}/60`;  // v1.2
+    if (tEl) {
+      const total = (typeof TECH_DEFS !== 'undefined' ? Object.keys(TECH_DEFS).length : 0)
+        + (typeof TECH_V15 !== 'undefined' ? TECH_V15.length : 0)
+        + (typeof TECH_V16 !== 'undefined' ? TECH_V16.length : 0)
+        + (typeof TECH_V17 !== 'undefined' ? TECH_V17.length : 0);
+      tEl.textContent = `🔬${this.tech.totalUnlocked()}/${total || '?'}`;
+    }
+    // v1.9：科技锁定的建筑在工具栏置灰，直观可见
+    try {
+      for (const btn of document.querySelectorAll('[data-build]')) {
+        const id = btn.dataset.build;
+        const lv = BUILDINGS[id] && BUILDINGS[id].levels[1];
+        const locked = lv && lv.needTech && this.tech && !this.tech.buildingUnlocked(id);
+        btn.classList.toggle('locked', !!locked);
+      }
+    } catch (e) {}
   }
 
   showVictory(type) {
@@ -1263,7 +1293,7 @@ class Game {
       this.ctx.save();
       this.ctx.translate(-left * effTile, -top * effTile);
     }
-    this.map.render(this.ctx, effTile);
+    this.map.renderFast(this.ctx, effTile, cam ? cam.visibleRange() : null);
     this.builder.render(this.ctx, effTile);
     this.logistics.render(this.ctx, effTile);
     this.player.render(this.ctx, effTile);
@@ -1415,6 +1445,9 @@ if (typeof document !== 'undefined') {
     }
     game.updateHUD();
     window.__starport = game;
+    // v1.9：隐藏加载屏
+    const ld = document.getElementById('loading');
+    if (ld) ld.classList.add('hide');
   });
 }
 

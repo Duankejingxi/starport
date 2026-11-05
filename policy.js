@@ -427,14 +427,19 @@ class PolicyManager {
     const self = this;
     let panel = null, curCat = 'tax';
 
-    // 政策按钮（挂到顶栏；若顶栏不存在则 fixed 右上角）
+    // 政策按钮（v1.9-fix：用 tool-btn 统一样式，挂到底栏）
     const btn = document.createElement('button');
-    btn.textContent = '📜 政策';
+    btn.innerHTML = '📜<small>政策</small>';
+    btn.className = 'tool-btn';
     btn.title = `颁布城市政策（${this.active.size}/${MAX_ACTIVE_POLICY}）`;
-    btn.style.cssText = 'margin-left:6px;cursor:pointer;';
     btn.onclick = () => { panel ? close() : open(); };
-    const topbar = document.getElementById('topbar') || document.body;
-    topbar.appendChild(btn);
+    const toolbar = document.getElementById('toolbar');
+    if (toolbar) toolbar.appendChild(btn);
+    else {
+      btn.style.cssText = 'margin-left:6px;cursor:pointer;';
+      const topbar = document.getElementById('topbar') || document.body;
+      topbar.appendChild(btn);
+    }
 
     function open() {
       panel = document.createElement('div');

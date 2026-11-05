@@ -80,6 +80,7 @@ class GameMap {
     spendRes(inv, cost);
     this.sectors[sy][sx] = true;
     this.scatterSector(sx, sy);
+    this.invalidateTerrain();  // v1.9：迷雾变化，重绘离屏地形
     return { ok: true };
   }
 
@@ -239,6 +240,140 @@ class GameMap {
   // v1.2：地形名称（UI 用）
   terrainName(t) {
     return ['平地', '岩石', '环形山', '峡谷', '极地', '火山'][t] || '未知';
+  }
+
+  // v1.9：静态地形离屏预渲染（50×50 每帧 2500 格 fillRect+stroke 手机上太卡）
+  // 地形+迷雾+扇区边框画到离屏 canvas，主循环只 drawImage；资源点稀疏，逐帧画。
+  renderTerrainOffscreen(tile) {
+    const n = this.size;
+    if (!this._off || this._offTile !== tile) {
+      this._off = document.createElement('canvas');
+      this._off.width = n * tile;
+      this._off.height = n * tile;
+      this._offTile = tile;
+    }
+    const ctx = this._off.getContext('2d');
+    const c = ctx;
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const px = x * tile, py = y * tile;
+        const unlocked = this.isUnlocked(x, y);
+        if (!unlocked) {
+          c.fillStyle = '#0a0a12';
+          c.fillRect(px, py, tile, tile);
+          c.strokeStyle = 'rgba(120,120,180,0.12)';
+          c.lineWidth = 1;
+          c.strokeRect(px + 0.5, py + 0.5, tile - 1, tile - 1);
+          continue;
+        }
+        const t = this.terrain[y][x];
+        c.fillStyle = TERRAIN_COLORS[t] || '#5a2e1a';
+        c.fillRect(px, py, tile, tile);
+        if (t === TERRAIN.ROCK) {
+          c.fillStyle = '#5c4030';
+          c.fillRect(px + tile * 0.2, py + tile * 0.25, tile * 0.25, tile * 0.2);
+          c.fillRect(px + tile * 0.55, py + tile * 0.6, tile * 0.3, tile * 0.25);
+        } else if (t === TERRAIN.CRATER) {
+          c.strokeStyle = '#3a2214';
+          c.lineWidth = Math.max(2, tile * 0.08);
+          c.beginPath();
+          c.arc(px + tile / 2, py + tile / 2, tile * 0.32, 0, Math.PI * 2);
+          c.stroke();
+          c.fillStyle = '#140a06';
+          c.beginPath();
+          c.arc(px + tile / 2, py + tile / 2, tile * 0.22, 0, Math.PI * 2);
+          c.fill();
+        } else if (t === TERRAIN.CANYON) {
+          c.fillStyle = '#05050c';
+          c.fillRect(px + tile * 0.15, py, tile * 0.7, tile);
+          c.strokeStyle = '#2a2a4a';
+          c.lineWidth = 1;
+          c.beginPath();
+          c.moveTo(px + tile * 0.15, py); c.lineTo(px + tile * 0.15, py + tile);
+          c.moveTo(px + tile * 0.85, py); c.lineTo(px + tile * 0.85, py + tile);
+          c.stroke();
+        } else if (t === TERRAIN.POLAR) {
+          c.fillStyle = 'rgba(255,255,255,0.35)';
+          const sx = ((x * 7 + y * 13) % 5) / 5, sy = ((x * 11 + y * 5) % 5) / 5;
+          c.fillRect(px + sx * tile * 0.7, py + sy * tile * 0.7, tile * 0.12, tile * 0.12);
+          c.fillStyle = '#7dd3fc';
+          c.font = `${Math.max(6, tile * 0.25)}px sans-serif`;
+          c.fillText('❄', px + tile * 0.35, py + tile * 0.7);
+        } else if (t === TERRAIN.VOLCANO) {
+          c.fillStyle = '#ff6a2a';
+          c.beginPath();
+          c.arc(px + tile / 2, py + tile / 2, tile * 0.18, 0, Math.PI * 2);
+          c.fill();
+          c.fillStyle = '#ffd23c';
+          c.beginPath();
+          c.arc(px + tile / 2, py + tile / 2, tile * 0.09, 0, Math.PI * 2);
+          c.fill();
+        } else {
+          c.fillStyle = 'rgba(0,0,0,0.08)';
+          const sx = ((x * 7 + y * 13) % 5) / 5, sy = ((x * 11 + y * 5) % 5) / 5;
+          const d = Math.max(2, tile * 0.08);
+          c.fillRect(px + sx * tile * 0.7, py + sy * tile * 0.7, d, d);
+        }
+        c.strokeStyle = 'rgba(0,0,0,0.15)';
+        c.lineWidth = 1;
+        c.strokeRect(px + 0.5, py + 0.5, tile - 1, tile - 1);
+      }
+    }
+    // 扇区边界虚线
+    c.strokeStyle = 'rgba(125,211,252,0.35)';
+    c.lineWidth = 2;
+    c.setLineDash([6, 4]);
+    for (let sy = 0; sy < SECTOR_N; sy++) {
+      for (let sx = 0; sx < SECTOR_N; sx++) {
+        if (this.sectors[sy][sx]) continue;
+        let adj = false;
+        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          const nx = sx + dx, ny = sy + dy;
+          if (nx >= 0 && nx < SECTOR_N && ny >= 0 && ny < SECTOR_N && this.sectors[ny][nx]) { adj = true; break; }
+        }
+        if (adj) {
+          const ss = this.sectorSize * tile;
+          c.strokeRect(sx * ss + 2, sy * ss + 2, ss - 4, ss - 4);
+        }
+      }
+    }
+    c.setLineDash([]);
+    this._offDirty = false;
+  }
+
+  // 扇区解锁/资源变化后调用
+  invalidateTerrain() { this._offDirty = true; }
+
+  // 主循环调用：贴离屏 + 画资源点（稀疏）
+  renderFast(ctx, tile, camView) {
+    const n = this.size;
+    const offTile = 32;
+    if (!this._off || this._offDirty || this._offTile !== offTile) {
+      this.renderTerrainOffscreen(offTile);
+    }
+    // 把离屏（offTile/格）缩放到当前 tile/格
+    ctx.drawImage(this._off, 0, 0, n * offTile, n * offTile, 0, 0, n * tile, n * tile);
+    // 资源点：只画视野内的
+    const r = camView || { x0: 0, y0: 0, x1: n - 1, y1: n - 1 };
+    for (let y = r.y0; y <= r.y1; y++) {
+      for (let x = r.x0; x <= r.x1; x++) {
+        const res = this.resource[y] && this.resource[y][x];
+        if (!res || !RES_DEFS[res] || !this.isUnlocked(x, y)) continue;
+        const px = x * tile, py = y * tile;
+        ctx.fillStyle = RES_DEFS[res].color;
+        const rr = tile * 0.14;
+        for (const [ox, oy] of [[-0.18, -0.1], [0.18, -0.1], [0, 0.2]]) {
+          const dx = px + tile / 2 + ox * tile, dy = py + tile / 2 + oy * tile;
+          ctx.beginPath();
+          ctx.moveTo(dx, dy - rr);
+          ctx.lineTo(dx + rr, dy);
+          ctx.lineTo(dx, dy + rr);
+          ctx.lineTo(dx - rr, dy);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
   }
 
   render(ctx, tile) {
