@@ -21,18 +21,19 @@
       <span id="disaster-ind"></span>
       <span id="tech-count"></span>
     </div>
-    <div id="res-bar">
-      <div class="res"><span>🟤</span><span id="res-iron">0</span></div>
+    <div id="res-bar" class="collapsed">
+      <div class="res key"><span>🟤</span><span id="res-iron">0</span></div>
+      <div class="res key"><span>💧</span><span id="res-water">0</span></div>
+      <div class="res key"><span>⚡</span><span id="res-power">0/0</span></div>
+      <div class="res key"><span>👥</span><span id="res-pop">2/2</span></div>
+      <button id="btn-res-expand" aria-label="展开资源">＋</button>
       <div class="res"><span>🧊</span><span id="res-ice">0</span></div>
       <div class="res"><span>🟣</span><span id="res-rare">0</span></div>
-      <div class="res"><span>💧</span><span id="res-water">0</span></div>
       <div class="res"><span>🌾</span><span id="res-food">0</span></div>
       <div class="res"><span>🔩</span><span id="res-steel">0</span></div>
       <div class="res"><span>🔬</span><span id="res-tech">0</span></div>
       <div class="res"><span>☢️</span><span id="res-uranium">0</span></div>
       <div class="res"><span>🌌</span><span id="res-he3">0</span></div>
-      <div class="res"><span>👥</span><span id="res-pop">2/2</span></div>
-      <div class="res"><span>⚡</span><span id="res-power">0/0</span></div>
       <div class="res"><span id="sector-count">🗺️ 1/9</span></div>
     </div>
   </header>
@@ -111,6 +112,33 @@
       <div id="help-nav"></div>
       <div id="help-content"></div>
     </div>
+    <!-- 建筑菜单（v2.1 重构：分类 + 卡片） -->
+    <div id="build-menu" class="hidden">
+      <div class="panel-header">
+        <b>🏗️ 建造</b>
+        <button id="btn-close-buildmenu">✖</button>
+      </div>
+      <div id="build-cats"></div>
+      <div id="build-cards"></div>
+    </div>
+    <!-- 更多菜单（v2.1 重构） -->
+    <div id="more-menu" class="hidden">
+      <div class="panel-header">
+        <b>⚙️ 更多</b>
+        <button id="btn-close-moremenu">✖</button>
+      </div>
+      <div id="more-grid"></div>
+    </div>
+    <!-- 图层菜单（v2.1 重构） -->
+    <div id="overlay-menu" class="hidden">
+      <div class="panel-header">
+        <b>🗺️ 图层</b>
+        <button id="btn-close-overlaymenu">✖</button>
+      </div>
+      <div id="overlay-list"></div>
+    </div>
+    <!-- 取消建造（v2.1） -->
+    <button id="btn-cancel-build" class="hidden"></button>
     <!-- 小地图 -->
     <canvas id="minimap" width="120" height="120"></canvas>
     <!-- 教程 -->
@@ -136,43 +164,17 @@
     </div>
   </div>
 
-  <!-- 底栏：操作 -->
+  <!-- 底栏：操作（v2.1 重构：5 键） -->
   <footer id="toolbar">
     <button id="btn-harvest" class="tool-btn">⛏️<small>采集</small></button>
+    <button id="btn-build-menu" class="tool-btn">🏗️<small>建造</small></button>
     <button id="btn-tech" class="tool-btn">🔬<small>科技</small></button>
-    <button id="btn-truck" class="tool-btn">🚚<small>运输</small></button>
-    <button id="btn-achieve" class="tool-btn">🏆<small>成就</small></button>
-    <button id="btn-stats" class="tool-btn">📊<small>统计</small></button>
-    <button id="btn-help" class="tool-btn">❓<small>帮助</small></button>
-    <button id="btn-v15-menu" class="tool-btn">🌟<small>新纪元</small></button>
-    <button id="btn-speed" class="tool-btn">⏩<small>1x</small></button>
-    <button id="btn-sound" class="tool-btn">🔊<small>声音</small></button>
-    <button class="tool-btn" data-build="habitat">🏠<small>居住舱</small></button>
-    <button class="tool-btn" data-build="solar">🔆<small>太阳能</small></button>
-    <button class="tool-btn" data-build="miner">🏭<small>采矿机</small></button>
-    <button class="tool-btn" data-build="pump">💧<small>抽水机</small></button>
-    <button class="tool-btn" data-build="smelter">🔥<small>冶炼厂</small></button>
-    <button class="tool-btn" data-build="greenhouse">🌾<small>温室</small></button>
-    <button class="tool-btn" data-build="waterplant">🚰<small>水厂</small></button>
-    <button class="tool-btn" data-build="lab">🔬<small>实验室</small></button>
-    <button class="tool-btn" data-build="road">🛤️<small>道路</small></button>
-    <button class="tool-btn" data-build="hospital">🏥<small>医院</small></button>
-    <button class="tool-btn" data-build="nuclear">☢️<small>核电站</small></button>
-    <button class="tool-btn" data-build="school">🏫<small>学校</small></button>
-    <button class="tool-btn" data-build="trade">🏪<small>贸易站</small></button>
-    <button class="tool-btn" data-build="repair">🔧<small>维修站</small></button>
-    <button class="tool-btn" data-build="weather">📡<small>气象站</small></button>
-    <button class="tool-btn" data-build="dome">🌐<small>穹顶</small></button>
-    <button class="tool-btn" data-build="depot">🚚<small>运输站</small></button>
-    <button class="tool-btn" data-build="warehouse">📦<small>仓库</small></button>
-    <button class="tool-btn" data-build="logistics">🛰️<small>物流中心</small></button>
-    <button class="tool-btn" data-build="command">🎛️<small>指挥中心</small></button>
-    <button class="tool-btn victory-btn" data-build="launchpad">🚀<small>发射台</small></button>
-    <button id="btn-reset" class="tool-btn danger">🗑️<small>重开</small></button>
+    <button id="btn-overlay" class="tool-btn">🗺️<small>图层</small></button>
+    <button id="btn-more" class="tool-btn">⚙️<small>更多</small></button>
   </footer>
   <div id="build-info" class="hidden"></div>
   <div id="v15-panel" class="hidden"></div>
-  <div id="hint">点建筑查看/升级/维修 · 点迷雾扇区解锁（铁×50）· WASD/点击移动 · E/空格采集 · 🔬科技树别忘了</div>
+  <div id="hint">🏗️建造 → 选建筑 → 点空地放置 · 点建筑查看/升级 · 点迷雾扇区解锁（铁×50）</div>
 </div>
 
 <script src="resources.js"></script>
@@ -257,6 +259,7 @@
 <script src="v20_scenarios.js"></script>
 <script src="v20_whatsnew.js"></script>
 <script src="manual_v20.js"></script>
+<script src="ui_refactor.js"></script>
 <script src="game.js"></script>
 <!-- ============================================================
      星港 v2.0「经纬万象」快捷键速查（2026-11-05）

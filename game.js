@@ -133,6 +133,10 @@ class Game {
     this.disaster.onEvent = (type, data) => this.onDisaster(type, data);
 
     this.bindInput();
+    // v2.1：UI 重构模块（需在 bindUI 之前实例化）
+    try {
+      if (typeof UIRefactor !== 'undefined') this.uiref = new UIRefactor(this);
+    } catch (e) { this.uiref = null; }
     this.bindUI();
     this.tutorial.bindUI();
     this.help.bindUI();
@@ -142,6 +146,14 @@ class Game {
     if (this.policy && this.policy.bindUI) this.policy.bindUI(this);
     // v1.4
     if (this.deepSpace && this.deepSpace.bindUI) this.deepSpace.bindUI(this);
+    // v2.1：绑定重构后的 UI（建筑面板/更多/图层）+ 3 步教程
+    // 注意：必须在各系统 bindUI 之后，才能收走它们注入的工具栏按钮
+    try {
+      if (this.uiref) {
+        this.uiref.bindUI();
+        this.uiref.simplifyTutorial();
+      }
+    } catch (e) {}
     // v1.5：总督（需要建造回调）
     try {
       if (typeof GovernorManager !== 'undefined') {
@@ -567,6 +579,11 @@ class Game {
   }
 
   bindUI() {
+    // v2.1：防御性绑定助手（v2.1 重构后部分旧按钮已移除）
+    const on = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', fn);
+    };
     // v1.5：镜头缩放按钮
     const zi = document.getElementById('zoom-in');
     if (zi) zi.addEventListener('click', () => { if (this.camera && this.camera.zoomIn()) { this.updateZoomUI(); this.sound.click(); } });
@@ -575,7 +592,7 @@ class Game {
     const zr = document.getElementById('zoom-reset');
     if (zr) zr.addEventListener('click', () => { if (this.camera) { this.camera.reset(); this.updateZoomUI(); this.sound.click(); } });
     try { if (this.v15ui) this.v15ui.bindMenu(); } catch (e) {}
-    document.getElementById('btn-harvest').addEventListener('click', () => this.doHarvest());
+    on('btn-harvest', () => this.doHarvest());
     for (const btn of document.querySelectorAll('[data-build]')) {
       btn.addEventListener('click', () => {
         const id = btn.dataset.build;
@@ -591,48 +608,41 @@ class Game {
         this.sound.click();
       });
     }
-    document.getElementById('btn-upgrade').addEventListener('click', () => this.doUpgrade());
-    document.getElementById('btn-repair').addEventListener('click', () => this.doRepair());
-    document.getElementById('btn-demolish').addEventListener('click', () => this.doDemolish());
-    document.getElementById('btn-close-panel').addEventListener('click', () => this.hideBuildingPanel());
-    document.getElementById('btn-reset').addEventListener('click', () => {
+    on('btn-upgrade', () => this.doUpgrade());
+    on('btn-repair', () => this.doRepair());
+    on('btn-demolish', () => this.doDemolish());
+    on('btn-close-panel', () => this.hideBuildingPanel());
+    on('btn-reset', () => {
       if (confirm('重开？存档会清空！')) this.reset();
     });
     // 科技树
-    document.getElementById('btn-tech').addEventListener('click', () => {
+    on('btn-tech', () => {
       this.toggleTechPanel();
       this.sound.click();
     });
-    document.getElementById('btn-close-tech').addEventListener('click', () => this.hideTechPanel());
-    // 音效开关
-    const sndBtn = document.getElementById('btn-sound');
-    const refreshSnd = () => { sndBtn.textContent = this.sound.enabled ? '🔊' : '🔇'; };
-    sndBtn.addEventListener('click', () => {
-      this.sound.toggle();
-      refreshSnd();
-      this.sound.click();
-    });
-    refreshSnd();
+    on('btn-close-tech', () => this.hideTechPanel());
+    // 音效开关（v2.1：移到「更多」菜单，保留旧按钮兼容）
+    on('btn-sound', () => this.toggleSound());
     // 运输车
-    document.getElementById('btn-truck').addEventListener('click', () => this.toggleTruckPanel());
-    document.getElementById('btn-close-truck').addEventListener('click', () => this.hideTruckPanel());
-    document.getElementById('btn-build-truck').addEventListener('click', () => this.doBuildTruck());
+    on('btn-truck', () => this.toggleTruckPanel());
+    on('btn-close-truck', () => this.hideTruckPanel());
+    on('btn-build-truck', () => this.doBuildTruck());
     // 贸易
-    document.getElementById('btn-close-trade').addEventListener('click', () => this.hideTradePanel());
+    on('btn-close-trade', () => this.hideTradePanel());
     // 成就
-    document.getElementById('btn-achieve').addEventListener('click', () => {
+    on('btn-achieve', () => {
       this.toggleAchievePanel();
       this.sound.click();
     });
-    document.getElementById('btn-close-achieve').addEventListener('click', () => this.hideAchievePanel());
+    on('btn-close-achieve', () => this.hideAchievePanel());
     // 统计
-    document.getElementById('btn-stats').addEventListener('click', () => {
+    on('btn-stats', () => {
       this.toggleStatsPanel();
       this.sound.click();
     });
-    document.getElementById('btn-close-stats').addEventListener('click', () => this.hideStatsPanel());
-    // 帮助
-    document.getElementById('btn-help').addEventListener('click', () => {
+    on('btn-close-stats', () => this.hideStatsPanel());
+    // 帮助（v2.1：移到「更多」菜单，保留旧按钮兼容）
+    on('btn-help', () => {
       this.help.toggle();
       this._helpOpened = true;
       this.sound.click();
@@ -643,15 +653,8 @@ class Game {
       this.sound.click();
     });
     document.getElementById('city-rank').style.cursor = 'pointer';
-    // 速度控制
-    const speedBtn = document.getElementById('btn-speed');
-    const speedLabels = { 0: '⏸️<small>暂停</small>', 1: '⏩<small>1x</small>', 2: '⏩⏩<small>2x</small>' };
-    speedBtn.addEventListener('click', () => {
-      this.speedMode = this.speedMode === 1 ? 2 : (this.speedMode === 2 ? 0 : 1);
-      speedBtn.innerHTML = speedLabels[this.speedMode];
-      this.toast(this.speedMode === 0 ? '⏸️ 已暂停' : this.speedMode === 2 ? '⏩⏩ 双倍速' : '⏩ 正常速度');
-      this.sound.click();
-    });
+    // 速度控制（v2.1：移到「更多」菜单，保留旧按钮兼容）
+    on('btn-speed', () => this.cycleSpeed());
     // 胜利继续
     const contBtn = document.getElementById('btn-continue');
     if (contBtn) {
@@ -763,6 +766,26 @@ class Game {
       this.updateHUD();
       this.save();
     }
+  }
+
+  // v2.1：声音开关（供「更多」菜单调用）
+  toggleSound() {
+    this.sound.toggle();
+    const sndBtn = document.getElementById('btn-sound');
+    if (sndBtn) sndBtn.textContent = this.sound.enabled ? '🔊' : '🔇';
+    this.toast(this.sound.enabled ? '🔊 声音开' : '🔇 声音关');
+  }
+
+  // v2.1：速度切换（供「更多」菜单调用）
+  cycleSpeed() {
+    this.speedMode = this.speedMode === 1 ? 2 : (this.speedMode === 2 ? 0 : 1);
+    const speedBtn = document.getElementById('btn-speed');
+    if (speedBtn) {
+      const speedLabels = { 0: '⏸️<small>暂停</small>', 1: '⏩<small>1x</small>', 2: '⏩⏩<small>2x</small>' };
+      speedBtn.innerHTML = speedLabels[this.speedMode];
+    }
+    this.toast(this.speedMode === 0 ? '⏸️ 已暂停' : this.speedMode === 2 ? '⏩⏩ 双倍速' : '⏩ 正常速度');
+    this.sound.click();
   }
 
   doHarvest() {
