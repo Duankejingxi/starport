@@ -360,8 +360,16 @@ class GameMap {
         const res = this.resource[y] && this.resource[y][x];
         if (!res || !RES_DEFS[res] || !this.isUnlocked(x, y)) continue;
         const px = x * tile, py = y * tile;
+        // 资源格整格底色+描边：1x 全图视图下也一眼可见（用户反馈“方块太小了”）
+        ctx.globalAlpha = 0.30;
         ctx.fillStyle = RES_DEFS[res].color;
-        const rr = tile * 0.14;
+        ctx.fillRect(px + 1, py + 1, tile - 2, tile - 2);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = RES_DEFS[res].color;
+        ctx.lineWidth = Math.max(1, tile * 0.08);
+        ctx.strokeRect(px + 1, py + 1, tile - 2, tile - 2);
+        ctx.fillStyle = RES_DEFS[res].color;
+        const rr = tile * 0.22;
         for (const [ox, oy] of [[-0.18, -0.1], [0.18, -0.1], [0, 0.2]]) {
           const dx = px + tile / 2 + ox * tile, dy = py + tile / 2 + oy * tile;
           ctx.beginPath();
@@ -450,8 +458,16 @@ class GameMap {
         // 资源点
         const res = this.resource[y][x];
         if (res && RES_DEFS[res]) {
+          // 资源格整格底色+描边：1x 全图视图下也一眼可见（用户反馈“方块太小了”）
+          ctx.globalAlpha = 0.30;
           ctx.fillStyle = RES_DEFS[res].color;
-          const r = tile * 0.14;
+          ctx.fillRect(px + 1, py + 1, tile - 2, tile - 2);
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = RES_DEFS[res].color;
+          ctx.lineWidth = Math.max(1, tile * 0.08);
+          ctx.strokeRect(px + 1, py + 1, tile - 2, tile - 2);
+          ctx.fillStyle = RES_DEFS[res].color;
+          const r = tile * 0.22;
           for (const [ox, oy] of [[-0.18, -0.1], [0.18, -0.1], [0, 0.2]]) {
             const dx = px + tile / 2 + ox * tile, dy = py + tile / 2 + oy * tile;
             ctx.beginPath();
