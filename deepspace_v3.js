@@ -164,7 +164,7 @@ const DS_STARTING_STOCK = {
 };
 
 // ================= 全局调参 =================
-const DS_TUNE = {
+const DS_TUNE_V3 = {
   tickSec: 1,                 // update 按秒推进（调用方传 dt）
   prodCycleSec: 3600,         // 产量按「每小时」标定
   // —— 解锁门槛 ——
@@ -865,7 +865,7 @@ class DSCrewMember {
         0, 100);
     }
     this.morale = dsv3Clamp(
-      (typeof opts.morale === 'number') ? opts.morale : DS_TUNE.crewMoraleBase, 0, 100);
+      (typeof opts.morale === 'number') ? opts.morale : DS_TUNE_V3.crewMoraleBase, 0, 100);
     this.health = dsv3Clamp((typeof opts.health === 'number') ? opts.health : 100, 0, 100);
     this.status = opts.status || CREW_STATUS.IDLE;
     this.assignment = opts.assignment || null; // {kind:'ship'|'station'|'moon', id}
@@ -952,7 +952,7 @@ class DSCrewMember {
     const moralePart = 0.7 + (this.morale / 100) * 0.5;
     const healthPart = 0.5 + (this.health / 100) * 0.5;
     let eff = skillPart * moralePart * healthPart;
-    if (this.morale < DS_TUNE.crewMoraleLow) eff *= 0.7;
+    if (this.morale < DS_TUNE_V3.crewMoraleLow) eff *= 0.7;
     if (this.health < 50) eff *= 0.7;
     // 勋章效率加成
     for (let i = 0; i < this.medals.length; i++) {
@@ -1017,8 +1017,8 @@ class DSCrewMember {
   }
   // 士气过低可能辞职：返回 true 表示辞职
   checkResign(rng) {
-    if (this.morale >= DS_TUNE.crewMoraleCritical) return false;
-    const p = (DS_TUNE.crewMoraleCritical - this.morale) / 100 * 0.5;
+    if (this.morale >= DS_TUNE_V3.crewMoraleCritical) return false;
+    const p = (DS_TUNE_V3.crewMoraleCritical - this.morale) / 100 * 0.5;
     return (rng || Math.random)() < p;
   }
   summary() {
@@ -1105,13 +1105,13 @@ class DSCrewManager {
   // 每次招募生成 3 名候选人（岗位随机、技能随机），玩家挑 1 名雇佣。
   // 冷却 1 小时；费用 = 招募费 + 首月工资折算。
   recruitCost(role) {
-    const base = DS_TUNE.crewRecruitCost;
+    const base = DS_TUNE_V3.crewRecruitCost;
     const roleMul = { pilot: 1.5, engineer: 1.2, scientist: 1.6, medic: 1.3, miner: 1.0 };
     return Math.round(base * (roleMul[role] || 1));
   }
   canRecruit(nowSec) {
-    if (this.roster.length >= DS_TUNE.crewMaxRoster) {
-      return { ok: false, reason: '船员名册已满（' + DS_TUNE.crewMaxRoster + ' 人）' };
+    if (this.roster.length >= DS_TUNE_V3.crewMaxRoster) {
+      return { ok: false, reason: '船员名册已满（' + DS_TUNE_V3.crewMaxRoster + ' 人）' };
     }
     if (nowSec < this.recruitCooldownUntil) {
       return { ok: false, reason: '招募冷却中，还需 ' + dsv3FmtTime(this.recruitCooldownUntil - nowSec) };
@@ -1385,7 +1385,7 @@ class DSShip {
     if (!SHIP_TYPES[this.type]) this.type = 'transport';
     this.blueprint = opts.blueprint || null; // 蓝图变体 id（DS_SHIP_BLUEPRINTS）
     this.name = opts.name || DSShip.defaultName(this.type);
-    this.level = dsv3Clamp(opts.level || 1, 1, DS_TUNE.shipMaxLevel);
+    this.level = dsv3Clamp(opts.level || 1, 1, DS_TUNE_V3.shipMaxLevel);
     this.status = opts.status || SHIP_STATUS.DOCKED;
     this.upgrades = opts.upgrades || { engine: 0, cargo: 0, shield: 0 };
     this.hull = opts.hull != null ? opts.hull : this.maxHull();
@@ -2036,7 +2036,7 @@ class DSOrbitalStation {
     this.powerShortageHours = 0;    // 累计缺电小时（用于统计）
   }
 
-  slotCount() { return this.rings * DS_TUNE.stationSlotsPerRing; }
+  slotCount() { return this.rings * DS_TUNE_V3.stationSlotsPerRing; }
   usedSlots() { return this.slots.length; }
   freeSlots() { return this.slotCount() - this.slots.length; }
 
@@ -2095,7 +2095,7 @@ class DSOrbitalStation {
     // 找第一个空槽
     let ring = 1, slot = 0, found = false;
     for (let r = 1; r <= this.rings && !found; r++) {
-      for (let s = 0; s < DS_TUNE.stationSlotsPerRing; s++) {
+      for (let s = 0; s < DS_TUNE_V3.stationSlotsPerRing; s++) {
         if (!this.moduleAt(r, s)) { ring = r; slot = s; found = true; break; }
       }
     }
@@ -2159,8 +2159,8 @@ class DSOrbitalStation {
     };
   }
   canExpandRing(stock) {
-    if (this.rings >= DS_TUNE.stationMaxRings) {
-      return { ok: false, reason: '已达最大环数（' + DS_TUNE.stationMaxRings + ' 环）' };
+    if (this.rings >= DS_TUNE_V3.stationMaxRings) {
+      return { ok: false, reason: '已达最大环数（' + DS_TUNE_V3.stationMaxRings + ' 环）' };
     }
     const filled = this.slots.filter(function (s) { return s.ring === this.rings; }.bind(this)).length;
     if (filled < 8) {
@@ -2273,7 +2273,7 @@ class DSOrbitalStation {
   producePerHour(assignedCrewCount, moraleAvg) {
     const power = this.powerBalance();
     const powerShort = power.net < 0;
-    let eff = powerShort ? DS_TUNE.stationPowerShortageMul : 1;
+    let eff = powerShort ? DS_TUNE_V3.stationPowerShortageMul : 1;
     const need = this.crewNeed();
     if (need > 0 && assignedCrewCount < need) {
       // 缺员按比例降效，最低 0.5
@@ -3108,8 +3108,8 @@ class DSBeltManager {
     if (!a.discovered) return { ok: false, reason: '尚未发现该小行星' };
     if (a.claimed) return { ok: false, reason: '已被认领' };
     if (a.depleted()) return { ok: false, reason: '该小行星已采空' };
-    if (this.activeClaims().length >= DS_TUNE.beltMaxClaims) {
-      return { ok: false, reason: '认领已达上限（' + DS_TUNE.beltMaxClaims + ' 颗）' };
+    if (this.activeClaims().length >= DS_TUNE_V3.beltMaxClaims) {
+      return { ok: false, reason: '认领已达上限（' + DS_TUNE_V3.beltMaxClaims + ' 颗）' };
     }
     return { ok: true, asteroid: a };
   }
@@ -3684,8 +3684,8 @@ class DSExpeditionManager {
     if (!def.repeatable && this.isCompleted(defId)) {
       return { ok: false, reason: '该任务已完成，不可重复' };
     }
-    if (this.active.length >= DS_TUNE.expeditionMaxActive) {
-      return { ok: false, reason: '同时进行的远征已达上限（' + DS_TUNE.expeditionMaxActive + '）' };
+    if (this.active.length >= DS_TUNE_V3.expeditionMaxActive) {
+      return { ok: false, reason: '同时进行的远征已达上限（' + DS_TUNE_V3.expeditionMaxActive + '）' };
     }
     if (def.requires.tech && hasTech && !hasTech(def.requires.tech)) {
       return { ok: false, reason: '需要科技：' + def.requires.tech };
@@ -3779,7 +3779,7 @@ class DSExpeditionManager {
 
   // 事故判定：基础风险 + 难度 − 护盾/医生修正
   computeRisk(def, ship, crewMgr, crewIds) {
-    let risk = DS_TUNE.expeditionRiskBase + (def.difficulty - 1) * DS_TUNE.expeditionRiskPerLevel + (def.risk || 0);
+    let risk = DS_TUNE_V3.expeditionRiskBase + (def.difficulty - 1) * DS_TUNE_V3.expeditionRiskPerLevel + (def.risk || 0);
     if (ship) risk *= ship.riskMul();
     if (crewMgr && crewIds) {
       // 医生在队：事故率 −20%；平均士气低：事故率 +15%
@@ -3791,7 +3791,7 @@ class DSExpeditionManager {
         moraleSum += c.morale; n++;
       }
       if (hasMedic) risk *= 0.8;
-      if (n && moraleSum / n < DS_TUNE.crewMoraleLow) risk *= 1.15;
+      if (n && moraleSum / n < DS_TUNE_V3.crewMoraleLow) risk *= 1.15;
     }
     return dsv3Clamp(risk, 0.02, 0.7);
   }
@@ -4744,7 +4744,7 @@ class DeepSpaceV3 {
     if (this.unlocked) return true;
     if (!game) { this.unlocked = true; return true; }
     try {
-      if (game.tech && typeof game.tech.has === 'function' && game.tech.has(DS_TUNE.unlockStationTech)) {
+      if (game.tech && typeof game.tech.has === 'function' && game.tech.has(DS_TUNE_V3.unlockStationTech)) {
         this.unlocked = true; return true;
       }
       if (game.builder && game.builder.buildings) {
@@ -6253,7 +6253,7 @@ class DSValidator {
       }
     }
     if (data.crew && data.crew.roster) {
-      if (data.crew.roster.length > DS_TUNE.crewMaxRoster) {
+      if (data.crew.roster.length > DS_TUNE_V3.crewMaxRoster) {
         issues.push('船员超出上限：' + data.crew.roster.length);
       }
       for (let i = 0; i < data.crew.roster.length; i++) {
@@ -6263,7 +6263,7 @@ class DSValidator {
       }
     }
     if (data.station && data.station.slots) {
-      if (data.station.slots.length > data.station.rings * DS_TUNE.stationSlotsPerRing) {
+      if (data.station.slots.length > data.station.rings * DS_TUNE_V3.stationSlotsPerRing) {
         issues.push('轨道站槽位超限');
       }
     }
@@ -6275,7 +6275,7 @@ class DSValidator {
       }
     }
     if (data.expeditions && data.expeditions.active) {
-      if (data.expeditions.active.length > DS_TUNE.expeditionMaxActive) {
+      if (data.expeditions.active.length > DS_TUNE_V3.expeditionMaxActive) {
         issues.push('进行中远征超出上限');
       }
     }
@@ -6315,8 +6315,8 @@ class DSValidator {
         c.morale = dsv3Clamp(c.morale, 0, 100);
         c.health = dsv3Clamp(c.health, 0, 100);
       }
-      if (data.crew.roster.length > DS_TUNE.crewMaxRoster) {
-        data.crew.roster.length = DS_TUNE.crewMaxRoster;
+      if (data.crew.roster.length > DS_TUNE_V3.crewMaxRoster) {
+        data.crew.roster.length = DS_TUNE_V3.crewMaxRoster;
         fixed.push('船员名册截断至上限');
       }
     }
@@ -6539,7 +6539,7 @@ const DSUI = {
     let h = '<div class="ds-panel ds-belt">';
     h += '<h2>🪨 小行星带</h2>';
     h += '<p>已发现 ' + s.discovered + '/' + s.total + ' · 可认领 ' + s.claimable +
-      ' · 进行中认领 ' + s.activeClaims + '/' + DS_TUNE.beltMaxClaims +
+      ' · 进行中认领 ' + s.activeClaims + '/' + DS_TUNE_V3.beltMaxClaims +
       ' · 累计开采 ' + dsv3Fmt(s.totalMined) + ' 吨 · 勘测进度 ' + Math.round(s.surveyProgress * 100) + '%</p>';
     h += '<h3>分区</h3><div class="ds-grid">';
     for (let i = 0; i < BELT_ZONES.length; i++) {
@@ -6684,7 +6684,7 @@ Object.assign(DSUI, {
     const s = ex.summary();
     let h = '<div class="ds-panel ds-expeditions">';
     h += '<h2>🗺️ 远征任务</h2>';
-    h += '<p>进行中 ' + s.active.length + '/' + DS_TUNE.expeditionMaxActive +
+    h += '<p>进行中 ' + s.active.length + '/' + DS_TUNE_V3.expeditionMaxActive +
       ' · 累计出发 ' + s.totalStarted + ' · 成功 ' + s.totalSuccess + ' · 失败 ' + s.totalFailed + '</p>';
     if (s.active.length) {
       h += '<h3>进行中</h3>';
@@ -7473,7 +7473,7 @@ function dsApplyScenario(mgr, scenarioId, nowSec) {
       // 直接布放模块（不扣费、不占槽位检查之外的逻辑）
       let ring = 1, slot = 0, found = false;
       for (let r = 1; r <= mgr.station.rings && !found; r++) {
-        for (let s = 0; s < DS_TUNE.stationSlotsPerRing; s++) {
+        for (let s = 0; s < DS_TUNE_V3.stationSlotsPerRing; s++) {
           if (!mgr.station.moduleAt(r, s)) { ring = r; slot = s; found = true; break; }
         }
       }
@@ -9767,7 +9767,7 @@ const DeepSpaceV3Exports = {
   DS_MAP_NODES: DS_MAP_NODES,
   DS_MAP_ROUTES: DS_MAP_ROUTES,
   DS_RESOURCES: DS_RESOURCES,
-  DS_TUNE: DS_TUNE,
+  DS_TUNE: DS_TUNE_V3,
 };
 
 if (typeof window !== 'undefined') {

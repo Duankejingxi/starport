@@ -3,8 +3,8 @@
  */
 
 const SAVE_KEY = 'starport-save-v1';
-const GAME_VERSION = '2.0.0';
-const GAME_CODENAME = '经纬万象';
+const GAME_VERSION = '3.0.0';
+const GAME_CODENAME = '星海文明';
 // v1.9 - 时间/20新建筑/60科技/8灾难/5奇观/对战/MOD（70008行）
 // v2.0 - 电网/水管/交通深化/经济/30新建筑/UI（100000行）
 // v2.0 文件：powergrid/waternet/transit/economy/buildings_v20/ui_v20/
@@ -88,6 +88,19 @@ class Game {
     try { if (typeof TECH_V17 !== 'undefined' && this.tech && this.tech.addBatch) this.tech.addBatch(TECH_V17); } catch (e) {}
     try { if (typeof ACH_V16 !== 'undefined' && this.achievements && this.achievements.addBatch) this.achievements.addBatch(ACH_V16); } catch (e) {}
     try { if (typeof ACH_V17 !== 'undefined' && this.achievements && this.achievements.addBatch) this.achievements.addBatch(ACH_V17); } catch (e) {}
+    // v3.0 新系统：政治 / 军事 v3 / 深空 v3 / 生态（防御性实例化，缺文件时跳过）
+    try { if (typeof PoliticsIntegration !== 'undefined') PoliticsIntegration.attach(this); } catch (e) {}
+    try { if (typeof MilitaryV3Integration !== 'undefined') MilitaryV3Integration.attach(this); } catch (e) {}
+    try { this.deepSpaceV3 = (typeof DeepSpaceV3 !== 'undefined') ? new DeepSpaceV3() : null; } catch (e) { this.deepSpaceV3 = null; }
+    try { if (typeof EcologyIntegration !== 'undefined') EcologyIntegration.attach(this, this.map.size, 1337); } catch (e) {}
+    // v3.0 内容合并：建筑 / 科技 / 灾难 / 奇观 / 剧本（进全局注册表，建造面板与科技树打开时动态读取）
+    try { if (typeof mergeBuildingsV30 === 'function') mergeBuildingsV30(); } catch (e) {}
+    try { if (typeof mergeBuildingsV31 === 'function') mergeBuildingsV31(); } catch (e) {}
+    try { if (typeof mergeTechV30 === 'function') mergeTechV30(); } catch (e) {}
+    try { if (typeof mergeTechV31 === 'function') mergeTechV31(); } catch (e) {}
+    try { if (typeof mergeDisastersV30 === 'function') mergeDisastersV30(this.disaster); } catch (e) {}
+    try { if (typeof mergeWondersV30 === 'function') mergeWondersV30(); } catch (e) {}
+    try { if (typeof mergeScenariosV31 === 'function') mergeScenariosV31(); } catch (e) {}
     // 总督需要回调，延迟到 bindInput 后初始化
     this.governor = null;
     // v1.5 内容包：合并建筑/科技/成就/灾难/奇观配置
@@ -154,6 +167,15 @@ class Game {
         this.uiref.simplifyTutorial();
       }
     } catch (e) {}
+    // v3.0：新系统 UI（政治/深空/生态/军事/联机面板，经「更多」菜单打开；联机管理器由 V30UIManager 懒创建）
+    // 注意：须在 uiref.bindUI() 之后，patchMoreMenu 包装的是最终版 showMoreMenu
+    try {
+      if (typeof V30UIManager !== 'undefined' && !this.v30ui) {
+        this.v30ui = new V30UIManager(this);
+        this.v30ui.install();
+        if (typeof window !== 'undefined') window.__v30Installed = true; // 阻止 ui_v30.js 自动安装造出第二个实例
+      }
+    } catch (e) { this.v30ui = null; }
     // v1.5：总督（需要建造回调）
     try {
       if (typeof GovernorManager !== 'undefined') {
@@ -231,6 +253,11 @@ class Game {
         waternet: this.waternet ? this.waternet.save() : null,
         transit: this.transit ? this.transit.save() : null,
         economy: this.economy ? this.economy.save() : null,
+        // v3.0
+        politics: this.politics ? this.politics.save() : null,
+        militaryV3: this.militaryV3 ? this.militaryV3.save() : null,
+        deepSpaceV3: this.deepSpaceV3 ? this.deepSpaceV3.save() : null,
+        ecology: this.ecology ? this.ecology.save() : null,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch (e) { /* 忽略 */ }
@@ -268,6 +295,11 @@ class Game {
       if (data.waternet && this.waternet) this.waternet.load(data.waternet);
       if (data.transit && this.transit) this.transit.load(data.transit);
       if (data.economy && this.economy) this.economy.load(data.economy);
+      // v3.0
+      if (data.politics && this.politics) this.politics.load(data.politics);
+      if (data.militaryV3 && this.militaryV3) this.militaryV3.load(data.militaryV3);
+      if (data.deepSpaceV3 && this.deepSpaceV3) this.deepSpaceV3.load(data.deepSpaceV3);
+      if (data.ecology && this.ecology) this.ecology.load(typeof EcologyMigration !== 'undefined' ? EcologyMigration.migrate(data.ecology) : data.ecology);
       return true;
     } catch (e) { return false; }
   }
@@ -1242,6 +1274,11 @@ class Game {
     try { if (this.waternet) this.waternet.update(now, dt, this); } catch (e) {}
     try { if (this.transit) this.transit.update(now, dt, this); } catch (e) {}
     try { if (this.economy) this.economy.update(now, dt, this); } catch (e) {}
+    // v3.0：政治 / 军事 v3 / 深空 v3 / 生态
+    try { if (typeof PoliticsIntegration !== 'undefined') PoliticsIntegration.tick(this, now, dt); } catch (e) {}
+    try { if (typeof MilitaryV3Integration !== 'undefined') MilitaryV3Integration.tick(this, now, dt); } catch (e) {}
+    try { if (this.deepSpaceV3) this.deepSpaceV3.update(now, this); } catch (e) {}
+    try { if (this.ecology) this.ecology.update(now, dt, this); } catch (e) {}
     // v1.5 成就检查（每 10 秒）
     try {
       if (!this._v15achT || now - this._v15achT > 10000) {
