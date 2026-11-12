@@ -1,5 +1,7 @@
 import { G, RES_INFO, canAfford, costText, pay } from './state.js';
-import { DEFS, ORDER, setGhost, placement } from './buildings.js';
+import { DEFS, ORDER, setGhost, placement, unlockState } from './buildings.js';
+import { LEVELS, nextLevelInfo, CENTER } from './city.js';
+import { P as PLANET, PID } from './planets.js';
 import { CHAPTERS, RECIPES, radioCurrent } from './story.js';
 import { tool, TOOLS } from './tools.js';
 import { clockText } from './sky.js';
@@ -68,17 +70,18 @@ export function closeMenus(relock) {
 }
 
 function renderBuild() {
-  $('build-list').innerHTML = ORDER.map(k => {
-    const d = DEFS[k], locked = d.chapter > G.chapter, ok = canAfford(d.cost);
+  $('build-list').innerHTML = ORDER.filter(k => !unlockState(k).hide).map(k => {
+    const d = DEFS[k], us = unlockState(k), locked = !us.ok, ok = canAfford(d.cost);
+    const why = PID === 'mars' && d.chapter > G.chapter ? `在「${CHAPTERS[d.chapter].title}」解锁` : us.why;
     const pw = d.power > 0 ? `<span class="pw plus">+${d.power} ⚡</span>` : d.power < 0 ? `<span class="pw">${d.power} ⚡</span>` : '';
     return `<div class="card ${locked ? 'locked' : ''} ${ok ? '' : 'poor'}" data-k="${k}">
       <div class="h"><span class="ic">${locked ? '🔒' : d.icon}</span><b>${d.name}</b>${pw}</div>
-      <div class="d">${locked ? `在「${CHAPTERS[d.chapter].title}」解锁` : d.desc}</div>
+      <div class="d">${locked ? why : d.desc}</div>
       <div class="c">${locked ? '' : costText(d.cost)}</div></div>`;
   }).join('');
   $('build-list').querySelectorAll('.card').forEach(el => el.addEventListener('click', () => {
     const k = el.dataset.k, d = DEFS[k];
-    if (d.chapter > G.chapter) { audio.play('deny'); return; }
+    if (!unlockState(k).ok) { audio.play('deny'); return; }
     audio.play('ui');
     placement.rot = 0;
     setGhost(k); tool.index = 2;
@@ -118,7 +121,9 @@ export function updateUI(dt, ctx) {
     const pw = `${Math.round(C.powerProd)}/${C.powerUse}`;
     $('colony').innerHTML = `
       <div class="${C.deficit ? 'warn' : ''}">⚡ 电力 <b>${pw}</b>${C.deficit ? ' 不足' : ''}</div>
+      <div class="lv">${LEVELS[G.cityLevel].icon} <b>${LEVELS[G.cityLevel].name}</b> <small>· ${PLANET.name}</small></div>
       <div>👥 人口 <b>${C.pop}</b> <small>/ 可容纳 ${C.support}</small></div>
+      ${(() => { const n = nextLevelInfo(); return n ? `<div class="sub">下一级「${n.name}」：人口 ${Math.min(n.curPop, n.pop)}/${n.pop} · 设施 ${Math.min(n.curB, n.b)}/${n.b}</div>` : ''; })()}
       <div class="sub">🏠${C.housing} 🫧${C.o2} 🌱${C.food} 💧${C.water}</div>
       ${G.terraform > 0 ? `<div>🌍 大气改造 <b>${Math.floor(G.terraform * 100)}%</b></div>` : ''}`;
     $('clock').textContent = clockText() + (G.storm > 0.3 ? ' · 沙尘暴' : '') + (G.time.night > 0.5 ? ' · 夜' : '');
@@ -216,6 +221,8 @@ function drawMinimap() {
   mmx.fillStyle = '#7dff9a';
   for (const c of G.colonists) mmx.fillRect(tx(c.pos.x) - 1, tz(c.pos.z) - 1, 2, 2);
   for (const e of G.enemies) dot(e.pos.x, e.pos.z, e.guardian ? 3.5 : 2.5, '#ff3b2a');
+  mmx.strokeStyle = 'rgba(102,230,255,.6)'; mmx.lineWidth = 1.5; mmx.setLineDash([4, 4]);
+  mmx.beginPath(); mmx.arc(tx(CENTER.x), tz(CENTER.z), LEVELS[G.cityLevel].r * sc, 0, Math.PI * 2); mmx.stroke(); mmx.setLineDash([]);
   dot(LANDER_POS.x, LANDER_POS.z, 3, '#66ff99');
   // 玩家箭头
   const a = Math.atan2(P.fwd.x, -P.fwd.z);

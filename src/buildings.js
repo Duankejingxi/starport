@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { G, canAfford, pay } from './state.js';
-import { BUILD_MODELS, M } from './models.js';
+import { BUILD_MODELS, M, CITY_MATS } from './models.js';
+import { P, PID } from './planets.js';
+import { LEVELS, inTerritory } from './city.js';
 import { getHeight, slopeAt, HALF } from './terrain.js';
 import { fx } from './fx.js';
 import { audio } from './audio.js';
@@ -18,11 +20,26 @@ export const DEFS = {
   fabricator: { name: '制造工坊', icon: '🔧', chapter: 2, cost: { iron: 22, silicon: 14 }, power: -1, r: 4.6, hp: 220, desc: '靠近按 E 制造武器与装备。' },
   turret:     { name: '防御炮塔', icon: '🛡️', chapter: 2, cost: { iron: 22, silicon: 10 }, power: -2, r: 1.9, hp: 200, range: 40, desc: '自动攻击 40 米内的锈蚀蛛。需要电力。' },
   reactor:    { name: '聚变反应堆', icon: '⚛️', chapter: 3, cost: { iron: 40, silicon: 20, titanium: 12 }, power: 20, r: 5.4, hp: 400, desc: '昼夜不停 +20 ⚡。用火星的钛，点亮人类的第二颗太阳。' },
-  terraformer:{ name: '大气改造塔', icon: '🌍', chapter: 4, cost: { iron: 100, silicon: 60, titanium: 30, ice: 50 }, power: -12, r: 7.4, hp: 800, desc: '向天空释放温室气体与水汽。让这颗星球，真正成为家。' },
+  apartment:  { name: '公寓塔', icon: '🏢', level: 2, cost: { iron: 40, silicon: 25, titanium: 4 }, power: -3, r: 4.6, hp: 400, housing: 12, life: 12, desc: '可住 12 人。窗户里的灯光，是城市的星空。' },
+  vfarm:      { name: '垂直农场', icon: '🌾', level: 2, cost: { iron: 30, silicon: 30, ice: 15 }, power: -4, r: 4.2, hp: 260, food: 14, desc: '十四层的立体农田。供 14 人食物。' },
+  lifehub:    { name: '生态中枢', icon: '🌀', level: 3, cost: { iron: 45, silicon: 30, ice: 30, titanium: 6 }, power: -5, r: 6.0, hp: 400, o2: 16, water: 16, life: 20, desc: '大型氧气与水循环系统。供 16 人氧气和用水，20 米内补氧。' },
+  terraformer:{ name: '大气改造塔', icon: '🌍', chapter: 4, only: 'terraformable', cost: { iron: 100, silicon: 60, titanium: 30, ice: 50 }, power: -12, r: 7.4, hp: 800, desc: '向天空释放温室气体与水汽。让这颗星球，真正成为家。' },
+  launch:     { name: '星际发射台', icon: '🛸', chapter: 5, level: PID === 'mars' ? 5 : 4, only: 'next', cost: { iron: 160, silicon: 120, titanium: 60, ice: 60 }, power: -15, r: 9.5, hp: 900, desc: '建造殖民舰，前往下一颗星球。靠近按 E 发射。' },
+  monument:   { name: '文明纪念碑', icon: '🗼', level: 5, only: 'final', cost: { iron: 150, silicon: 120, titanium: 80 }, power: -6, r: 6.5, hp: 900, desc: '三颗星球，一个人类。献给所有出发的人。' },
 };
-export const ORDER = ['solar', 'oxygen', 'lamp', 'habitat', 'greenhouse', 'extractor', 'beacon', 'fabricator', 'turret', 'reactor', 'terraformer'];
+// 某座建筑当前能否建造
+export function unlockState(k) {
+  const d = DEFS[k];
+  if (d.only === 'terraformable' && !P.terraformable) return { hide: true };
+  if (d.only === 'next' && !P.next) return { hide: true };
+  if (d.only === 'final' && P.next) return { hide: true };
+  if (PID === 'mars' && d.chapter && d.chapter > G.chapter) return { ok: false, why: `剧情推进后解锁` };
+  if (d.level && d.level > G.cityLevel) return { ok: false, why: `城市等级达到「${LEVELS[d.level].name}」解锁` };
+  return { ok: true };
+}
+export const ORDER = ['solar', 'oxygen', 'lamp', 'habitat', 'greenhouse', 'extractor', 'beacon', 'fabricator', 'turret', 'reactor', 'apartment', 'vfarm', 'lifehub', 'terraformer', 'launch', 'monument'];
 // 停电时的供电优先级
-const PRIORITY = ['oxygen', 'turret', 'habitat', 'extractor', 'greenhouse', 'beacon', 'fabricator', 'terraformer'];
+const PRIORITY = ['oxygen', 'lifehub', 'turret', 'habitat', 'apartment', 'extractor', 'greenhouse', 'vfarm', 'beacon', 'fabricator', 'terraformer', 'launch', 'monument'];
 
 export function createBuilding(type, x, z, rot = 0, hp) {
   const def = DEFS[type];
@@ -56,7 +73,7 @@ export function count(type) { return G.buildings.filter(b => b.type === type).le
 // 计算电力与生命维持
 export function recalcColony() {
   const C = G.colony;
-  const solarK = G.time.elevation > 0.05 ? 1 : 0.4;
+  const solarK = (G.time.elevation > 0.05 ? 1 : 0.4) * P.solar;
   let prod = 0, use = 0;
   for (const b of G.buildings) {
     if (b.broken) continue;
@@ -135,6 +152,7 @@ export function updateGhost(hit, playerPos) {
   else if (G.colliders.overlaps(x, z, def.r * 0.85)) reason = '位置被占用';
   else if (d < def.r + 0.8) reason = '离自己太近';
   else if (Math.abs(x) > HALF - 170 || Math.abs(z) > HALF - 170) reason = '超出可建造区域';
+  else if (!inTerritory(x, z, def.r)) reason = '超出殖民地领地（提升城市等级来扩张）';
   placement.valid = !reason; placement.reason = reason;
   const mat = reason ? ghostBad : ghostOk;
   ghost.traverse(o => { if (o.isMesh) o.material = mat; });
@@ -157,6 +175,7 @@ export function updateBuildings(dt, ctx) {
   const night = G.time.night, now = performance.now() * 0.001;
   M.window.emissiveIntensity = 0.3 + night * 1.6;
   M.lamp.emissiveIntensity = night * 4;
+  for (const m of CITY_MATS) m.emissiveIntensity = 0.15 + night * 1.4;
   for (const b of G.buildings) {
     const a = b.anim, on = b.powered;
     b.t += dt;
@@ -178,6 +197,10 @@ export function updateBuildings(dt, ctx) {
       case 'greenhouse': a.light.material.opacity = on ? 0.3 + night * 0.5 : 0; break;
       case 'fabricator': if (on) { a.arm.rotation.y = Math.sin(b.t * 0.8) * 1.2; a.spark.visible = Math.sin(b.t * 7) > 0.6; } else a.spark.visible = false; break;
       case 'habitat': a.tip.visible = Math.sin(now * 2 + b.x) > 0.3; break;
+      case 'apartment': a.tip.visible = Math.sin(now * 2 + b.z) > 0.3; break;
+      case 'vfarm': a.light.material.opacity = on ? 0.25 + night * 0.5 : 0; break;
+      case 'lifehub': if (on) a.fan.rotation.y += dt * 3; a.light.visible = on; break;
+      case 'monument': a.rings.forEach((r, i) => { r.rotation.x = now * (0.3 + i * 0.2); r.rotation.y = now * (0.2 + i * 0.15); }); break;
       case 'reactor': a.r1.rotation.y += dt * 0.8; a.r2.rotation.z += dt * 0.6; a.light.material.opacity = 0.5 + Math.sin(now * 3) * 0.2; break;
       case 'beacon': {
         const k = Math.floor(now * 6) % 8;

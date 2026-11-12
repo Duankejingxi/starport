@@ -1,11 +1,17 @@
 import { G } from './state.js';
 import { count } from './buildings.js';
 import { audio } from './audio.js';
+import { PID, P } from './planets.js';
+import { LEVELS } from './city.js';
 
 const built = t => () => count(t) >= 1;
 const mined = (t, n) => ({ check: () => G.stats.mined[t] >= n, prog: () => `${Math.min(G.stats.mined[t], n)}/${n}` });
 
-export const CHAPTERS = [
+const lvl = n => ({ text: `城市等级达到「${LEVELS[n].name}」`, check: () => G.cityLevel >= n, prog: () => `人口 ${G.colony.pop}/${LEVELS[n].pop}` });
+const popGoal = n => ({ text: `人口达到 ${n}`, check: () => G.colony.pop >= n, prog: () => `${G.colony.pop}/${n}` });
+const launched = { text: '发射殖民舰', check: () => !!G.launched, prog: () => '靠近发射台按 E' };
+
+const MARS = [
   {
     title: '第一章 · 着陆', sub: '活下去',
     goals: [
@@ -68,14 +74,100 @@ export const CHAPTERS = [
     goals: [
       { text: '建造大气改造塔', check: built('terraformer') },
       { text: '殖民地人口达到 20', check: () => G.colony.pop >= 20, prog: () => `${G.colony.pop}/20` },
-      { text: '完成大气改造', check: () => G.terraform >= 1, prog: () => `${Math.floor(G.terraform * 100)}%` },
+      { text: '完成大气改造', check: () => G.terraform >= 1 && G.ended && !G.endingShown, prog: () => `${Math.floor(G.terraform * 100)}%` },
     ],
     radio: [
       ['地球指挥中心 · 林舟', '聚变反应堆点火成功。殖民地第一次在夜里也灯火通明。'],
       ['地球指挥中心 · 林舟', '最后一步了。大气改造塔——它要几十年才能彻底改变火星。但第一场雨，也许就在明天。'],
+      ['方舟一号 · AI', '提示：城市等级提升后领地会扩大，并解锁公寓塔、垂直农场、生态中枢。'],
+    ],
+  },
+  {
+    title: '第六章 · 星辰大海', sub: '下一颗星球',
+    goals: [lvl(5), { text: '建造星际发射台', check: built('launch') }, launched],
+    radio: [
+      ['地球指挥中心 · 林舟', '火星已经是家了。但人类的故事，从来不止于一个家。'],
+      ['方舟一号 · AI', '木卫二·欧罗巴：冰壳之下探测到液态海洋。把火星发展成「星港」，就能建造星际发射台。'],
     ],
   },
 ];
+
+const EUROPA = [
+  {
+    title: '第一章 · 冰原', sub: '在木星的注视下',
+    goals: [
+      { text: '采集水冰', ...mined('ice', 15) },
+      { text: '采集铁矿', ...mined('iron', 10) },
+      { text: '建造制氧站', check: built('oxygen') },
+      { text: '建造居住穹顶', check: built('habitat') },
+      { text: '建造着陆场', check: built('beacon') },
+    ],
+    radio: [
+      ['方舟二号 · AI', '着陆成功。表面温度零下 160 摄氏度。重力只有地球的七分之一。'],
+      ['火星殖民地 · 林晓', '你到了吗？我们在火星上看得见木星的光点。替我们看一眼它的大红斑吧。'],
+      ['方舟二号 · AI', '注意：这里离太阳太远，太阳能效率只有火星的一半。所有技术已从火星同步。'],
+    ],
+  },
+  {
+    title: '第二章 · 冰下之城', sub: '海洋之上的灯火',
+    goals: [popGoal(8), lvl(2), { text: '建造聚变反应堆', check: built('reactor') }],
+    radio: [
+      ['周青禾 · 水文学家', '冰层下的海洋比地球所有海洋加起来还多。有水，就有生命。'],
+      ['方舟二号 · AI', '警告：冰裂缝里有东西在移动。它们和火星的锈蚀蛛很像……但是蓝色的。'],
+    ],
+  },
+  {
+    title: '第三章 · 深渊之光', sub: '城市在冰原上生长',
+    goals: [lvl(3), popGoal(24), { text: '建造生态中枢', check: built('lifehub') }],
+    radio: [['Elena Petrova · 天文学家', '你知道吗？从这里看，太阳只是一颗特别亮的星星。']],
+  },
+  {
+    title: '第四章 · 下一站', sub: '一千二百光年',
+    goals: [lvl(4), { text: '建造星际发射台', check: built('launch') }, launched],
+    radio: [
+      ['方舟二号 · AI', '开普勒-442b：位于宜居带的类地行星，距离一千二百光年。'],
+      ['地球指挥中心 · 林舟', '这将是人类第一次离开太阳系。我老了，等不到你们抵达的那天。但我会一直看着星空。'],
+    ],
+  },
+];
+
+const KEPLER = [
+  {
+    title: '第一章 · 双日之下', sub: '另一颗恒星的晨光',
+    goals: [
+      { text: '采集铁矿', ...mined('iron', 15) },
+      { text: '采集硅晶', ...mined('silicon', 10) },
+      { text: '建造制氧站', check: built('oxygen') },
+      { text: '建造居住穹顶', check: built('habitat') },
+      { text: '建造着陆场', check: built('beacon') },
+    ],
+    radio: [
+      ['方舟三号 · AI', '冷冻休眠结束。当前日期：公元 2401 年。欢迎来到开普勒-442b。'],
+      ['方舟三号 · AI', '大气含氧 14%，还不够呼吸，但已经非常接近了。这里的重力比地球略大。'],
+    ],
+  },
+  {
+    title: '第二章 · 异星森林', sub: '会发光的树',
+    goals: [popGoal(10), lvl(2), { text: '建造聚变反应堆', check: built('reactor') }],
+    radio: [
+      ['Aiko Sato 的后代 · 生物学家', '那些伞菇树在夜里会发光。我的曾曾祖母一定会喜欢这里。'],
+      ['方舟三号 · AI', '警告：森林中的掠食者会在夜间出没。'],
+    ],
+  },
+  {
+    title: '第三章 · 文明', sub: '城市连成了星河',
+    goals: [lvl(4), popGoal(36), { text: '建造生态中枢', check: built('lifehub') }],
+    radio: [['方舟三号 · AI', '来自火星和欧罗巴的信号已经抵达——它们在一千二百年前发出。两座城市都还亮着。']],
+  },
+  {
+    title: '终章 · 星际文明', sub: '三颗星球，一个人类',
+    goals: [lvl(5), { text: '建造文明纪念碑', check: built('monument') }],
+    radio: [['方舟三号 · AI', '建一座纪念碑吧。献给第一个踏上火星的人——也就是你。']],
+  },
+];
+
+export const CHAPTERS = PID === 'europa' ? EUROPA : PID === 'kepler' ? KEPLER : MARS;
+export const THREAT_FROM = PID === 'mars' ? 2 : 1;
 
 export const RECIPES = {
   rifle:     { name: '等离子步枪', icon: '🔫', cost: { iron: 18, silicon: 12 }, desc: '按 2 切换。消耗能量发射等离子弹。' },
@@ -122,7 +214,7 @@ export function updateStory(dt) {
   G.raining = G.terraform >= 1 && Math.sin(G.time.t * Math.PI * 4 + G.time.day) > 0.3;
 
   // 沙尘暴
-  if (G.time.day >= 2 && G.terraform < 0.7) {
+  if (P.storms && G.time.day >= 2 && G.terraform < 0.7) {
     stormT -= dt;
     if (stormPhase === 'calm' && stormT <= 0 && G.time.night < 0.5) { stormPhase = 'warn'; stormT = 25; radio('方舟一号 · AI', '警告：沙尘暴将在 25 秒后抵达。能见度会急剧下降，氧气消耗加快。靠近生命维持设施。'); }
     else if (stormPhase === 'warn' && stormT <= 0) { stormPhase = 'storm'; stormLeft = 70 + Math.random() * 40; }

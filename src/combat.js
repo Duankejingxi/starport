@@ -5,6 +5,7 @@ import { getHeight, HALF } from './terrain.js';
 import { fx } from './fx.js';
 import { audio } from './audio.js';
 import { recalcColony } from './buildings.js';
+import { THREAT_FROM } from './story.js';
 
 // —— 弹道 ——
 const projectiles = [];
@@ -88,7 +89,7 @@ function colonyCenter() {
 export function updateEnemies(dt) {
   const P = G.player.pos;
   const night = G.time.night > 0.6;
-  const threat = G.chapter >= 2 && G.terraform < 1;
+  const threat = G.chapter >= THREAT_FROM && G.terraform < 1;
   if (night && !wasNight && threat) {
     nightBudget = Math.min(3 + (G.nightsSurvived || 0) * 2 + Math.floor(G.colony.pop / 4), 26);
     G.nightsSurvived = (G.nightsSurvived || 0) + 1;

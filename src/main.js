@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { G, ColliderGrid, RES_INFO } from './state.js';
-import { buildTerrain, makeMapCanvas, getHeight, applyTerraform } from './terrain.js';
+import { buildTerrain, makeMapCanvas, getHeight, applyTerraform, floraMat } from './terrain.js';
 import { buildSky, updateSky } from './sky.js';
 import { initFx, updateFx, fx } from './fx.js';
 import { audio } from './audio.js';
@@ -14,8 +14,9 @@ import { updateStory, startChapter, radio, CHAPTERS, setStormState, stormState, 
 import { initUI, updateUI, toast, chapterCard, openMenu, closeMenus } from './ui.js';
 import { input, initInput } from './input.js';
 import { makeLander } from './models.js';
+import { P, PID, PLANETS, SAVE_KEY, META, saveMeta, loadMeta, clearAll } from './planets.js';
+import { initCity, updateCity, LEVELS } from './city.js';
 
-const SAVE_KEY = 'starport-newhome-v1';
 const $ = id => document.getElementById(id);
 G.debug = /[?&]debug/.test(location.search);
 
@@ -50,6 +51,7 @@ G.player = player;
 initTools(camera);
 initInput(canvas);
 initUI(makeMapCanvas(350));
+initCity(scene);
 
 // —— 指针锁定 ——
 G.requestLock = () => {
@@ -68,7 +70,7 @@ canvas.addEventListener('click', () => {
 function save(silent) {
   if (!G.started) return;
   const data = {
-    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0,
+    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched,
     time: { t: G.time.t, day: G.time.day },
     player: { x: player.pos.x, z: player.pos.z, yaw: player.yaw, o2: player.o2, hp: player.health },
     buildings: serializeBuildings(), nodes: serializeNodes(), colonists: serializeColonists(), storm: stormState(),
@@ -90,6 +92,8 @@ function applySave(d) {
   player.pos.set(d.player.x, getHeight(d.player.x, d.player.z), d.player.z);
   player.yaw = d.player.yaw; player.o2 = d.player.o2; player.health = Math.max(30, d.player.hp);
   loadColonists(d.colonists || []);
+  G.cityLevel = d.city || 0; G.popTotal = d.pop ?? (d.colonists || []).length; G.launched = !!d.launched;
+  initCity(scene);
   setStormState(d.storm);
   startChapter(d.chapter, true);
   recalcColony();
@@ -98,21 +102,17 @@ function applySave(d) {
 const terraCenters = () => G.buildings.filter(b => b.type === 'terraformer').map(b => ({ x: b.x, z: b.z }));
 
 // —— 开场 ——
-const STORY = [
-  '2089 年。',
-  '地球依然美丽，但已经太拥挤、太炎热、太疲惫。',
-  '「方舟计划」把人类的未来，押在了一颗红色星球上。',
-  '经过七个月、两亿两千五百万公里的航行——',
-  '你的着陆舱，在乌托邦平原的晨光中落地。',
-  '你是第一个。<b style="color:#ff8a3d">但不会是最后一个。</b>',
-];
+const STORY = P.intro;
+document.querySelector('.logo span').textContent = '：' + P.title;
+document.title = '星港：' + P.title;
+if (META.visited?.length) $('touch-note').innerHTML = '已开拓：' + META.visited.map(v => `${PLANETS[v.id].name}（${v.pop} 人）`).join(' · ');
 $('story').innerHTML = STORY.map((s, i) => `<p style="animation-delay:${0.4 + i * 1.1}s">${s}</p>`).join('');
 const existing = loadSave();
 if (existing) {
   $('btn-continue').classList.remove('hidden');
-  $('cont-info').textContent = `${CHAPTERS[existing.chapter]?.title || ''} · 第 ${existing.time.day} 火星日 · ${existing.colonists?.length || 0} 位居民`;
+  $('cont-info').textContent = `${P.name} · ${CHAPTERS[existing.chapter]?.title || ''} · 第 ${existing.time.day} 日 · ${existing.pop ?? existing.colonists?.length ?? 0} 位居民`;
 }
-if (matchMedia('(pointer: coarse)').matches) $('touch-note').textContent = '本游戏需要键盘和鼠标，请在电脑上游玩。';
+if (matchMedia('(pointer: coarse)').matches) $('touch-note').innerHTML += '本游戏需要键盘和鼠标，请在电脑上游玩。';
 
 function begin(fromSave) {
   audio.init();
@@ -120,6 +120,12 @@ function begin(fromSave) {
   else {
     localStorage.removeItem(SAVE_KEY);
     generateNodes();
+    // 从上一颗星球带来的装备与物资
+    if (META.carry && PID !== 'mars') {
+      Object.assign(G.upgrades, META.carry.upgrades || {});
+      for (const k in META.carry.res) G.res[k] += META.carry.res[k];
+      setTimeout(() => toast('随舰物资已卸载，所有装备已同步'), 4000);
+    }
     G.time.t = 0.29; // 清晨
     startChapter(0, true);
     setTimeout(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); }, 1200);
@@ -135,7 +141,7 @@ $('btn-new').addEventListener('click', () => {
 });
 $('btn-continue').addEventListener('click', () => begin(true));
 $('btn-save').addEventListener('click', () => save(false));
-$('btn-restart').addEventListener('click', () => { if (confirm('确定删除存档并重新开始？')) { localStorage.removeItem(SAVE_KEY); G.started = false; location.reload(); } });
+$('btn-restart').addEventListener('click', () => { if (confirm('将删除所有星球的进度，从火星重新开始。确定吗？')) { clearAll(); G.started = false; location.href = location.pathname + (G.debug ? '?debug' : ''); } });
 $('vol').addEventListener('input', e => audio.setVolume(+e.target.value));
 $('sens').addEventListener('input', e => { input.sens = +e.target.value; });
 $('btn-respawn').addEventListener('click', () => { player.respawn(); $('death').classList.add('hidden'); G.requestLock(); });
@@ -143,6 +149,18 @@ $('btn-endcont').addEventListener('click', () => { $('ending').classList.add('hi
 
 // —— 事件 ——
 G.events.on('chapter', ch => chapterCard(ch));
+G.events.on('cityLevel', lv => {
+  chapterCard({ title: `${lv.icon} 城市升级：${lv.name}`, sub: `领地扩展至 ${lv.r} 米` });
+  const lines = {
+    1: ['方舟 · AI', '殖民地升级为定居点。领地扩大了，更远的土地可以建造了。'],
+    2: ['方舟 · AI', '小镇规模达成。公寓塔与垂直农场的设计图已解锁。'],
+    3: ['方舟 · AI', '这里已经是一座城市了。生态中枢的设计图已解锁。'],
+    4: ['方舟 · AI', '大都会。夜里，从轨道上能看见你们的灯光。'],
+    5: ['方舟 · AI', '城市等级达到「星港」——人类可以从这里飞向下一颗星球了。'],
+  }[G.cityLevel];
+  if (lines) radio(lines[0], lines[1]);
+  save(true);
+});
 G.events.on('openBuild', () => openMenu('build'));
 G.events.on('death', why => {
   audio.laser(false);
@@ -175,12 +193,16 @@ const BUILT_MSG = {
   beacon: ['地球指挥中心 · 林舟', '收到着陆场的信标信号了！只要殖民地能养活他们，移民飞船就会出发。'],
   reactor: ['方舟一号 · AI', '聚变反应堆点火成功。输出稳定。'],
   terraformer: ['地球指挥中心 · 林舟', '大气改造塔……启动了。我们见证的，是一颗星球的苏醒。'],
+  apartment: ['方舟 · AI', '第一座公寓塔落成。城市开始向天空生长。'],
+  launch: ['方舟 · AI', '星际发射台完工。殖民舰已加注完毕，随时可以出发。'],
+  monument: ['方舟 · AI', '纪念碑上刻着一行字：「致第一个出发的人」。'],
   turret: ['方舟一号 · AI', '防御炮塔上线。它们需要电力才能运转。'],
   fabricator: ['方舟一号 · AI', '制造工坊就绪。靠近后按 E 打开。'],
 };
 G.events.on('built', b => {
   const m = BUILT_MSG[b.type];
   if (m && G.stats.built[b.type] === 1) radio(m[0], m[1]);
+  if (b.type === 'monument' && G.stats.built.monument === 1) setTimeout(finalEnding, 6000);
   save(true);
 });
 G.events.on('ending', () => {
@@ -218,17 +240,83 @@ window.addEventListener('keydown', e => {
 function showClickHint() { /* 由每帧逻辑显示 */ }
 
 let interact = null, demolishArm = 0, autosave = 30, terraT = 0;
+let launchArm = 0;
+function startLaunch(b) {
+  G.launching = { b, t: 0 };
+  G.launched = true;
+  audio.play('rumble');
+  radio('方舟 · AI', `殖民舰点火。目标：${PLANETS[P.next].name}。全体乘员，祝你们好运。`);
+  b.anim.flame.visible = true;
+}
+function updateLaunch(dt) {
+  const L = G.launching; if (!L) return;
+  L.t += dt;
+  const ship = L.b.anim.ship;
+  if (L.t > 2) ship.position.y += dt * (2 + (L.t - 2) * 9);
+  const base = new THREE.Vector3(L.b.x, L.b.y + ship.position.y, L.b.z);
+  for (let i = 0; i < 6; i++) fx.flame(base);
+  if (L.t < 5) fx.dustPuff(new THREE.Vector3(L.b.x + (Math.random() - 0.5) * 16, L.b.y + 1, L.b.z + (Math.random() - 0.5) * 16), 3, 4);
+  player.landDip = Math.max(player.landDip, Math.min(0.15, 0.03 * L.t) * Math.random());
+  if (L.t > 9 && !L.faded) { L.faded = true; $('fade').classList.add('on'); }
+  if (L.t > 11.5 && !L.done) { L.done = true; travel(); }
+}
+function travel() {
+  const meta = loadMeta();
+  meta.visited = (meta.visited || []).filter(v => v.id !== PID).concat([{ id: PID, pop: G.colony.pop, day: G.time.day }]);
+  meta.planet = P.next;
+  const carry = {};
+  for (const k in G.res) carry[k] = Math.min(Math.floor(G.res[k] * 0.4), 80);
+  meta.carry = { upgrades: G.upgrades, res: carry };
+  save(true);
+  saveMeta(meta);
+  const nx = PLANETS[P.next];
+  $('ending-text').innerHTML = [`曲速航行中……`, `目的地：<b>${nx.name}</b>`, `<span class="stats">${P.name}的 ${G.colony.pop} 位居民，会替你守着那里的灯火。</span>`].map((l, i) => `<p style="animation-delay:${i * 1.2}s">${l}</p>`).join('');
+  document.querySelector('#ending .btns').classList.add('hidden');
+  $('ending').classList.remove('hidden'); $('fade').classList.remove('on');
+  G.endingShown = true;
+  if (document.pointerLockElement) document.exitPointerLock();
+  setTimeout(() => { location.href = location.pathname + (G.debug ? '?debug' : ''); }, 5000);
+}
+function finalEnding() {
+  G.endingShown = true;
+  if (document.pointerLockElement) document.exitPointerLock();
+  const meta = loadMeta();
+  const all = (meta.visited || []).concat([{ id: PID, pop: G.colony.pop }]);
+  const total = all.reduce((s, v) => s + v.pop, 0);
+  const lines = [
+    '很久很久以前，一个人独自站在火星的红色尘土里。',
+    '氧气只够撑三分钟，身边只有一座着陆舱。',
+    all.map(v => `${PLANETS[v.id].name} · ${v.pop} 人`).join('　'),
+    `今天，${total} 个人，生活在三颗星球上。`,
+    '<div class="big">星际文明</div>',
+    '这一切，都从你迈出的第一步开始。',
+    '<span class="stats">感谢游玩《星港》。你可以继续建设，城市会一直在这里等你。</span>',
+  ];
+  $('ending-text').innerHTML = lines.map((l, i) => `<p style="animation-delay:${i * 1.8}s">${l}</p>`).join('');
+  $('ending').classList.remove('hidden');
+  audio.play('chapter');
+  save(true);
+}
+
 function handleInteraction(dt) {
   const ctx = { prompt: '', crossClass: '' };
   if (player.dead || G.menuOpen) return ctx;
   const origin = camera.position, dir = player.fwd;
   const col = lookColonist(origin, dir);
   const fab = G.buildings.find(b => b.type === 'fabricator' && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < b.def.r + 6);
-  demolishArm = Math.max(0, demolishArm - dt);
+  demolishArm = Math.max(0, demolishArm - dt); launchArm = Math.max(0, launchArm - dt);
+  const launchPad = P.next && G.buildings.find(b => b.type === 'launch' && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < b.def.r + 8);
   if (col) {
     ctx.crossClass = 'talk';
     ctx.prompt = `<b>${col.name}</b> · ${col.job}<br><kbd>E</kbd> 交谈`;
     if (input.hit('KeyE')) { radio(col.name, col.line); }
+  } else if (launchPad && !G.launching) {
+    const nx = PLANETS[P.next];
+    if (!launchPad.powered) ctx.prompt = '星际发射台 · <span class="badc">电力不足</span>';
+    else {
+      ctx.prompt = `🛸 殖民舰已就绪 · 目的地：<b>${nx.name}</b><br><kbd>E</kbd> ${launchArm > 0 ? '<span class="badc">再按一次确认发射</span>' : '发射（本星球殖民地会继续自主运转）'}`;
+      if (input.hit('KeyE')) { if (launchArm > 0) startLaunch(launchPad); else launchArm = 3; }
+    }
   } else if (fab) {
     ctx.prompt = `<kbd>E</kbd> 打开制造工坊${fab.powered ? '' : '（停电中）'}`;
     if (input.hit('KeyE')) { if (fab.powered) openMenu('craft'); else toast('制造工坊没有电力'); }
@@ -285,11 +373,14 @@ function update(dt) {
   {
     player.update(dt);
     updateSky(dt, camera.position);
-    if (G.time.dawn) { G.time.dawn = false; toast(`☀ 第 ${G.time.day} 个火星日的黎明`); }
+    if (G.time.dawn) { G.time.dawn = false; toast(`☀ 第 ${G.time.day} 日的黎明 · ${P.name}`); }
     updateNodes(dt);
     updateTools(dt, player, camera);
     updateBuildings(dt, { shoot });
     updateColony(dt);
+    updateCity(dt, tool.id === 'build' && !!placement.type);
+    updateLaunch(dt);
+    floraMat.emissiveIntensity = 0.06 + G.time.night * (0.55 + Math.sin(performance.now() * 0.0015) * 0.15);
     updateEnemies(dt);
     updateProjectiles(dt);
     updateStory(dt);

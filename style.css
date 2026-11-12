@@ -20,7 +20,7 @@ body:not(.playing) #hud, body:not(.playing) #visor { display: none; }
 #res .r.flash { animation: flash .4s; }
 @keyframes flash { 0% { background: rgba(255,170,90,.5); } 100% { background: var(--panel); } }
 #colony { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; line-height: 1.65; backdrop-filter: blur(4px); }
-#colony .warn { color: var(--bad); } #colony .sub { opacity: .75; font-size: 12px; letter-spacing: 1px; }
+#colony .warn { color: var(--bad); } #colony .lv { color: var(--accent2); font-size: 14px; } #colony .sub { opacity: .75; font-size: 12px; letter-spacing: 1px; }
 
 #topcenter { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); width: 440px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 #compass { position: relative; width: 440px; height: 26px; background: linear-gradient(90deg, transparent, var(--panel) 15%, var(--panel) 85%, transparent); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow: hidden; }

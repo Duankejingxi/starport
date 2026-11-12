@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { P } from './planets.js';
 
 // 共享材质
 export const M = {
@@ -244,8 +245,8 @@ export function makeColonist(seed) {
 }
 
 // 锈蚀蛛：火星原生的晶体生物
-const crawlerBody = new THREE.MeshStandardMaterial({ color: 0x3a1d18, roughness: 0.3, metalness: 0.6, flatShading: true, emissive: 0x200500 });
-const crawlerCrystal = new THREE.MeshStandardMaterial({ color: 0x8a2a10, emissive: 0xff4a10, emissiveIntensity: 0.8, roughness: 0.2, flatShading: true });
+const crawlerBody = new THREE.MeshStandardMaterial({ color: P.enemy[0], roughness: 0.3, metalness: 0.6, flatShading: true, emissive: 0x100500 });
+const crawlerCrystal = new THREE.MeshStandardMaterial({ color: P.enemy[1], emissive: P.enemy[2], emissiveIntensity: 0.8, roughness: 0.2, flatShading: true });
 const crawlerEye = new THREE.MeshBasicMaterial({ color: 0xffd040 });
 export function makeCrawler(scale = 1) {
   const g = new THREE.Group();
@@ -268,3 +269,90 @@ export function makeCrawler(scale = 1) {
   g.scale.setScalar(scale);
   return { group: g, legs, inner };
 }
+
+// —— 城市扩张期的大型建筑 ——
+function windowTex(cols, rows, seed) {
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256;
+  const g = cv.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 128, 256);
+  let s = seed;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const w = 128 / cols, h = 256 / rows;
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+    if (rnd() < 0.65) { g.fillStyle = rnd() < 0.8 ? '#ffd9a0' : '#a0d8ff'; g.fillRect(i * w + w * 0.2, j * h + h * 0.25, w * 0.6, h * 0.5); }
+  }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+export const CITY_MATS = [];
+function towerMat(seed) {
+  const m = new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.5, metalness: 0.2, emissive: 0xffffff, emissiveMap: windowTex(6, 14, seed), emissiveIntensity: 0.2 });
+  CITY_MATS.push(m); return m;
+}
+const tm = [towerMat(7), towerMat(31)];
+
+Object.assign(BUILD_MODELS, {
+  apartment(g, a) {
+    foundation(g, 4.4, true);
+    mk(box(8, 1, 8), M.panel, 0, 0.5, 0, g);
+    mk(box(5, 18, 5), tm[0], -1.2, 10, -1.2, g);
+    mk(box(4, 12, 4), tm[1], 2, 7, 2, g);
+    mk(box(5.2, 0.5, 5.2), M.orange, -1.2, 19.2, -1.2, g);
+    mk(box(4.2, 0.5, 4.2), M.orange, 2, 13.2, 2, g);
+    mk(cyl(0.1, 0.1, 4, 6), M.metal, -1.2, 21.4, -1.2, g);
+    a.tip = glow(0xff4040, 1.6, g, -1.2, 23.5, -1.2);
+    mk(new THREE.SphereGeometry(1.6, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.glass, 2, 13.4, 2, g).castShadow = false;
+  },
+  vfarm(g, a) {
+    foundation(g, 4);
+    mk(cyl(3.8, 4, 1, 16), M.panel, 0, 0.5, 0, g);
+    const glassT = mk(cyl(3.2, 3.2, 14, 16), M.glass, 0, 8, 0, g); glassT.castShadow = false;
+    for (let i = 0; i < 6; i++) {
+      mk(cyl(3, 3, 0.25, 16), M.white, 0, 2 + i * 2.3, 0, g);
+      for (let k = 0; k < 7; k++) { const an = k / 7 * Math.PI * 2 + i; const p = mk(new THREE.ConeGeometry(0.4, 0.9, 5), M.plant, Math.cos(an) * 2.2, 2.6 + i * 2.3, Math.sin(an) * 2.2, g); p.castShadow = false; }
+    }
+    mk(new THREE.SphereGeometry(3.2, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.glass, 0, 15, 0, g).castShadow = false;
+    a.light = glow(0xff66cc, 9, g, 0, 8, 0);
+  },
+  lifehub(g, a) {
+    foundation(g, 5.5);
+    mk(cyl(5.5, 5.8, 1.2, 20), M.panel, 0, 0.6, 0, g);
+    const d = mk(new THREE.SphereGeometry(4.5, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.white, 0, 1.2, 0, g);
+    mk(new THREE.TorusGeometry(4.6, 0.3, 8, 32), M.orange, 0, 1.6, 0, g).rotation.x = Math.PI / 2;
+    for (let i = 0; i < 4; i++) {
+      const an = i * Math.PI / 2 + Math.PI / 4;
+      mk(cyl(0.9, 0.9, 5, 12), M.white, Math.cos(an) * 5.2, 2.5, Math.sin(an) * 5.2, g);
+      mk(cyl(0.95, 0.95, 0.4, 12), M.cyan, Math.cos(an) * 5.2, 4.2, Math.sin(an) * 5.2, g);
+    }
+    const fan = new THREE.Group(); fan.position.y = 6; g.add(fan);
+    for (let i = 0; i < 3; i++) { const b = mk(box(4, 0.1, 0.6), M.dark, 0, 0, 0, fan); b.rotation.y = i * Math.PI / 3; }
+    a.fan = fan; a.light = glow(0x66ddff, 5, g, 0, 6, 0);
+  },
+  launch(g, a) {
+    foundation(g, 9, true);
+    mk(box(18, 1.2, 18), M.found, 0, 0.6, 0, g);
+    mk(new THREE.RingGeometry(5, 6, 32), M.orange, 0, 1.25, 0, g).rotation.x = -Math.PI / 2;
+    // 发射塔架
+    for (const [x, z] of [[6, -1.5], [6, 1.5], [9, -1.5], [9, 1.5]]) mk(box(0.4, 34, 0.4), M.metal, x, 18, z, g);
+    for (let i = 0; i < 8; i++) mk(box(3.4, 0.25, 3.4), M.metal, 7.5, 4 + i * 4, 0, g);
+    mk(box(4, 0.5, 0.8), M.orange, 4.2, 26, 0, g);
+    // 殖民舰
+    const ship = new THREE.Group(); ship.position.y = 1.2; g.add(ship);
+    mk(cyl(2.4, 2.8, 24, 20), M.white, 0, 13, 0, ship);
+    mk(new THREE.ConeGeometry(2.4, 7, 20), M.white, 0, 28.5, 0, ship);
+    mk(cyl(2.45, 2.45, 1.2, 20), M.orange, 0, 20, 0, ship);
+    mk(cyl(2.45, 2.45, 0.6, 20), M.dark, 0, 8, 0, ship);
+    for (let i = 0; i < 4; i++) { const an = i * Math.PI / 2; const f = mk(box(0.4, 6, 3), M.panel, Math.cos(an) * 2.8, 3.5, Math.sin(an) * 2.8, ship); f.rotation.y = -an; }
+    for (let i = 0; i < 4; i++) { const an = i * Math.PI / 2 + Math.PI / 4; mk(cyl(0.8, 1.2, 2, 10), M.dark, Math.cos(an) * 1.2, 0.6, Math.sin(an) * 1.2, ship); }
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(3, 16, 16, 1, true), M.flame); flame.rotation.x = Math.PI; flame.position.y = -8; flame.visible = false; ship.add(flame);
+    a.ship = ship; a.flame = flame; a.tip = glow(0xffffff, 3, ship, 0, 32.5, 0);
+  },
+  monument(g, a) {
+    foundation(g, 6);
+    mk(cyl(6, 6.5, 1.5, 8), M.panel, 0, 0.75, 0, g);
+    mk(cyl(4.5, 5, 1, 8), M.white, 0, 2, 0, g);
+    const ob = mk(new THREE.CylinderGeometry(0.6, 1.8, 30, 4), M.white, 0, 17, 0, g); ob.rotation.y = Math.PI / 4;
+    a.rings = [];
+    const cols = [new THREE.MeshStandardMaterial({ color: 0x331100, emissive: 0xff7a2a, emissiveIntensity: 2 }), new THREE.MeshStandardMaterial({ color: 0x002233, emissive: 0x66e6ff, emissiveIntensity: 2 }), new THREE.MeshStandardMaterial({ color: 0x113300, emissive: 0xa0ff40, emissiveIntensity: 2 })];
+    for (let i = 0; i < 3; i++) { const r = mk(new THREE.TorusGeometry(4 - i * 0.6, 0.18, 8, 40), cols[i], 0, 14 + i * 5, 0, g); r.castShadow = false; a.rings.push(r); }
+    a.top = glow(0xffffff, 8, g, 0, 33, 0);
+  },
+});

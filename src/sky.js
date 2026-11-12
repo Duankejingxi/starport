@@ -1,19 +1,23 @@
 import * as THREE from 'three';
 import { G } from './state.js';
+import { glowTexture as glowTex } from './models.js';
 import { smoothstep, lerp, clamp } from './noise.js';
+import { P } from './planets.js';
 
 const DAY_LEN = 540; // 一个火星日（游戏秒）
 let sky, stars, sun, hemi, amb, phobos, deimos, skyMat;
 const C = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
+const PS = P.sky, CC = a => C(a[0], a[1], a[2]);
 const PAL = {
-  dayTop: C(0.62, 0.42, 0.29), dayHor: C(0.90, 0.68, 0.50),
-  setTop: C(0.17, 0.13, 0.15), setHor: C(0.58, 0.40, 0.33),
-  nightTop: C(0.006, 0.008, 0.022), nightHor: C(0.035, 0.035, 0.055),
+  dayTop: CC(PS.dayTop), dayHor: CC(PS.dayHor),
+  setTop: CC(PS.setTop), setHor: CC(PS.setHor),
+  nightTop: CC(PS.nightTop), nightHor: CC(PS.nightHor),
   earthTop: C(0.22, 0.44, 0.82), earthHor: C(0.68, 0.80, 0.92),
-  stormHor: C(0.62, 0.42, 0.28),
-  halo: C(0.35, 0.58, 0.95),
+  stormHor: CC(PS.storm),
+  halo: CC(PS.halo),
 };
-const MOON = C(0.36, 0.42, 0.62);
+let extra = {};
+const MOON = C(0.36, 0.42, 0.62), JUP = C(0.75, 0.65, 0.55);
 const tmpA = new THREE.Color(), tmpB = new THREE.Color();
 export const sunDir = new THREE.Vector3();
 
@@ -65,7 +69,31 @@ export function buildSky(scene) {
   const moonMat = new THREE.MeshStandardMaterial({ color: 0x8a7d70, roughness: 1, fog: false, flatShading: true });
   phobos = new THREE.Mesh(new THREE.IcosahedronGeometry(60, 1), moonMat); phobos.scale.set(1.3, 0.9, 1);
   deimos = new THREE.Mesh(new THREE.IcosahedronGeometry(24, 1), moonMat);
-  scene.add(phobos, deimos);
+  if (P.extras === 'moons') scene.add(phobos, deimos);
+  if (P.extras === 'jupiter') {
+    // 木星：带条纹的巨大行星
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256;
+    const g = cv.getContext('2d');
+    const bands = ['#e8d8c0', '#c89a70', '#f0e6d4', '#b07850', '#e0c8a8', '#9a6a48', '#efe2cc', '#c8a07a', '#e6d6bc'];
+    for (let y = 0; y < 256; y++) { g.fillStyle = bands[Math.floor((y / 256) * bands.length * 2 + Math.sin(y * 0.3) * 0.6) % bands.length]; g.fillRect(0, y, 512, 1); }
+    g.globalAlpha = 0.25; for (let i = 0; i < 400; i++) { g.fillStyle = bands[i % bands.length]; g.fillRect(Math.random() * 512, Math.random() * 256, 30 + Math.random() * 80, 2); }
+    g.globalAlpha = 1; g.fillStyle = '#b8583a'; g.beginPath(); g.ellipse(330, 165, 34, 16, 0, 0, Math.PI * 2); g.fill();
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const jup = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 32), new THREE.MeshBasicMaterial({ map: tex, fog: false }));
+    jup.rotation.z = 0.06;
+    const shade = new THREE.Mesh(new THREE.SphereGeometry(905, 48, 32, Math.PI * 0.55, Math.PI), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, fog: false }));
+    jup.add(shade);
+    const io = new THREE.Mesh(new THREE.IcosahedronGeometry(30, 2), new THREE.MeshBasicMaterial({ color: 0xe8d070, fog: false }));
+    scene.add(jup, io); extra = { jup, io };
+  }
+  if (P.extras === 'twinsuns') {
+    const s2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: 0xff9a60, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    s2.scale.set(500, 500, 1);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(700, 1100, 64), new THREE.MeshBasicMaterial({ color: 0xd8c8ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, fog: false, depthWrite: false }));
+    const gas = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 24), new THREE.MeshBasicMaterial({ color: 0x8a7ad0, fog: false }));
+    gas.add(ring); ring.rotation.x = 1.2;
+    scene.add(s2, gas); extra = { s2, gas };
+  }
 
   sun = new THREE.DirectionalLight(0xfff0dd, 3);
   sun.castShadow = true;
@@ -105,13 +133,24 @@ export function updateSky(dt, camPos) {
   skyMat.uniforms.uSunDir.value.copy(sunDir);
   skyMat.uniforms.uSunVis.value = smoothstep(-0.08, 0.02, el) * (1 - storm * 0.85);
   sky.position.copy(camPos); stars.position.copy(camPos);
-  stars.material.opacity = T.night * (1 - storm);
+  stars.material.opacity = Math.max(T.night, P.id === 'europa' ? 0.85 : 0) * (1 - storm);
 
   // 卫星
   const pa = G.time.t * Math.PI * 6, da = -G.time.t * Math.PI * 2 + 2;
   phobos.position.set(camPos.x + Math.cos(pa) * 2600, camPos.y + Math.sin(pa) * 1700 + 300, camPos.z - 1300);
   phobos.lookAt(camPos);
   deimos.position.set(camPos.x + Math.cos(da) * 2800, camPos.y + Math.sin(da) * 2200, camPos.z + 1600);
+  if (extra.jup) {
+    extra.jup.position.set(camPos.x - 1800, camPos.y + 650, camPos.z - 2600);
+    extra.jup.rotation.y += 0.00004;
+    const ia = G.time.t * Math.PI * 8;
+    extra.io.position.set(camPos.x - 1800 + Math.cos(ia) * 1400, camPos.y + 650 + Math.sin(ia) * 300, camPos.z - 2600 + Math.sin(ia) * 1400);
+  }
+  if (extra.s2) {
+    extra.s2.position.copy(camPos).addScaledVector(new THREE.Vector3(sunDir.x * 0.8 - 0.3, sunDir.y * 0.9 - 0.05, sunDir.z + 0.4).normalize(), 3000);
+    extra.s2.material.opacity = smoothstep(-0.2, 0.05, el) * 0.9;
+    extra.gas.position.set(camPos.x + 1600, camPos.y + 1100, camPos.z + 2400);
+  }
 
   // 灯光
   const sunK = smoothstep(-0.04, 0.25, el);
@@ -122,6 +161,7 @@ export function updateSky(dt, camPos) {
   // 阴影贴图按 texel 对齐，避免移动时闪烁
   hemi.intensity = lerp(0.55, 1.1, dayK) * (1 - storm * 0.3);
   hemi.color.copy(hor).lerp(top, 0.3).lerp(MOON, T.night * 0.85);
+  if (P.id === 'europa') hemi.color.lerp(JUP, 0.6);
   hemi.groundColor.setRGB(lerp(0.05, 0.38, dayK), lerp(0.04, 0.18, dayK), lerp(0.05, 0.10, dayK));
   amb.intensity = lerp(0.8, 0.2, dayK);
 
@@ -134,5 +174,5 @@ export function updateSky(dt, camPos) {
 
 export function clockText() {
   const h = Math.floor(G.time.t * 24.66), m = Math.floor((G.time.t * 24.66 - h) * 60);
-  return `第 ${G.time.day} 火星日 · ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return `${P.name} · 第 ${G.time.day} 日 · ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }

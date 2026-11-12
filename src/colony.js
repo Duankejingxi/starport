@@ -78,7 +78,8 @@ function startLanding(pad, n) {
 
 export function updateColony(dt) {
   const C = G.colony;
-  C.pop = G.colonists.length;
+  G.popTotal = Math.max(G.popTotal || 0, G.colonists.length);
+  C.pop = G.popTotal;
   // 每位居民都在工作：缓慢产出资源
   if (C.pop) {
     G._work = (G._work || 0) + dt * C.pop * 0.04;
@@ -90,8 +91,8 @@ export function updateColony(dt) {
   if (!shuttle && pads.length && room > 0 && !G.ended) {
     arrivalT -= dt;
     if (arrivalT <= 0) {
-      arrivalT = 50;
-      startLanding(pads[Math.floor(Math.random() * pads.length)], Math.min(room, 4));
+      arrivalT = Math.max(20, 50 / pads.length);
+      startLanding(pads[Math.floor(Math.random() * pads.length)], Math.min(room, 4 + (G.cityLevel || 0) * 2));
     }
   }
   if (shuttle) updateShuttle(dt);
@@ -140,13 +141,16 @@ function updateShuttle(dt) {
     if (k > 0.85 && Math.random() < 0.5) fx.dustPuff(new THREE.Vector3(P.x, P.y, P.z), 4, 10);
     if (k >= 1) { s.phase = 'landed'; s.t = 0; fx.ring(new THREE.Vector3(P.x, P.y, P.z), 3, 80); s.flame.visible = false; s.flameGlow.visible = false; }
   } else if (s.phase === 'landed') {
-    if (s.t > 2 && s.n > 0 && s.t > 2 + (4 - s.n) * 0.8) {
-      const names = [];
-      // 依次走下飞船
-      const c = spawnColonist(P.x + (Math.random() - 0.5) * 2, P.z + 3);
-      c.target = new THREE.Vector3(P.x + (Math.random() - 0.5) * 20, 0, P.z + 10 + Math.random() * 8);
-      names.push(c);
-      s.n--; s.arrived = (s.arrived || []).concat(names);
+    s.total = s.total || s.n;
+    if (s.n > 0 && s.t > 2 + (s.total - s.n) * 0.6) {
+      // 依次走下飞船（画面上最多 40 人，其余住进城里）
+      let c;
+      if (G.colonists.length < 40) {
+        c = spawnColonist(P.x + (Math.random() - 0.5) * 2, P.z + 3);
+        c.target = new THREE.Vector3(P.x + (Math.random() - 0.5) * 20, 0, P.z + 10 + Math.random() * 8);
+      } else { const p = PEOPLE[nextPerson++ % PEOPLE.length]; c = { name: p[0] }; }
+      s.n--; s.arrived = (s.arrived || []).concat([c]);
+      G.popTotal = (G.popTotal || 0) + 1;
       G.stats.arrived++;
     }
     if (s.n <= 0 && s.t > 7) { s.phase = 'ascend'; s.t = 0; s.flame.visible = true; s.flameGlow.visible = true; audio.play('rumble'); G.events.emit('colonistsArrived', s.arrived || []); }
@@ -176,3 +180,4 @@ export function loadColonists(list) {
   nextPerson = Math.max(nextPerson, ...list.map(l => l[0] + 1), 0);
 }
 export function shuttleBusy() { return !!shuttle; }
+export function personCount() { return PEOPLE.length; }

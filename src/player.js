@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { G } from './state.js';
+import { P } from './planets.js';
 import { getHeight, HALF } from './terrain.js';
 import { input } from './input.js';
 import { audio } from './audio.js';
 import { fx } from './fx.js';
 import { lifeSupportAt } from './buildings.js';
 
-const GRAVITY = 5.6, EYE = 1.7;
+const GRAVITY = P.gravity, EYE = 1.7;
 export const LANDER_POS = new THREE.Vector3(-6, 0, -6);
 
 export class Player {
