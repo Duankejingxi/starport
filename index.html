@@ -2,299 +2,115 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>星港 Starport — 火星城市建造</title>
-<link rel="stylesheet" href="styles.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星港：新家园</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="loading">
-  <div style="font-size:48px">🚀</div>
-  <div style="font-size:18px;font-weight:bold;margin:12px 0;color:#facc15">星港 Starport</div>
-  <div style="font-size:13px;opacity:.7">正在加载火星…</div>
-</div>
-<div id="app">
-  <!-- 顶栏：城市评级 + 资源 -->
-  <header id="topbar">
-    <div id="city-info">
-      <span id="city-rank">🏕️ 聚落</span>
-      <small id="city-next"></small>
-      <span id="disaster-ind"></span>
-      <span id="tech-count"></span>
-    </div>
-    <div id="res-bar" class="collapsed">
-      <div class="res key"><span>🟤</span><span id="res-iron">0</span></div>
-      <div class="res key"><span>💧</span><span id="res-water">0</span></div>
-      <div class="res key"><span>⚡</span><span id="res-power">0/0</span></div>
-      <div class="res key"><span>👥</span><span id="res-pop">2/2</span></div>
-      <button id="btn-res-expand" aria-label="展开资源">＋</button>
-      <div class="res"><span>🧊</span><span id="res-ice">0</span></div>
-      <div class="res"><span>🟣</span><span id="res-rare">0</span></div>
-      <div class="res"><span>🌾</span><span id="res-food">0</span></div>
-      <div class="res"><span>🔩</span><span id="res-steel">0</span></div>
-      <div class="res"><span>🔬</span><span id="res-tech">0</span></div>
-      <div class="res"><span>☢️</span><span id="res-uranium">0</span></div>
-      <div class="res"><span>🌌</span><span id="res-he3">0</span></div>
-      <div class="res"><span id="sector-count">🗺️ 1/9</span></div>
-    </div>
-  </header>
+<canvas id="c"></canvas>
 
-  <!-- 地图 -->
-  <div id="map-wrap">
-    <canvas id="map" width="660" height="660"></canvas>
-    <div id="zoom-ctrl">
-      <button id="zoom-in" aria-label="放大">＋</button>
-      <span id="zoom-level">1x</span>
-      <button id="zoom-out" aria-label="缩小">－</button>
-      <button id="zoom-reset" aria-label="重置视角">🎯</button>
+<div id="hud">
+  <div id="topleft">
+    <div id="res"></div>
+    <div id="colony"></div>
+  </div>
+  <div id="topcenter">
+    <div id="compass"></div>
+    <div id="clock"></div>
+    <div id="toasts"></div>
+  </div>
+  <div id="topright">
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <div id="goals"></div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="prompt"></div>
+  <div id="buildhint"></div>
+  <div id="feed"></div>
+  <div id="radio"></div>
+  <div id="bars">
+    <div id="o2-state"></div>
+    <div class="bar" id="bar-hp"><span>生命</span><div><i></i></div><b></b></div>
+    <div class="bar" id="bar-o2"><span>氧气</span><div><i></i></div><b></b></div>
+    <div class="bar" id="bar-en"><span>能量</span><div><i></i></div><b></b></div>
+  </div>
+  <div id="hotbar"></div>
+  <div id="keys">WASD 移动 · Shift 冲刺 · 空格 跳跃 · B 建造 · E 互动 · F 手电 · Esc 暂停</div>
+</div>
+<div id="visor"></div>
+<div id="hurt"></div>
+<div id="lowo2"></div>
+<div id="chapter"></div>
+<div id="fade"></div>
+
+<div id="intro" class="screen">
+  <div class="inner">
+    <div class="logo">星港<span>：新家园</span></div>
+    <div class="story" id="story"></div>
+    <div class="btns">
+      <button id="btn-new" class="primary">开始新的旅程</button>
+      <button id="btn-continue" class="hidden">继续：<span id="cont-info"></span></button>
     </div>
-    <div id="toast" class="hidden"></div>
-    <!-- 建筑详情面板 -->
-    <div id="building-panel" class="hidden">
-      <div id="bp-title"></div>
-      <div id="bp-desc"></div>
-      <div id="bp-btns">
-        <button id="btn-upgrade">⬆️ 升级</button>
-        <button id="btn-repair" style="display:none">🔧 维修</button>
-        <button id="btn-demolish" class="danger">💥 拆除</button>
-        <button id="btn-building-extra" style="display:none"></button>
-        <button id="btn-close-panel">✖</button>
-      </div>
+    <div class="ctrl">
+      <div><kbd>W A S D</kbd> 移动　<kbd>Shift</kbd> 冲刺　<kbd>空格</kbd> 跳跃 / 喷气</div>
+      <div><kbd>鼠标</kbd> 环视　<kbd>左键</kbd> 采矿 / 射击 / 放置　<kbd>右键</kbd> 取消建造</div>
+      <div><kbd>1</kbd> 采矿激光　<kbd>2</kbd> 等离子步枪　<kbd>B</kbd> 建造　<kbd>E</kbd> 互动 / 交谈　<kbd>F</kbd> 手电筒</div>
     </div>
-    <!-- 科技树面板 -->
-    <div id="tech-panel" class="hidden">
-      <div class="panel-header">
-        <b>🔬 科技树</b>
-        <button id="btn-close-tech">✖</button>
-      </div>
-      <div id="tech-tree"></div>
+    <div class="note" id="touch-note"></div>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="inner small">
+    <h2>暂停</h2>
+    <div class="btns col">
+      <button class="primary" data-close>继续</button>
+      <button id="btn-save">保存游戏</button>
+      <button id="btn-restart" class="danger">放弃存档，重新开始</button>
     </div>
-    <!-- 运输车面板 -->
-    <div id="truck-panel" class="hidden">
-      <div class="panel-header">
-        <b>🚚 运输车队</b>
-        <button id="btn-close-truck">✖</button>
-      </div>
-      <div id="truck-list"></div>
-      <button id="btn-build-truck">🚚 建造运输车（铁×20 稀土×10）</button>
-    </div>
-    <!-- 贸易面板 -->
-    <div id="trade-panel" class="hidden">
-      <div class="panel-header">
-        <b>🤝 地球贸易</b>
-        <button id="btn-close-trade">✖</button>
-      </div>
-      <div id="trade-list"></div>
-      <div style="font-size:11px;opacity:.6;margin-top:8px">每 60 秒刷新一次价格（当前固定）</div>
-    </div>
-    <!-- 成就面板 -->
-    <div id="achieve-panel" class="hidden">
-      <div class="panel-header">
-        <b>🏆 成就</b>
-        <button id="btn-close-achieve">✖</button>
-      </div>
-      <div id="achieve-stats" class="tech-stats"></div>
-      <div id="achieve-list"></div>
-    </div>
-    <!-- 统计面板 -->
-    <div id="stats-panel" class="hidden">
-      <div class="panel-header">
-        <b>📊 统计</b>
-        <button id="btn-close-stats">✖</button>
-      </div>
-      <div id="stats-list"></div>
-    </div>
-    <!-- 帮助面板 -->
-    <div id="help-panel" class="hidden">
-      <div class="panel-header">
-        <b>❓ 帮助手册</b>
-        <button id="btn-close-help">✖</button>
-      </div>
-      <div id="help-nav"></div>
-      <div id="help-content"></div>
-    </div>
-    <!-- 建筑菜单（v2.1 重构：分类 + 卡片） -->
-    <div id="build-menu" class="hidden">
-      <div class="panel-header">
-        <b>🏗️ 建造</b>
-        <button id="btn-close-buildmenu">✖</button>
-      </div>
-      <div id="build-cats"></div>
-      <div id="build-cards"></div>
-    </div>
-    <!-- 更多菜单（v2.1 重构） -->
-    <div id="more-menu" class="hidden">
-      <div class="panel-header">
-        <b>⚙️ 更多</b>
-        <button id="btn-close-moremenu">✖</button>
-      </div>
-      <div id="more-grid"></div>
-    </div>
-    <!-- 图层菜单（v2.1 重构） -->
-    <div id="overlay-menu" class="hidden">
-      <div class="panel-header">
-        <b>🗺️ 图层</b>
-        <button id="btn-close-overlaymenu">✖</button>
-      </div>
-      <div id="overlay-list"></div>
-    </div>
-    <!-- 取消建造（v2.1） -->
-    <button id="btn-cancel-build" class="hidden"></button>
-    <!-- 小地图 -->
-    <canvas id="minimap" width="120" height="120"></canvas>
-    <!-- 教程 -->
-    <div id="tutorial" class="hidden">
-      <div id="tut-progress"></div>
-      <div id="tut-title"></div>
-      <div id="tut-text"></div>
-      <div id="tut-hint"></div>
-      <div id="tut-btns">
-        <button id="btn-tut-prev">◀ 上一步</button>
-        <button id="btn-tut-next">跳过教程</button>
-      </div>
-    </div>
-    <!-- 胜利 -->
-    <div id="victory" class="hidden">
-      <div id="victory-inner">
-        <div style="font-size:48px">🚀</div>
-        <h2>发射成功！</h2>
-        <p>你的城市建成了发射台，<br>第一艘飞船离开了火星。</p>
-        <p style="opacity:.7">可以继续自由建造，冲击「星港」评级！</p>
-        <button id="btn-continue">继续建造</button>
-      </div>
+    <label class="vol">音量 <input type="range" id="vol" min="0" max="1" step="0.05" value="0.7"></label>
+    <label class="vol">鼠标灵敏度 <input type="range" id="sens" min="0.0008" max="0.005" step="0.0002" value="0.0022"></label>
+    <div class="ctrl">
+      <div><kbd>W A S D</kbd> 移动　<kbd>Shift</kbd> 冲刺　<kbd>空格</kbd> 跳跃 / 喷气</div>
+      <div><kbd>左键</kbd> 采矿 / 射击 / 放置　<kbd>右键</kbd> 取消　<kbd>R</kbd> 旋转建筑</div>
+      <div><kbd>1 2</kbd> 切换工具　<kbd>B</kbd> 建造　<kbd>E</kbd> 互动　<kbd>X</kbd> 拆除　<kbd>F</kbd> 手电</div>
     </div>
   </div>
-
-  <!-- 底栏：操作（v2.1 重构：5 键） -->
-  <footer id="toolbar">
-    <button id="btn-harvest" class="tool-btn">⛏️<small>采集</small></button>
-    <button id="btn-build-menu" class="tool-btn">🏗️<small>建造</small></button>
-    <button id="btn-tech" class="tool-btn">🔬<small>科技</small></button>
-    <button id="btn-overlay" class="tool-btn">🗺️<small>图层</small></button>
-    <button id="btn-more" class="tool-btn">⚙️<small>更多</small></button>
-  </footer>
-  <div id="build-info" class="hidden"></div>
-  <div id="v15-panel" class="hidden"></div>
-  <div id="hint">🏗️建造 → 选建筑 → 点空地放置 · 点建筑查看/升级 · 点迷雾扇区解锁（铁×50）</div>
 </div>
 
-<script src="resources.js"></script>
-<script src="map.js"></script>
-<script src="player.js"></script>
-<script src="pop.js"></script>
-<script src="city.js"></script>
-<script src="tech.js"></script>
-<script src="disaster.js"></script>
-<script src="logistics.js"></script>
-<script src="sound.js"></script>
-<script src="tutorial.js"></script>
-<script src="achievements.js"></script>
-<script src="stats.js"></script>
-<script src="help.js"></script>
-<script src="trade.js"></script>
-<script src="scenarios.js"></script>
-<script src="build.js"></script>
-<script src="buildings_v13.js"></script>
-<script src="diplomacy.js"></script>
-<script src="military.js"></script>
-<script src="policy.js"></script>
-<script src="content_v13.js"></script>
-<script src="orbital.js"></script>
-<script src="deep_space.js"></script>
-<script src="content_v14.js"></script>
-<script src="camera.js"></script>
-<script src="underground.js"></script>
-<script src="ocean.js"></script>
-<script src="governor.js"></script>
-<script src="buildings_v15.js"></script>
-<script src="campaign.js"></script>
-<script src="content_v15.js"></script>
-<script src="v15_ui.js"></script>
-<script src="v15_integration.js"></script>
-<script src="v15_manual.js"></script>
-<script src="v15_events.js"></script>
-<script src="v15_achievements.js"></script>
-<script src="v15_balance.js"></script>
-<script src="changelog.js"></script>
-<script src="sky.js"></script>
-<script src="robots.js"></script>
-<script src="buildings_v16.js"></script>
-<script src="content_v16.js"></script>
-<script src="quantum.js"></script>
-<script src="bio.js"></script>
-<script src="content_v17.js"></script>
-<script src="buildings_v18.js"></script>
-<script src="content_v18.js"></script>
-<script src="v18_integration.js"></script>
-<script src="v18_endgame.js"></script>
-<script src="hall_of_fame.js"></script>
-<script src="game_guide.js"></script>
-<script src="settings.js"></script>
-<script src="time.js"></script>
-<script src="buildings_v19.js"></script>
-<script src="tech_time.js"></script>
-<script src="disaster_v19.js"></script>
-<script src="wonders_v19.js"></script>
-<script src="achievements_v19.js"></script>
-<script src="versus.js"></script>
-<script src="mods.js"></script>
-<script src="codex_v19.js"></script>
-<script src="chronicles_v19.js"></script>
-<script src="scenarios_v19.js"></script>
-<script src="dialogues_v19.js"></script>
-<script src="manual_v19.js"></script>
-<script src="events_v19.js"></script>
-<script src="tips_v19.js"></script>
-<script src="faq_v19.js"></script>
-<script src="patchnotes_v19.js"></script>
-<script src="credits_v19.js"></script>
-<script src="v19_integration.js"></script>
-<script src="powergrid.js"></script>
-<script src="waternet.js"></script>
-<script src="transit.js"></script>
-<script src="economy.js"></script>
-<script src="buildings_v20.js"></script>
-<script src="ui_v20.js"></script>
-<script src="v20_integration.js"></script>
-<script src="v20_balance.js"></script>
-<script src="v20_scenarios.js"></script>
-<script src="v20_whatsnew.js"></script>
-<script src="manual_v20.js"></script>
-<script src="politics.js"></script>
-<script src="military_v3.js"></script>
-<script src="deepspace_v3.js"></script>
-<script src="ecology.js"></script>
-<script src="buildings_v30.js"></script>
-<script src="tech_v30.js"></script>
-<script src="disasters_v30.js"></script>
-<script src="wonders_v30.js"></script>
-<script src="multiplayer.js"></script>
-<script src="ui_v30.js"></script>
-<script src="buildings_v31.js"></script>
-<script src="tech_v31.js"></script>
-<script src="scenarios_v31.js"></script>
-<script src="ui_refactor.js"></script>
-<script src="game.js"></script>
-<!-- ============================================================
-     星港 v2.0「经纬万象」快捷键速查（2026-11-05）
-     ------------------------------------------------------------
-     覆盖层：  1=电网  2=水管  3=交通  0=关闭
-     工具：    B=建造  E=电缆  R=水管  T=道路
-     面板：    F1=电网教程  F2=水管教程  F3=交通教程  F4=经济教程
-     剧本：    F8=剧本选择器
-     通用：    Space=暂停  +/-=速度  Esc=取消
-     ------------------------------------------------------------
-     v2.0 模块（按加载顺序）：
-       1. powergrid.js      电网系统
-       2. waternet.js       水管系统
-       3. transit.js        交通深化
-       4. economy.js        经济系统
-       5. buildings_v20.js  30 新建筑
-       6. ui_v20.js         UI（覆盖层/面板/教程）
-       7. v20_integration.js 集成层
-       8. v20_balance.js    数值验算
-       9. v20_scenarios.js  10 挑战剧本
-      10. v20_whatsnew.js   更新说明
-      11. manual_v20.js     30 章手册
-     ============================================================ -->
+<div id="build" class="screen menu hidden">
+  <div class="inner wide">
+    <h2>🏗 建造 <small>选择要建造的设施</small></h2>
+    <div class="grid" id="build-list"></div>
+    <div class="btns"><button data-close>关闭（Esc）</button></div>
+  </div>
+</div>
+<div id="craft" class="screen menu hidden">
+  <div class="inner wide">
+    <h2>🔧 制造工坊 <small>武器与装备</small></h2>
+    <div class="grid" id="craft-list"></div>
+    <div class="btns"><button data-close>关闭（Esc）</button></div>
+  </div>
+</div>
+
+<div id="death" class="screen hidden">
+  <div class="inner small">
+    <h2 id="death-why">你倒下了</h2>
+    <p>救援无人机把你送回了基地。背包里四分之一的资源遗失在了荒野中。</p>
+    <div class="btns"><button class="primary" id="btn-respawn">重新站起来</button></div>
+  </div>
+</div>
+
+<div id="ending" class="screen hidden">
+  <div class="inner">
+    <div class="ending-text" id="ending-text"></div>
+    <div class="btns"><button class="primary" id="btn-endcont">继续建设家园</button></div>
+  </div>
+</div>
+
+<div id="clickhint" class="hidden">点击画面继续</div>
+<div id="loading">正在生成火星地表……</div>
+
+<script src="dist/game.js"></script>
 </body>
 </html>
