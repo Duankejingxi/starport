@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/Duankejingxi/starport#readme",
   "devDependencies": {
+    "@fontsource/rajdhani": "^5.1.0",
     "esbuild": "^0.24.0",
     "three": "^0.170.0"
   }

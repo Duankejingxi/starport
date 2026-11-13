@@ -278,7 +278,7 @@ export function archiveHTML() {
     const v = id === PID ? { pop: C.pop } : meta.find(m => m.id === id);
     return `<div><small>${PLANETS[id].name}</small><b>${v ? v.pop + ' 人' : '—'}</b></div>`;
   }).join('');
-  const people = G.colonists.map(c => `<div class="person"><span class="pn">${c.name}</span><span class="pj">${c.job}</span><div class="pl">“${c.line}”</div></div>`).join('');
+  const people = G.colonists.map(c => `<div class="person" data-i="${[...c.name][0]}"><span class="pn">${c.name}</span><span class="pj">${c.job}</span><div class="pl">“${c.line}”</div></div>`).join('');
   const more = C.pop - G.colonists.length;
   return `<h3>概况 · ${PLANET.name}</h3><div class="kv">${kv.map(x => `<div><small>${x[0]}</small><b>${x[1]}</b></div>`).join('')}</div>
     <h3>人类的足迹</h3><div class="kv">${planets}<div><small>星际总人口</small><b>${meta.filter(m => m.id !== PID).reduce((a, m) => a + m.pop, 0) + C.pop}</b></div></div>

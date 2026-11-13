@@ -4,16 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>星港：新家园</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <canvas id="c"></canvas>
 
 <div id="hud">
-  <div id="tl" class="curve-l">
+  <div id="tl">
     <section class="panel" id="p-colony">
       <header class="ph"><span>殖民地</span><span id="pl-cn"></span></header>
       <div id="city"></div>
@@ -30,7 +27,7 @@
     <div id="bossbar" class="hidden"><div class="bn"><span>晶母</span><small>CRYSTAL MOTHER</small></div><div class="bt"><i></i></div></div>
     <div id="alert"></div>
   </div>
-  <div id="tr" class="curve-r">
+  <div id="tr">
     <section class="panel nav">
       <div id="mm-wrap"><canvas id="minimap" width="200" height="200"></canvas></div>
       <div id="pl-en"></div>
@@ -46,7 +43,7 @@
   <div id="buildhint"></div>
   <div id="feed"></div>
   <div id="radio"><div class="wave"><i></i><i></i><i></i><i></i><i></i></div><div class="body"><div class="who"></div><div class="txt"></div></div></div>
-  <div id="suit" class="curve-l">
+  <div id="suit">
     <svg viewBox="0 0 160 160" class="dial">
       <circle cx="80" cy="80" r="70" class="trk"/><circle cx="80" cy="80" r="70" class="hp" id="d-hp"/>
       <circle cx="80" cy="80" r="58" class="trk"/><circle cx="80" cy="80" r="58" class="o2" id="d-o2"/>
