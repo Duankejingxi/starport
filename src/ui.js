@@ -38,12 +38,34 @@ const LEAD = { '✓': ['check', 'good'], '⚠': ['warn', 'warn'], '🔧': ['wren
 export function toast(text, icon = 'radio', kind = '') {
   const ch = [...text][0];
   if (LEAD[ch]) { [icon, kind] = LEAD[ch]; text = text.slice(ch.length).trim(); }
-  const el = document.createElement('div'); el.className = 'toast ' + kind;
-  el.innerHTML = `${ic(icon)}<span>${text}</span>`;
-  const box = $('toasts'); box.appendChild(el);
+  // 紧急信息 → 罗盘下方红色横幅（只保留一条）；其余 → 左侧事件记录
+  if (kind === 'warn' || icon === 'boss') return alertBanner(text, icon, kind);
+  const box = $('log');
+  const same = [...box.children].find(e => e.dataset.t === text && !e.classList.contains('out'));
+  if (same) { const n = (+same.dataset.n || 1) + 1; same.dataset.n = n; same.querySelector('em').textContent = '×' + n; clearTimeout(same._to); same._to = setTimeout(() => fadeOut(same), 5000); return; }
+  const el = document.createElement('div'); el.className = 'ev ' + kind; el.dataset.t = text;
+  el.innerHTML = `${ic(icon)}<span>${text}</span><em></em>`;
+  box.appendChild(el);
   while (box.children.length > 3) box.firstChild.remove();
-  setTimeout(() => el.classList.add('out'), 3000);
-  setTimeout(() => el.remove(), 3700);
+  el._to = setTimeout(() => fadeOut(el), 5000);
+}
+function fadeOut(el) { el.classList.add('out'); setTimeout(() => el.remove(), 600); }
+let alertTo, alertPri = 0, alertUntil = 0;
+function alertBanner(text, icon, kind) {
+  const pri = icon === 'boss' ? 2 : 1, now = performance.now();
+  if (pri < alertPri && now < alertUntil) {
+    // 更重要的警报正在显示：这条记进事件列表
+    const box = $('log'), el = document.createElement('div'); el.className = 'ev warn';
+    el.innerHTML = `${ic(icon === 'radio' ? 'warn' : icon)}<span>${text}</span><em></em>`;
+    box.appendChild(el); while (box.children.length > 3) box.firstChild.remove();
+    setTimeout(() => fadeOut(el), 5000); return;
+  }
+  alertPri = pri; alertUntil = now + 4500;
+  const el = $('alert');
+  el.className = 'show ' + (kind === 'good' ? 'good' : '');
+  el.innerHTML = `${ic(icon === 'radio' ? 'warn' : icon)}<span>${text}</span>`;
+  audio.play('alarm');
+  clearTimeout(alertTo); alertTo = setTimeout(() => { el.className = ''; }, 4500);
 }
 
 const feedMap = {};
@@ -60,7 +82,12 @@ function pickup({ type, n, note }) {
   const rr = $('r-' + type); rr.classList.remove('flash'); void rr.offsetWidth; rr.classList.add('flash');
 }
 
+// 大标题：同一时间只显示一个，其余排队
+const cardQ = []; let cardBusy = false;
 export function chapterCard(ch) {
+  if (cardBusy) { cardQ.length = 0; cardQ.push(ch); return; }
+  cardBusy = true;
+  setTimeout(() => { cardBusy = false; if (cardQ.length) chapterCard(cardQ.shift()); }, 5200);
   const el = $('chapter');
   const i = CHAPTERS.indexOf(ch);
   const k = ch.k || (i >= 0 ? `CHAPTER ${String(i + 1).padStart(2, '0')}` : '');
@@ -288,6 +315,9 @@ export function updateUI(dt, ctx) {
   $('hurt').style.opacity = Math.min(1, P.hurtT * 1.6 + (P.o2 <= 0 ? 0.5 + Math.sin(performance.now() * 0.01) * 0.2 : 0));
   $('lowo2').style.opacity = !P.inLife && P.o2 < P.maxO2 * 0.2 ? (0.4 + Math.sin(performance.now() * 0.006) * 0.3) * (1 - P.o2 / (P.maxO2 * 0.2) * 0.6) : 0;
   $('crosshair').className = ctx.crossClass || '';
+  const tip = $('tip');
+  if (tip.dataset.k !== (ctx.tip || '')) { tip.dataset.k = ctx.tip || ''; tip.innerHTML = ctx.tip ? `<div class="tk">提示</div><div>${ctx.tip}</div>` : ''; }
+  tip.classList.toggle('show', !!ctx.tip);
   const boss = bossAlive();
   const showBoss = boss && Math.hypot(boss.pos.x - P.pos.x, boss.pos.z - P.pos.z) < 260;
   $('bossbar').classList.toggle('hidden', !showBoss);

@@ -261,7 +261,7 @@ G.events.on('bossDown', () => { toast('晶母陨落', 'boss', 'good'); radio('�
 let firstNight = true;
 G.events.on('nightfall', n => {
   audio.play('night');
-  toast(`夜幕降临 · 雷达探测到约 ${n} 个移动信号`);
+  toast(`夜幕降临 · 约 ${n} 个移动信号接近`, 'moon', 'warn');
   if (firstNight) { firstNight = false; radio('方舟一号 · AI', '它们来了。锈蚀蛛会攻击建筑和人。用激光或步枪击退它们——它们的晶体残骸里含有钛。'); }
 });
 G.events.on('broken', b => toast(`${b.def.name} 受损停机，白天会自动修复`, 'warn', 'warn'));
@@ -357,9 +357,9 @@ function hintPrompt(dt) {
   if (hintCur) {
     hintT -= dt;
     if (hintT <= 0 || !hintCur.when()) { hintSeen[hintCur.id] = true; hintCur = null; try { localStorage.setItem('starport-hints', JSON.stringify(hintSeen)); } catch (e) { /* 忽略 */ } }
-    else return `<span class="hint">${hintCur.text}</span>`;
+    else return hintCur.text;
   }
-  for (const h of HINTS) if (!hintSeen[h.id] && h.when()) { hintCur = h; hintT = 12; return `<span class="hint">${h.text}</span>`; }
+  for (const h of HINTS) if (!hintSeen[h.id] && h.when()) { hintCur = h; hintT = 12; return h.text; }
   return '';
 }
 // —— 星图：前往新星球，或回到已开拓的家园 ——
@@ -554,7 +554,7 @@ function update(dt) {
     updateAmbient(dt);
     updateRelics(dt);
     const ctx = handleInteraction(dt);
-    if (!ctx.prompt) ctx.prompt = hintPrompt(dt);
+    ctx.tip = hintPrompt(dt);
     updateUI(dt, ctx);
     audio.update(G.storm, G.time.night);
     autosave -= dt; if (autosave <= 0) { autosave = 45; save(true); }

@@ -394,3 +394,40 @@ body.photo #photo-tip { opacity: 1; }
 #bossbar .bn small { font: 600 11px var(--fn); letter-spacing: 3px; color: var(--red); }
 #bossbar .bt { height: 8px; margin-top: 6px; background: rgba(255, 255, 255, .1); clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
 #bossbar .bt i { display: block; height: 100%; background: linear-gradient(90deg, #ff3b22, #ff8a3d); box-shadow: 0 0 12px var(--red); transition: width .2s; }
+
+/* ===== 信息分区：标题 / 警报 / 事件 / 提示 ===== */
+/* 1. 大标题：上移、加暗色衬底，不压准星 */
+#chapter { top: 17%; width: 100%; left: 0; transform: none; padding: 18px 0 20px; background: linear-gradient(90deg, transparent, rgba(0, 0, 0, .55) 25%, rgba(0, 0, 0, .55) 75%, transparent); }
+#chapter.show { animation: chap 5s forwards; }
+#chapter .t { font-size: 48px; margin: 6px 0 2px; }
+#chapter .s { font-size: 15px; letter-spacing: 6px; color: rgba(236, 230, 220, .7); }
+#chapter .ln { margin: 10px auto; animation: ln 5s forwards; }
+
+/* 2. 紧急警报：罗盘下方，红色实底，同时只有一条 */
+#alert { margin-top: 10px; display: flex; align-items: center; gap: 10px; padding: 8px 22px; font-size: 17px; font-weight: 500; letter-spacing: 2px; color: #fff; background: rgba(190, 40, 25, .82); clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%); opacity: 0; transform: translateY(-6px); transition: opacity .3s, transform .3s; text-shadow: none; }
+#alert.show { opacity: 1; transform: none; animation: alertp 1s 2; }
+#alert.good { background: rgba(30, 130, 80, .85); }
+#alert .ico { font-size: 19px; }
+@keyframes alertp { 50% { filter: brightness(1.35); } }
+
+/* 3. 左侧通道：新手提示卡 + 事件记录 */
+#lane { position: absolute; left: 28px; top: 54%; transform: translateY(-50%); width: 290px; display: flex; flex-direction: column; gap: 12px; }
+#tip { display: none; padding: 10px 14px; background: rgba(6, 22, 28, .72); border-left: 3px solid var(--cyan); font-size: 15px; line-height: 1.7; color: #dff7ff; animation: sidein .3s; }
+#tip.show { display: block; }
+#tip .tk { font-size: 12px; letter-spacing: 3px; color: var(--cyan); margin-bottom: 2px; }
+#log { display: flex; flex-direction: column; gap: 5px; }
+.ev { display: flex; align-items: center; gap: 9px; font-size: 14px; color: rgba(236, 230, 220, .88); padding: 5px 12px; background: linear-gradient(90deg, rgba(12, 8, 7, .62), transparent); border-left: 2px solid var(--amber); animation: sidein .3s; transition: opacity .6s, transform .6s; }
+.ev .ico { color: var(--amber); font-size: 16px; flex: none; }
+.ev.good { border-left-color: var(--green); } .ev.good .ico { color: var(--green); }
+.ev em { font-style: normal; font: 600 13px var(--fn); color: var(--amber); }
+.ev.out { opacity: 0; transform: translateX(-12px); }
+
+/* 4. 成就：右侧滑入，不进中央 */
+#achv-pop { left: auto; right: 28px; top: auto; bottom: 120px; transform: translateX(30px); }
+#achv-pop.show { transform: none; }
+
+/* 中央只留准星与交互提示 */
+#prompt { font-size: 16px; }
+#lane { top: auto; bottom: 196px; transform: none; }
+#chapter { top: 25%; }
+.ev.warn { border-left-color: var(--red); } .ev.warn .ico { color: var(--red); }
