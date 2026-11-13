@@ -443,3 +443,94 @@ body.photo #photo-bar { display: flex; position: fixed; left: 50%; bottom: 3.2vh
 
 @media (max-width: 1200px) { #tl { width: 260px; } #tr { width: 240px; } #mm-wrap, #minimap { width: 160px; height: 160px; } #tc, #compass { width: 420px; } .bp-detail { width: 340px; padding: 26px 30px; } }
 @media (max-width: 800px) { .logo { font-size: 64px; letter-spacing: 16px; } .telemetry { display: none; } }
+
+/* =========================================================
+   全息面罩：两侧面板带透视倾斜，像投射在眼前的全息屏
+   ========================================================= */
+#hud { perspective: 900px; perspective-origin: 50% 45%; }
+#hud::before { background: linear-gradient(0deg, rgba(8, 6, 5, .32), transparent 20%); }
+.curve-l { transform: rotateY(16deg); transform-origin: left center; transform-style: preserve-3d; }
+.curve-r { transform: rotateY(-16deg); transform-origin: right center; transform-style: preserve-3d; }
+:root { --holo: 142, 231, 255; --holo-a: 255, 182, 92; }
+
+.panel, #suit { position: relative; padding: 14px 18px 16px; border-radius: 4px;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px),
+    linear-gradient(135deg, rgba(var(--holo-a), .10), rgba(20, 14, 12, .58) 38%, rgba(10, 12, 16, .62));
+  box-shadow: inset 0 0 0 1px rgba(var(--holo-a), .22), inset 0 0 30px rgba(var(--holo-a), .06), 0 0 28px rgba(0, 0, 0, .35), 0 0 22px rgba(var(--holo-a), .08);
+  backdrop-filter: blur(6px) saturate(1.2);
+  animation: holoin .9s var(--ease) both; }
+.panel::before, .panel::after, #suit::before, #suit::after { content: ''; position: absolute; width: 16px; height: 16px; pointer-events: none; border: 2px solid var(--amber); filter: drop-shadow(0 0 4px var(--amber)); }
+.panel::before, #suit::before { left: -1px; top: -1px; border-right: 0; border-bottom: 0; }
+.panel::after, #suit::after { right: -1px; bottom: -1px; border-left: 0; border-top: 0; }
+#tr .panel, #tr .panel::before, #tr .panel::after { --amber: #8ee7ff; }
+#tr .panel { background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px),
+    linear-gradient(225deg, rgba(var(--holo), .10), rgba(10, 16, 20, .58) 38%, rgba(10, 12, 16, .62));
+  box-shadow: inset 0 0 0 1px rgba(var(--holo), .22), inset 0 0 30px rgba(var(--holo), .06), 0 0 28px rgba(0, 0, 0, .35), 0 0 22px rgba(var(--holo), .08); }
+.panel:nth-child(2) { animation-delay: .12s; } #tr .panel:nth-child(2) { animation-delay: .2s; }
+@keyframes holoin { 0% { opacity: 0; filter: brightness(2.2) blur(2px); clip-path: inset(0 0 100% 0); } 40% { opacity: .9; clip-path: inset(0 0 0 0); } 55% { opacity: .35; } 70% { opacity: 1; filter: none; } 100% { opacity: 1; } }
+
+/* 面板标题恢复 */
+#p-colony .ph { display: flex; }
+.ph { color: var(--amber); letter-spacing: 5px; font-size: 12px; margin-bottom: 12px; }
+#tr .ph { color: var(--cyan); }
+.ph::after { background: linear-gradient(90deg, rgba(var(--holo-a), .4), transparent); }
+#tr .ph::after { background: linear-gradient(90deg, rgba(var(--holo), .4), transparent); }
+#p-goals .ph { flex-direction: row; }
+#p-goals .ph::after { background: linear-gradient(90deg, rgba(var(--holo), .4), transparent); }
+
+#tl { width: 300px; gap: 14px; top: 26px; left: 30px; }
+#tr { width: 290px; gap: 14px; top: 26px; right: 30px; align-items: stretch; }
+#city .nm { font-size: 24px; letter-spacing: 5px; text-shadow: 0 0 18px rgba(var(--holo-a), .35); }
+#city .lv { order: 0; color: #160b05; background: var(--amber); padding: 1px 7px; border-radius: 2px; box-shadow: 0 0 10px rgba(var(--holo-a), .5); }
+#city .nm { order: 1; }
+#city .pg { height: 3px; }
+#res .r .ic { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc) 55%, transparent), 0 0 12px color-mix(in srgb, var(--rc) 30%, transparent); }
+#res .r b, #colony .st b { text-shadow: 0 0 12px rgba(255, 255, 255, .18); }
+
+/* 右侧：小地图嵌入面板，任务左对齐 */
+.panel.nav { padding: 14px; }
+#mm-wrap { margin: 0 auto; box-shadow: 0 0 0 1px rgba(var(--holo), .35), 0 0 30px rgba(var(--holo), .15); }
+#pl-en { color: var(--cyan); text-shadow: 0 0 10px rgba(var(--holo), .5); }
+#goals .g { justify-content: flex-start; text-align: left; }
+#goals .g .cb { order: 0; border-color: var(--cyan); }
+#goals .g .gp { margin-left: 0; margin-right: 0; } #goals .g .gp i { float: none; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+#goals .g small { color: var(--cyan); }
+#goals .rq-h { justify-content: flex-start; color: var(--cyan); }
+#goals .rq-h::before { display: none; } #goals .rq-h::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(var(--holo), .35), transparent); }
+#goals .g.rq .cb { border-color: var(--amber); } #goals .g.rq small { color: var(--amber); }
+
+/* 宇航服仪表：并入左下全息面板 */
+#suit { left: 30px; bottom: 26px; padding: 12px 22px 12px 12px; }
+.dial-c b { text-shadow: 0 0 16px rgba(var(--holo), .5); }
+.dial .o2 { filter: drop-shadow(0 0 4px var(--cyan)); }
+
+/* 左侧提示与事件也做成全息条 */
+#lane { left: 30px; bottom: 210px; }
+#tip { background: linear-gradient(90deg, rgba(var(--holo), .14), transparent); padding: 8px 14px; }
+.ev { padding: 4px 12px; background: linear-gradient(90deg, rgba(20, 14, 12, .55), transparent); border-left: 2px solid rgba(var(--holo-a), .7); }
+
+/* 工具栏：全息托盘 */
+#hotbar { border-radius: 4px; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px), linear-gradient(180deg, rgba(20, 14, 12, .45), rgba(10, 8, 8, .7)); box-shadow: inset 0 0 0 1px rgba(var(--holo-a), .25), 0 0 24px rgba(var(--holo-a), .1); transform: perspective(600px) rotateX(14deg); transform-origin: bottom; }
+.slot { border-radius: 3px; }
+.slot.on { box-shadow: inset 0 0 0 1px var(--amber), 0 0 18px rgba(var(--holo-a), .35); }
+
+/* 对话框：全息条 */
+#radio { padding: 12px 24px; background: linear-gradient(90deg, transparent, rgba(8, 18, 24, .7) 12%, rgba(8, 18, 24, .7) 88%, transparent); border-top: 1px solid rgba(var(--holo), .35); border-bottom: 1px solid rgba(var(--holo), .15); }
+
+/* 面罩边缘：淡淡的弧形反光，强化"戴着头盔"的感觉 */
+#visor { background: radial-gradient(ellipse 95% 90% at center, transparent 62%, rgba(0, 0, 0, .42) 100%); }
+#visor::before { content: ''; display: block; position: absolute; inset: 0; background: radial-gradient(ellipse 120% 60% at 50% -10%, rgba(180, 220, 255, .06), transparent 50%); }
+#suit { position: absolute; }
+#hotbar { transform: translateX(-50%) perspective(600px) rotateX(14deg); }
+#lane { bottom: 200px; width: 300px; }
+#city .lv { order: 0; } #city .nm { order: 1; } #city .pg, #city .nx { order: 2; }
+#city .pg { margin-top: 8px; }
+#tl { gap: 10px; }
+.panel { padding: 12px 18px 13px; }
+#res { gap: 8px 18px; }
+#res .r .ic { width: 30px; height: 30px; }
+#res .r b { font-size: 21px; }
+#lane { bottom: 196px; gap: 8px; }
+#tip { font-size: 14px; line-height: 1.6; }
