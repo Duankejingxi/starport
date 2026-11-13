@@ -35,6 +35,7 @@ import { P, PID, PLANETS, SAVE_KEY, META, saveMeta, loadMeta, clearAll } from '.
 import { initCity, updateCity, LEVELS } from './city.js';
 import { spawnRover, getRover, roverState, enterRover, exitRover, updateRover, roverSpeed } from './rover.js';
 import { updateEvents, podAt, openPod, dropPod } from './events.js';
+import { updateFestival, startFestival } from './festival.js';
 
 const $ = id => document.getElementById(id);
 G.debug = /[?&]debug/.test(location.search);
@@ -147,7 +148,7 @@ canvas.addEventListener('click', () => {
 function save(silent) {
   if (!G.started) return;
   const data = {
-    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [], plazaSeen: !!G.plazaSeen, mode: G.mode, diff: G.diffKey, morale: G.morale, tech: G.tech || {}, rp: G.rp || 0, requests: G.requests || [],
+    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [], plazaSeen: !!G.plazaSeen, mode: G.mode, diff: G.diffKey, morale: G.morale, waypoint: G.waypoint || null, tech: G.tech || {}, rp: G.rp || 0, requests: G.requests || [],
     time: { t: G.time.t, day: G.time.day },
     player: { x: player.pos.x, z: player.pos.z, yaw: player.yaw, o2: player.o2, hp: player.health },
     buildings: serializeBuildings(), nodes: serializeNodes(), colonists: serializeColonists(), storm: stormState(),
@@ -171,7 +172,7 @@ function applySave(d) {
   loadColonists(d.colonists || []);
   if (d.rover) spawnRover(d.rover.x, d.rover.z, d.rover.h);
   G.relicsFound = d.relics || []; G.plazaSeen = !!d.plazaSeen;
-  G.morale = d.morale; G.mode = d.mode || 'story'; G.diffKey = d.diff || 'normal'; G.tech = d.tech || {}; G.rp = d.rp || 0; G.requests = d.requests || [];
+  G.morale = d.morale; G.waypoint = d.waypoint || null; G.mode = d.mode || 'story'; G.diffKey = d.diff || 'normal'; G.tech = d.tech || {}; G.rp = d.rp || 0; G.requests = d.requests || [];
   G.cityLevel = d.city || 0; G.popTotal = d.pop ?? (d.colonists || []).length; G.launched = !!d.launched;
   initCity(scene);
   setStormState(d.storm);
@@ -295,7 +296,7 @@ const HELP = `<h3>操作</h3><div class="keys">
   <div><kbd>左键</kbd><span>采矿 · 射击 · 放置建筑</span></div><div><kbd>右键</kbd><span>取消建造</span></div>
   <div><kbd>1</kbd><kbd>2</kbd><span>切换工具</span></div><div><kbd>B</kbd><span>建造蓝图</span></div>
   <div><kbd>E</kbd><span>互动 · 交谈 · 上车</span></div><div><kbd>U</kbd><span>升级注视的建筑</span></div><div><kbd>T</kbd><span>科研</span></div>
-  <div><kbd>Q</kbd><span>小星扫描矿藏</span></div><div><kbd>F</kbd><span>手电筒</span></div><div><kbd>Tab</kbd><span>殖民地档案</span></div>
+  <div><kbd>Q</kbd><span>小星扫描矿藏</span></div><div><kbd>M</kbd><span>星球地图 / 导航</span></div><div><kbd>F</kbd><span>手电筒</span></div><div><kbd>Tab</kbd><span>殖民地档案</span></div>
   <div><kbd>P</kbd><span>拍照模式</span></div><div><kbd>Esc</kbd><span>暂停</span></div></div>
   <h3>生存</h3><p>氧气会持续消耗。着陆舱、制氧站和居住穹顶附近会自动补氧。建好住房、氧气、食物、水和着陆场，移民飞船就会到来。夜里要提防锈蚀蛛。</p>`;
 const togglePane = html => { const el = $('intro-pane'); if (!el.classList.contains('hidden') && el.dataset.k === html.slice(0, 20)) { el.classList.add('hidden'); return; } el.dataset.k = html.slice(0, 20); el.innerHTML = html; el.classList.remove('hidden'); audio.play('tick'); };
@@ -438,6 +439,8 @@ window.addEventListener('keydown', e => {
     if (G.menuOpen === 'archive') closeMenus(true); else if (!G.menuOpen) openMenu('archive');
     return;
   }
+  if (e.code === 'KeyM' && !G.endingShown && !player.dead) { if (G.menuOpen === 'mapscr') closeMenus(true); else if (!G.menuOpen) openMenu('mapscr'); return; }
+  if (G.menuOpen === 'mapscr' && e.code === 'Escape') { closeMenus(true); return; }
   if (e.code === 'KeyT' && !G.endingShown && !player.dead) { if (G.menuOpen === 'research') closeMenus(true); else if (!G.menuOpen) openMenu('research'); return; }
   if (G.menuOpen === 'research' && e.code === 'Escape') { closeMenus(true); return; }
   if (G.menuOpen === 'trade' && (e.code === 'Escape' || e.code === 'KeyE')) { closeMenus(true); return; }
@@ -469,6 +472,7 @@ const HINTS = [
   { id: 'drive', text: '漫游车就在附近，走过去按 <kbd>E</kbd> 上车', when: () => getRover() && !G.driving && !hintSeen.drove },
   { id: 'research', text: '研究所已建成，按 <kbd>T</kbd> 用科研点数解锁科技', when: () => G.buildings.some(b => b.type === 'lab') && (G.rp || 0) >= 20 },
   { id: 'request', text: '居民提出了委托（右侧任务栏），完成后有奖励', when: () => (G.requests || []).length > 0 },
+  { id: 'map', text: '按 <kbd>M</kbd> 打开星球地图，点击可设置导航点', when: () => playT > 90 },
   { id: 'talk', text: '对准居民按 <kbd>E</kbd>，听听他们的故事', when: () => G.colonists.some(c => c.pos.distanceTo(player.pos) < 10) },
   { id: 'level', text: '人口和设施越多，城市等级越高，领地也会扩大（看左上角）', when: () => G.colony.pop >= 2 },
 ];
@@ -788,6 +792,7 @@ function update(dt) {
     updateRelics(dt);
     updateCompanion(dt);
     updateSystems(dt, reqCtx);
+    updateFestival(dt);
     updatePebbles();
     if (!G.plazaSeen && G.time.night > 0.6 && G.colonists.filter(c => c.atPlaza && !c.target).length >= 4) {
       G.plazaSeen = true;
@@ -816,6 +821,7 @@ window.__dbg = {
   chapter: i => startChapter(i),
   look(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; },
   begin: () => begin(false),
+  fest: () => startFestival(),
   pod: () => { const p = dropPod(); return { x: p.x, z: p.z }; },
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },

@@ -534,3 +534,39 @@ body.photo #photo-bar { display: flex; position: fixed; left: 50%; bottom: 3.2vh
 #res .r b { font-size: 21px; }
 #lane { bottom: 196px; gap: 8px; }
 #tip { font-size: 14px; line-height: 1.6; }
+
+/* —— 全息地图 —— */
+#mapscr { background: radial-gradient(ellipse at center, rgba(8, 20, 26, .9), rgba(3, 5, 8, .97)); }
+.mapwrap { width: min(1180px, 94vw); position: relative; }
+.mapwrap header { position: relative; margin-bottom: 18px; } .mapwrap header .x { top: 0; right: 0; }
+.mapwrap .kicker { color: var(--cyan); }
+.mapbody { display: flex; gap: 34px; align-items: flex-start; }
+.mapframe { position: relative; padding: 10px; transform: perspective(1400px) rotateX(10deg); transform-origin: center bottom;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .02) 0 1px, transparent 1px 3px), rgba(8, 18, 24, .6);
+  box-shadow: inset 0 0 0 1px rgba(var(--holo), .3), 0 0 50px rgba(var(--holo), .12); }
+.mapframe::before, .mapframe::after { content: ''; position: absolute; width: 22px; height: 22px; border: 2px solid var(--cyan); filter: drop-shadow(0 0 5px var(--cyan)); }
+.mapframe::before { left: -2px; top: -2px; border-right: 0; border-bottom: 0; } .mapframe::after { right: -2px; bottom: -2px; border-left: 0; border-top: 0; }
+#bigmap { display: block; width: min(68vh, 680px); height: min(68vh, 680px); cursor: crosshair; filter: saturate(1.1); }
+.maplegend { flex: 1; font-size: 14px; color: var(--txt2); }
+.maplegend h4 { font: 500 12px var(--fc); letter-spacing: 5px; color: var(--cyan); margin: 6px 0 12px; }
+.maplegend h4:not(:first-child) { margin-top: 26px; }
+.maplegend p { line-height: 1.8; font-size: 13.5px; }
+.lg { display: flex; align-items: center; gap: 12px; padding: 4px 0; letter-spacing: 2px; }
+.lg i { width: 12px; height: 12px; flex: none; background: var(--c); border-radius: 50%; }
+.lg i.sq { border-radius: 1px; } .lg i.dia { transform: rotate(45deg) scale(.8); border-radius: 1px; }
+.lg i.ring { background: none; box-shadow: inset 0 0 0 2px var(--c); } .lg i.dash { background: none; border-top: 2px dashed var(--c); border-radius: 0; height: 0; }
+.lg i.arrow { background: none; width: 0; height: 0; border-radius: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 12px solid var(--c); }
+.go.small { margin-top: 14px; padding: 10px; font-size: 14px; letter-spacing: 6px; }
+
+/* —— 菜单全息化：与 HUD 一致的角标、扫描线、光边 —— */
+.tile, .opt, .rs, .kv div, .person, .ach, .bp-detail, #intro-pane, .dest { position: relative; }
+.tile::after, .bp-detail::after, #intro-pane::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .018) 0 1px, transparent 1px 3px); }
+.tile.sel::before, #intro-pane::before { content: ''; position: absolute; left: -1px; top: -1px; width: 18px; height: 18px; border: 2px solid var(--amber); border-right: 0; border-bottom: 0; border-top-left-radius: 14px; filter: drop-shadow(0 0 5px var(--amber)); }
+#research .tile.sel::before { border-color: var(--cyan); filter: drop-shadow(0 0 5px var(--cyan)); }
+.bp-detail { box-shadow: inset 1px 0 0 rgba(var(--holo-a), .25), inset 30px 0 60px -40px rgba(var(--holo-a), .12); }
+#research .bp-detail { box-shadow: inset 1px 0 0 rgba(var(--holo), .25), inset 30px 0 60px -40px rgba(var(--holo), .12); }
+.bp-head h2, .sheet h2, .mapwrap h2, #pause h2 { text-shadow: 0 0 24px rgba(var(--holo-a), .25); }
+.bp-head::after { content: ''; position: absolute; left: 48px; right: 48px; bottom: -1px; height: 1px; background: linear-gradient(90deg, rgba(var(--holo-a), .5), transparent 60%); }
+#research .bp-head::after, #trade .bp-head::after { background: linear-gradient(90deg, rgba(var(--holo), .5), transparent 60%); }
+.kv div { box-shadow: inset 0 0 0 1px var(--hair), inset 0 1px 0 rgba(var(--holo-a), .25); }
+#intro-pane { box-shadow: inset 0 0 0 1px rgba(var(--holo-a), .22), 0 0 40px rgba(var(--holo-a), .08), 0 30px 80px rgba(0, 0, 0, .5); }

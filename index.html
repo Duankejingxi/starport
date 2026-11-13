@@ -106,7 +106,7 @@
       <div><kbd>W A S D</kbd>移动 <kbd>Shift</kbd>冲刺 <kbd>空格</kbd>跳跃 / 喷气</div>
       <div><kbd>左键</kbd>采集 / 射击 / 放置 <kbd>右键</kbd>取消 <kbd>R</kbd>旋转</div>
       <div><kbd>1</kbd><kbd>2</kbd>工具 <kbd>B</kbd>建造 <kbd>E</kbd>互动 <kbd>X</kbd>拆除</div>
-      <div><kbd>Q</kbd>扫描 <kbd>T</kbd>科研 <kbd>F</kbd>手电 <kbd>Tab</kbd>档案 <kbd>P</kbd>拍照模式</div>
+      <div><kbd>Q</kbd>扫描 <kbd>M</kbd>地图 <kbd>T</kbd>科研 <kbd>F</kbd>手电 <kbd>Tab</kbd>档案 <kbd>P</kbd>拍照模式</div>
     </div>
   </div>
   <div class="pane" id="pause-pane"></div>
@@ -154,6 +154,13 @@
     <button class="x" data-close>ESC</button>
   </header>
   <div class="bp-body"><div class="bp-grid" id="craft-list"></div><aside class="bp-detail" id="craft-detail"></aside></div>
+</div>
+<div id="mapscr" class="screen menu hidden">
+  <div class="mapwrap">
+    <header><div class="kicker"><span class="dash"></span>PLANETARY MAP</div><h2 id="map-title">地图</h2><button class="x" data-close>ESC</button></header>
+    <div class="mapbody"><div class="mapframe"><canvas id="bigmap" width="760" height="760"></canvas></div>
+      <aside class="maplegend" id="map-legend"></aside></div>
+  </div>
 </div>
 <div id="starmap" class="screen menu hidden">
   <div class="sm">

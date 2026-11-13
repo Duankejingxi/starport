@@ -55,9 +55,10 @@ class Particles {
   }
 }
 
-let sparks, dust, ambient, rain;
+let sparks, dust, ambient, rain, fwk;
 export function initFx(scene) {
   sparks = new Particles(scene, 3000, true, 0.35);
+  fwk = new Particles(scene, 4000, true, 1.3);
   dust = new Particles(scene, 2500, false, 1.6);
   // 飘浮在空中的细尘 / 沙尘暴
   const ag = new THREE.BufferGeometry(), ap = new Float32Array(1500 * 3);
@@ -104,6 +105,7 @@ export const fx = {
       dust.emit(p.x + Math.cos(a) * radius, p.y + 0.4, p.z + Math.sin(a) * radius, Math.cos(a) * s, 0.5 + Math.random(), Math.sin(a) * s, color[0], color[1], color[2], 0.6, 1.5 + Math.random(), -0.1, 1.2);
     }
   },
+  firework(p, vx, vy, vz, c) { fwk.emit(p.x, p.y, p.z, vx, vy, vz, c[0] * 1.6, c[1] * 1.6, c[2] * 1.6, 1, 1.6 + Math.random() * 0.8, 3, 1.4); },
   trail(p, color, size = 1) {
     sparks.emit(p.x, p.y, p.z, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, color[0] * size, color[1] * size, color[2] * size, 1, 0.18, 0, 0);
   },
@@ -117,7 +119,7 @@ export const fx = {
 
 let rainAmt = 0;
 export function updateFx(dt, cam) {
-  sparks.update(dt); dust.update(dt);
+  sparks.update(dt); dust.update(dt); fwk.update(dt);
   for (let i = debris.length - 1; i >= 0; i--) {
     const d = debris[i];
     d.life -= dt; d.v.y -= 9 * dt;

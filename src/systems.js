@@ -178,6 +178,7 @@ export function updateMorale(dt) {
   const safe = G.buildings.some(b => b.type === 'turret') ? 6 : (D().foe > 0 && (G.nightsSurvived || 0) > 0 ? -8 : 0); m += safe; f.push(['安全感', safe]);
   const crowd = C.housing && C.pop > C.housing * 0.9 ? -8 : 0; m += crowd; f.push(['住房拥挤', crowd]);
   if (has('culture')) { m += 10; f.push(['殖民地文化', 10]); }
+  if (G.festival) { m += 15; f.push(['殖民地节', 15]); }
   G.morale = Math.round(Math.max(0, Math.min(100, m)));
   G.moraleFactors = f.filter(x => Math.abs(x[1]) >= 0.5);
 }

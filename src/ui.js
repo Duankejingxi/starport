@@ -99,7 +99,7 @@ export function chapterCard(ch) {
 }
 
 // —— 菜单 ——
-const MENUS = ['build', 'craft', 'pause', 'starmap', 'archive', 'research', 'trade'];
+const MENUS = ['build', 'craft', 'pause', 'starmap', 'archive', 'research', 'trade', 'mapscr'];
 export function openMenu(id) {
   closeMenus(false);
   G.menuOpen = id;
@@ -110,6 +110,7 @@ export function openMenu(id) {
   if (id === 'craft') renderCraft();
   if (id === 'research') renderResearch();
   if (id === 'trade') renderTrade();
+  if (id === 'mapscr') renderMap();
   if (id === 'archive') $('archive-body').innerHTML = archiveHTML();
   if (id === 'pause') $('pause-pane').innerHTML = '';
 }
@@ -248,6 +249,45 @@ function renderResearch() {
     <div class="need"><div class="row ${ok || done ? '' : 'lack'}" style="--rc:var(--cyan)">${ic('book')}<span class="nm">科研点数</span>${Math.floor(G.rp || 0)} / ${t.cost}</div></div>
     <button class="go" ${done || !ok ? 'disabled' : ''}>${done ? '已完成' : ok ? '开始研究' : '科研点数不足'}</button>`;
   $('research-detail').querySelector('.go').addEventListener('click', () => { if (research(rsSel)) { rsSel = Object.keys(TECHS).find(k => !has(k)) || rsSel; renderResearch(); } });
+}
+
+// —— 全息地图 ——
+let mapBound = false;
+function renderMap() {
+  const cv = $('bigmap'), g = cv.getContext('2d'), S = cv.width, P = G.player;
+  const k = S / WORLD, tx = x => (x + WORLD / 2) * k, tz = z => (z + WORLD / 2) * k;
+  $('map-title').textContent = `${PLANET.name} · ${PLANET.place}`;
+  g.clearRect(0, 0, S, S);
+  g.globalAlpha = 0.9; g.drawImage(mapCv, 0, 0, S, S); g.globalAlpha = 1;
+  // 网格
+  g.strokeStyle = 'rgba(142,231,255,.08)'; g.lineWidth = 1;
+  for (let i = 0; i <= S; i += S / 14) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, S); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(S, i); g.stroke(); }
+  // 领地
+  g.strokeStyle = 'rgba(142,231,255,.7)'; g.setLineDash([6, 6]); g.lineWidth = 1.5;
+  g.beginPath(); g.arc(tx(CENTER.x), tz(CENTER.z), LEVELS[G.cityLevel].r * k, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+  const dia = (x, z, s, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(tx(x), tz(z) - s); g.lineTo(tx(x) + s, tz(z)); g.lineTo(tx(x), tz(z) + s); g.lineTo(tx(x) - s, tz(z)); g.fill(); };
+  for (const n of G.nodes) dia(n.x, n.z, n.type === 'titanium' ? 3.5 : 2.2, RES_INFO[n.type].color);
+  for (const b of G.buildings) { const r = Math.max(2.5, b.def.r * k); g.fillStyle = b.broken ? '#ff5a45' : '#f3efe8'; g.fillRect(tx(b.x) - r, tz(b.z) - r, r * 2, r * 2); }
+  for (const e of G.enemies) { g.fillStyle = '#ff5a45'; g.beginPath(); g.arc(tx(e.pos.x), tz(e.pos.z), e.boss ? 6 : 2.5, 0, 7); g.fill(); }
+  for (const r of allRelics()) { g.strokeStyle = r.found ? 'rgba(255,210,138,.4)' : '#ffd28a'; g.lineWidth = 2; g.beginPath(); g.arc(tx(r.x), tz(r.z), 6, 0, 7); g.stroke(); }
+  for (const p of allPods()) { g.fillStyle = '#8bf0a9'; g.beginPath(); g.arc(tx(p.x), tz(p.z), 5, 0, 7); g.fill(); }
+  g.fillStyle = '#8bf0a9'; g.fillRect(tx(LANDER_POS.x) - 3, tz(LANDER_POS.z) - 3, 6, 6);
+  if (G.waypoint) { const w = G.waypoint; g.strokeStyle = '#ffb65c'; g.lineWidth = 2; g.beginPath(); g.arc(tx(w.x), tz(w.z), 9, 0, 7); g.stroke(); g.beginPath(); g.moveTo(tx(w.x), tz(w.z) - 14); g.lineTo(tx(w.x), tz(w.z) + 14); g.moveTo(tx(w.x) - 14, tz(w.z)); g.lineTo(tx(w.x) + 14, tz(w.z)); g.stroke(); }
+  // 玩家
+  const a = Math.atan2(P.fwd.x, -P.fwd.z);
+  g.save(); g.translate(tx(P.pos.x), tz(P.pos.z)); g.rotate(a);
+  g.fillStyle = '#fff'; g.shadowColor = '#8ee7ff'; g.shadowBlur = 10; g.beginPath(); g.moveTo(0, -10); g.lineTo(7, 7); g.lineTo(0, 3); g.lineTo(-7, 7); g.closePath(); g.fill(); g.restore();
+  const li = (c, t, shape = 'dot') => `<div class="lg"><i class="${shape}" style="--c:${c}"></i>${t}</div>`;
+  $('map-legend').innerHTML = `<h4>图例</h4>${li('#fff', '你的位置', 'arrow')}${li('#f3efe8', '建筑', 'sq')}${Object.values(RES_INFO).map(r => li(r.color, r.name, 'dia')).join('')}${li('#ffd28a', '遗迹', 'ring')}${li('#8bf0a9', '补给舱 / 着陆舱')}${li('#ff5a45', '锈蚀蛛')}${li('#8ee7ff', '殖民地领地', 'dash')}
+    <h4>导航</h4><p>点击地图任意位置设置导航点，罗盘会指向它，地面会出现光柱。</p>${G.waypoint ? '<button class="go small" id="wp-clear">清除导航点</button>' : ''}`;
+  $('wp-clear')?.addEventListener('click', () => { G.waypoint = null; audio.play('tick'); renderMap(); });
+  if (!mapBound) {
+    mapBound = true;
+    cv.addEventListener('click', e => {
+      const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * WORLD - WORLD / 2, z = (e.clientY - r.top) / r.height * WORLD - WORLD / 2;
+      G.waypoint = { x, z }; audio.play('ui'); renderMap();
+    });
+  }
 }
 
 // —— 星际贸易 ——
@@ -410,6 +450,7 @@ function drawCompass() {
     for (const n of G.nodes) if (n.type === 'titanium') { const d = Math.hypot(n.x - P.pos.x, n.z - P.pos.z); if (d < bd) { bd = d; best = n; } }
     if (best) marks.push({ c: 'ti', t: `${ic('titanium')}${Math.round(bd)}m`, a: bearing(best.x, best.z) });
   }
+  if (G.waypoint) marks.push({ c: 'ship', t: `${ic('star')}导航 ${Math.round(Math.hypot(G.waypoint.x - P.pos.x, G.waypoint.z - P.pos.z))}m`, a: bearing(G.waypoint.x, G.waypoint.z) });
   const np = nearestPod(P.pos);
   if (np) marks.push({ c: 'home', t: `${ic('ship')}补给 ${Math.round(np.d)}m`, a: bearing(np.p.x, np.p.z) });
   const nr = nearestRelic(P.pos);
