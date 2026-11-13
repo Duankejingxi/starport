@@ -1,4 +1,6 @@
 // 全程合成的音效（WebAudio，无外部文件）
+import { G } from './state.js';
+let G_engine = null;
 let ctx, master, sfx, musicGain, windGain, windFilter, laserNode, noiseBuf;
 export const audio = {
   enabled: true,
@@ -67,6 +69,21 @@ export const audio = {
       case 'rumble': this.noise(4, 150, 0.6); this.noise(3, 400, 0.25, 'lowpass', 0.5); break;
       case 'jet': this.noise(0.12, 800, 0.1, 'bandpass'); break;
       case 'night': this.tone(110, 3, 'sine', 0.12, 0.8); this.tone(165, 3, 'sine', 0.08, 0.8, 0.3); break;
+    }
+  },
+  engine(k) {
+    if (!ctx) return;
+    if (k > 0 || G_engine) {
+      if (!G_engine) {
+        const o = ctx.createOscillator(), o2 = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        o.type = 'sawtooth'; o2.type = 'triangle'; f.type = 'lowpass'; f.frequency.value = 500; g.gain.value = 0.0001;
+        o.connect(f); o2.connect(f); f.connect(g); g.connect(sfx); o.start(); o2.start();
+        G_engine = { o, o2, f, g };
+      }
+      const t = ctx.currentTime, e = G_engine;
+      e.o.frequency.setTargetAtTime(38 + k * 70, t, 0.1); e.o2.frequency.setTargetAtTime(76 + k * 140, t, 0.1);
+      e.f.frequency.setTargetAtTime(300 + k * 900, t, 0.1);
+      e.g.gain.setTargetAtTime(k > 0 || G.driving ? 0.03 + k * 0.05 : 0.0001, t, 0.15);
     }
   },
   laser(on) {

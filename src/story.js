@@ -172,6 +172,7 @@ export const THREAT_FROM = PID === 'mars' ? 2 : 1;
 export const RECIPES = {
   rifle:     { name: '等离子步枪', icon: '🔫', cost: { iron: 18, silicon: 12 }, desc: '按 2 切换。消耗能量发射等离子弹。' },
   tank:      { name: '大容量氧气罐', icon: '🫁', cost: { iron: 12, ice: 10 }, desc: '宇航服氧气上限 100 → 180。' },
+  rover:     { name: '加压漫游车', icon: '🚙', cost: { iron: 35, silicon: 20, ice: 5 }, desc: '在工坊旁出厂。按 E 上车，Shift 加速。车舱内自动补氧，还能撞飞锈蚀蛛。' },
   scanner:   { name: '地质扫描仪', icon: '📡', cost: { iron: 8, silicon: 10 }, desc: '小地图范围扩大，罗盘标出最近的钛矿。' },
   jetpack:   { name: '喷气背包', icon: '🚀', cost: { iron: 20, silicon: 15, titanium: 4 }, desc: '空中按住空格飞行，消耗能量。' },
   overclock: { name: '激光超频', icon: '⚡', cost: { silicon: 20, titanium: 3 }, desc: '采矿速度 ×2，激光伤害提升。' },

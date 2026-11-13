@@ -154,6 +154,7 @@ export function updateUI(dt, ctx) {
   // 提示
   $('prompt').innerHTML = ctx.prompt || '';
   $('prompt').classList.toggle('show', !!ctx.prompt);
+  $('prompt').classList.toggle('drive', !!G.driving);
   // 建造模式提示
   const bh = $('buildhint');
   if (tool.id === 'build' && placement.type && !G.menuOpen) {

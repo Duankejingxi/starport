@@ -16,6 +16,8 @@ import { input, initInput } from './input.js';
 import { makeLander } from './models.js';
 import { P, PID, PLANETS, SAVE_KEY, META, saveMeta, loadMeta, clearAll } from './planets.js';
 import { initCity, updateCity, LEVELS } from './city.js';
+import { spawnRover, getRover, roverState, enterRover, exitRover, updateRover, roverSpeed } from './rover.js';
+import { updateEvents } from './events.js';
 
 const $ = id => document.getElementById(id);
 G.debug = /[?&]debug/.test(location.search);
@@ -27,6 +29,20 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+// 画质：默认按设备性能自动选择
+let quality = 'high';
+try { quality = localStorage.getItem('starport-quality') || ((navigator.hardwareConcurrency || 8) <= 4 ? 'mid' : 'high'); } catch (e) { /* 忽略 */ }
+function applyQuality(q, live) {
+  quality = q;
+  renderer.setPixelRatio(q === 'high' ? Math.min(window.devicePixelRatio, 1.5) : q === 'mid' ? 1 : 0.75);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  const sh = q !== 'low';
+  if (renderer.shadowMap.enabled !== sh) {
+    renderer.shadowMap.enabled = sh;
+    if (live) G.scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.needsUpdate = true; }); });
+  }
+}
+applyQuality(quality, false);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 6000);
 G.scene = scene; G.camera = camera; G.renderer = renderer;
@@ -70,7 +86,7 @@ canvas.addEventListener('click', () => {
 function save(silent) {
   if (!G.started) return;
   const data = {
-    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched,
+    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(),
     time: { t: G.time.t, day: G.time.day },
     player: { x: player.pos.x, z: player.pos.z, yaw: player.yaw, o2: player.o2, hp: player.health },
     buildings: serializeBuildings(), nodes: serializeNodes(), colonists: serializeColonists(), storm: stormState(),
@@ -92,6 +108,7 @@ function applySave(d) {
   player.pos.set(d.player.x, getHeight(d.player.x, d.player.z), d.player.z);
   player.yaw = d.player.yaw; player.o2 = d.player.o2; player.health = Math.max(30, d.player.hp);
   loadColonists(d.colonists || []);
+  if (d.rover) spawnRover(d.rover.x, d.rover.z, d.rover.h);
   G.cityLevel = d.city || 0; G.popTotal = d.pop ?? (d.colonists || []).length; G.launched = !!d.launched;
   initCity(scene);
   setStormState(d.storm);
@@ -124,6 +141,7 @@ function begin(fromSave) {
     if (META.carry && PID !== 'mars') {
       Object.assign(G.upgrades, META.carry.upgrades || {});
       for (const k in META.carry.res) G.res[k] += META.carry.res[k];
+      if (G.upgrades.rover) spawnRover(LANDER_POS.x + 10, LANDER_POS.z + 4, 0.5);
       setTimeout(() => toast('随舰物资已卸载，所有装备已同步'), 4000);
     }
     G.time.t = 0.29; // 清晨
@@ -143,12 +161,25 @@ $('btn-continue').addEventListener('click', () => begin(true));
 $('btn-save').addEventListener('click', () => save(false));
 $('btn-restart').addEventListener('click', () => { if (confirm('将删除所有星球的进度，从火星重新开始。确定吗？')) { clearAll(); G.started = false; location.href = location.pathname + (G.debug ? '?debug' : ''); } });
 $('vol').addEventListener('input', e => audio.setVolume(+e.target.value));
+$('quality').value = quality;
+$('quality').addEventListener('change', e => { applyQuality(e.target.value, true); try { localStorage.setItem('starport-quality', e.target.value); } catch (err) { /* 忽略 */ } });
 $('sens').addEventListener('input', e => { input.sens = +e.target.value; });
-$('btn-respawn').addEventListener('click', () => { player.respawn(); $('death').classList.add('hidden'); G.requestLock(); });
+$('btn-respawn').addEventListener('click', () => { if (G.driving) exitRover(player); player.respawn(); $('death').classList.add('hidden'); G.requestLock(); });
 $('btn-endcont').addEventListener('click', () => { $('ending').classList.add('hidden'); G.endingShown = false; G.requestLock(); });
 
 // —— 事件 ——
 G.events.on('chapter', ch => chapterCard(ch));
+G.events.on('crafted', k => {
+  if (k !== 'rover') return;
+  const fab = G.buildings.find(b => b.type === 'fabricator');
+  const base = fab || player.pos;
+  for (let i = 0; i < 12; i++) {
+    const a = i * 0.9, d = (fab ? fab.def.r : 0) + 5 + i;
+    const x = base.x + Math.cos(a) * d, z = base.z + Math.sin(a) * d;
+    if (!G.colliders.overlaps(x, z, 2.6)) { spawnRover(x, z, -a); break; }
+  }
+  radio('方舟 · AI', '漫游车已出厂。车舱加压，可以在车里补氧。小心别开下悬崖。');
+});
 G.events.on('cityLevel', lv => {
   chapterCard({ title: `${lv.icon} 城市升级：${lv.name}`, sub: `领地扩展至 ${lv.r} 米` });
   const lines = {
@@ -241,6 +272,30 @@ function showClickHint() { /* 由每帧逻辑显示 */ }
 
 let interact = null, demolishArm = 0, autosave = 30, terraT = 0;
 let launchArm = 0;
+// —— 情境提示：每条只出现一次 ——
+let hintSeen = {}; try { hintSeen = JSON.parse(localStorage.getItem('starport-hints')) || {}; } catch (e) { /* 忽略 */ }
+let hintCur = null, hintT = 0, playT = 0;
+const HINTS = [
+  { id: 'mine', text: '对准发光的矿石，<kbd>按住左键</kbd> 用采矿激光采集', when: () => playT > 6 && G.stats.mined.iron + G.stats.mined.silicon === 0 },
+  { id: 'build', text: '资源够了！按 <kbd>B</kbd> 打开建造菜单', when: () => G.buildings.length === 0 && G.res.iron >= 8 && G.res.silicon >= 6 },
+  { id: 'o2', text: '氧气在持续消耗。回到着陆舱或制氧站附近会自动补氧', when: () => !player.inLife && player.o2 < player.maxO2 * 0.5 },
+  { id: 'night', text: '天黑了，按 <kbd>F</kbd> 打开手电筒', when: () => G.time.night > 0.6 && !player.flashlight },
+  { id: 'craft', text: '靠近制造工坊按 <kbd>E</kbd> 制造武器和装备——试试加压漫游车', when: () => G.buildings.some(b => b.type === 'fabricator') && !G.upgrades.rifle },
+  { id: 'drive', text: '漫游车就在附近，走过去按 <kbd>E</kbd> 上车', when: () => getRover() && !G.driving && !hintSeen.drove },
+  { id: 'talk', text: '对准居民按 <kbd>E</kbd>，听听他们的故事', when: () => G.colonists.some(c => c.pos.distanceTo(player.pos) < 10) },
+  { id: 'level', text: '人口和设施越多，城市等级越高，领地也会扩大（看左上角）', when: () => G.colony.pop >= 2 },
+];
+function hintPrompt(dt) {
+  playT += dt;
+  if (G.driving) hintSeen.drove = true;
+  if (hintCur) {
+    hintT -= dt;
+    if (hintT <= 0 || !hintCur.when()) { hintSeen[hintCur.id] = true; hintCur = null; try { localStorage.setItem('starport-hints', JSON.stringify(hintSeen)); } catch (e) { /* 忽略 */ } }
+    else return `💡 ${hintCur.text}`;
+  }
+  for (const h of HINTS) if (!hintSeen[h.id] && h.when()) { hintCur = h; hintT = 12; return `💡 ${h.text}`; }
+  return '';
+}
 function startLaunch(b) {
   G.launching = { b, t: 0 };
   G.launched = true;
@@ -301,6 +356,13 @@ function finalEnding() {
 function handleInteraction(dt) {
   const ctx = { prompt: '', crossClass: '' };
   if (player.dead || G.menuOpen) return ctx;
+  if (G.driving) { ctx.prompt = `🚙 <b>${roverSpeed()}</b> km/h<br><kbd>W S</kbd> 油门 · <kbd>A D</kbd> 转向 · <kbd>Shift</kbd> 加速 · <kbd>空格</kbd> 刹车 · <kbd>E</kbd> 下车`; return ctx; }
+  const rv = getRover();
+  if (rv && Math.hypot(rv.x - player.pos.x, rv.z - player.pos.z) < 4.5) {
+    ctx.prompt = '🚙 加压漫游车<br><kbd>E</kbd> 上车';
+    if (input.hit('KeyE')) { enterRover(); input.pressed.delete('KeyE'); }
+    return ctx;
+  }
   const origin = camera.position, dir = player.fwd;
   const col = lookColonist(origin, dir);
   const fab = G.buildings.find(b => b.type === 'fabricator' && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < b.def.r + 6);
@@ -371,21 +433,25 @@ function frame() {
 }
 function update(dt) {
   {
-    player.update(dt);
+    if (G.driving) { if (input.hit('KeyE') && !G.menuOpen) { exitRover(player); input.pressed.delete('KeyE'); } }
+    if (!G.driving) player.update(dt);
+    updateRover(dt, player, camera);
     updateSky(dt, camera.position);
     if (G.time.dawn) { G.time.dawn = false; toast(`☀ 第 ${G.time.day} 日的黎明 · ${P.name}`); }
     updateNodes(dt);
-    updateTools(dt, player, camera);
+    if (!G.driving) updateTools(dt, player, camera); else G.lookBuilding = null;
     updateBuildings(dt, { shoot });
     updateColony(dt);
     updateCity(dt, tool.id === 'build' && !!placement.type);
     updateLaunch(dt);
     floraMat.emissiveIntensity = 0.06 + G.time.night * (0.55 + Math.sin(performance.now() * 0.0015) * 0.15);
     updateEnemies(dt);
+    updateEvents(dt);
     updateProjectiles(dt);
     updateStory(dt);
     lander.beacon.visible = Math.sin(performance.now() * 0.004) > 0;
     const ctx = handleInteraction(dt);
+    if (!ctx.prompt) ctx.prompt = hintPrompt(dt);
     updateUI(dt, ctx);
     audio.update(G.storm, G.time.night);
     autosave -= dt; if (autosave <= 0) { autosave = 45; save(true); }
@@ -409,5 +475,5 @@ window.__dbg = {
   begin: () => begin(false),
   step(sec, dt = 0.05) { for (let t = 0; t < sec; t += dt) { update(dt); updateFx(dt, camera.position); input.endFrame(); } },
   input,
-  save, toast, setGhost, openMenu, closeMenus, tool, placement,
+  save, toast, setGhost, openMenu, closeMenus, tool, placement, rover: getRover,
 };

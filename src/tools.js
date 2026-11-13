@@ -216,7 +216,7 @@ export function updateTools(dt, player, camera) {
 }
 
 export function renderViewmodel(renderer) {
-  if (G.player.dead) return;
+  if (G.player.dead || G.driving) return;
   renderer.autoClear = false;
   renderer.clearDepth();
   renderer.render(vmScene, vmCam);

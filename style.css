@@ -55,6 +55,7 @@ body:not(.playing) #hud, body:not(.playing) #visor { display: none; }
 
 #prompt { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px; opacity: 0; transition: opacity .15s; text-align: center; line-height: 1.6; max-width: 520px; }
 #prompt.show { opacity: 1; }
+#prompt.drive { top: auto; bottom: 160px; }
 #prompt .line { color: #ffe8c8; font-style: italic; }
 #prompt kbd { color: var(--accent); border-color: var(--accent); }
 #buildhint { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 16px; text-align: center; line-height: 1.7; opacity: 0; }
@@ -124,6 +125,7 @@ button.primary:hover { filter: brightness(1.12); }
 button.danger:hover { border-color: var(--bad); color: var(--bad); }
 .ctrl { margin-top: 26px; font-size: 13px; opacity: .7; line-height: 2.2; }
 .note { margin-top: 12px; color: var(--accent); font-size: 13px; }
+.vol select { background: #2a1d18; color: var(--txt); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font: inherit; }
 .vol { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
