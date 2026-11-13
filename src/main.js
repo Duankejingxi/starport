@@ -80,7 +80,7 @@ G.requestLock = () => {
 };
 document.addEventListener('pointerlockchange', () => {
   G.locked = document.pointerLockElement === canvas;
-  if (!G.locked && G.started && !G.menuOpen && !player.dead && !G.endingShown) openMenu('pause');
+  if (!G.locked && G.started && !G.menuOpen && !player.dead && !G.endingShown && !G.cine) openMenu('pause');
 });
 canvas.addEventListener('click', () => {
   audio.init();
@@ -126,7 +126,7 @@ const terraCenters = () => G.buildings.filter(b => b.type === 'terraformer').map
 
 // —— 开场 ——
 const STORY = P.intro;
-document.querySelector('.logo span').textContent = '：' + P.title;
+document.querySelector('.logo span').textContent = P.title;
 document.title = '星港：' + P.title;
 if (META.visited?.length) $('touch-note').innerHTML = '已开拓：' + META.visited.map(v => `${PLANETS[v.id].name}（${v.pop} 人）`).join(' · ');
 $('story').innerHTML = STORY.map((s, i) => `<p style="animation-delay:${0.4 + i * 1.1}s">${s}</p>`).join('');
@@ -137,6 +137,25 @@ if (existing) {
 }
 if (matchMedia('(pointer: coarse)').matches) $('touch-note').innerHTML += '本游戏需要键盘和鼠标，请在电脑上游玩。';
 
+// —— 开场字幕：黑场中逐行浮现，可跳过 ——
+function playCine(done) {
+  if (G.debug) { setTimeout(done, 1200); return; }
+  const el = $('cine'), lines = P.intro;
+  G.cine = true;
+  el.classList.remove('hidden', 'out');
+  $('cine-lines').innerHTML = lines.map((s, i) => `<p style="animation-delay:${0.6 + i * 2.1}s">${s}</p>`).join('');
+  let finished = false;
+  const end = () => {
+    if (finished) return; finished = true;
+    el.classList.add('out'); G.cine = false;
+    window.removeEventListener('keydown', key); window.removeEventListener('mousedown', end);
+    setTimeout(() => el.classList.add('hidden'), 1500);
+    setTimeout(done, 900);
+  };
+  const key = e => { if (e.code === 'Space' || e.code === 'Escape' || e.code === 'Enter') end(); };
+  window.addEventListener('keydown', key); window.addEventListener('mousedown', end);
+  setTimeout(end, 1500 + lines.length * 2100 + 1800);
+}
 function begin(fromSave) {
   audio.init();
   if (fromSave && existing) applySave(existing);
@@ -152,7 +171,7 @@ function begin(fromSave) {
     }
     G.time.t = 0.29; // 清晨
     startChapter(0, true);
-    setTimeout(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); }, 1200);
+    playCine(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); });
   }
   initRelics();
   $('intro').classList.add('hidden');
@@ -176,8 +195,9 @@ $('btn-achv').addEventListener('click', () => setPausePane(achievementsHTML()));
 $('btn-restart').addEventListener('click', () => { if (confirm('将删除所有星球的进度，从火星重新开始。确定吗？')) { clearAll(); G.started = false; location.href = location.pathname + (G.debug ? '?debug' : ''); } });
 $('vol').addEventListener('input', e => audio.setVolume(+e.target.value));
 $('quality').value = quality;
-try { const f = +localStorage.getItem('starport-fov'); if (f >= 60 && f <= 100) { camera.fov = f; camera.updateProjectionMatrix(); $('fov').value = f; } } catch (e) { /* 忽略 */ }
-$('fov').addEventListener('input', e => { camera.fov = +e.target.value; camera.updateProjectionMatrix(); try { localStorage.setItem('starport-fov', e.target.value); } catch (err) { /* 忽略 */ } });
+G.baseFov = 72;
+try { const f = +localStorage.getItem('starport-fov'); if (f >= 60 && f <= 100) { G.baseFov = f; camera.fov = f; camera.updateProjectionMatrix(); $('fov').value = f; } } catch (e) { /* 忽略 */ }
+$('fov').addEventListener('input', e => { G.baseFov = +e.target.value; camera.fov = +e.target.value; camera.updateProjectionMatrix(); try { localStorage.setItem('starport-fov', e.target.value); } catch (err) { /* 忽略 */ } });
 $('quality').addEventListener('change', e => { applyQuality(e.target.value, true); try { localStorage.setItem('starport-quality', e.target.value); } catch (err) { /* 忽略 */ } });
 $('sens').addEventListener('input', e => { input.sens = +e.target.value; });
 $('btn-respawn').addEventListener('click', () => { if (G.driving) exitRover(player); player.respawn(); $('death').classList.add('hidden'); G.requestLock(); });
@@ -300,6 +320,7 @@ let launchArm = 0;
 let hintSeen = {}; try { hintSeen = JSON.parse(localStorage.getItem('starport-hints')) || {}; } catch (e) { /* 忽略 */ }
 let hintCur = null, hintT = 0, playT = 0;
 const HINTS = [
+  { id: 'move', text: '<kbd>W A S D</kbd>移动　<kbd>鼠标</kbd>环视　<kbd>Shift</kbd>冲刺　<kbd>空格</kbd>跳跃', when: () => playT > 0.5 && playT < 40 },
   { id: 'mine', text: '对准发光的矿石，<kbd>按住左键</kbd> 用采矿激光采集', when: () => playT > 6 && G.stats.mined.iron + G.stats.mined.silicon === 0 },
   { id: 'build', text: '资源够了！按 <kbd>B</kbd> 打开建造菜单', when: () => G.buildings.length === 0 && G.res.iron >= 8 && G.res.silicon >= 6 },
   { id: 'o2', text: '氧气在持续消耗。回到着陆舱或制氧站附近会自动补氧', when: () => !player.inLife && player.o2 < player.maxO2 * 0.5 },
@@ -470,8 +491,8 @@ function frame() {
     return;
   }
   if (G.debug) G.locked = true;
-  const running = G.locked && !G.menuOpen && !G.endingShown;
-  $('clickhint').classList.toggle('hidden', !(G.started && !G.locked && !G.menuOpen && !player.dead && !G.endingShown));
+  const running = G.locked && !G.menuOpen && !G.endingShown && !G.cine;
+  $('clickhint').classList.toggle('hidden', !(G.started && !G.locked && !G.menuOpen && !player.dead && !G.endingShown && !G.cine));
   if (running) {
     update(dt);
   } else {

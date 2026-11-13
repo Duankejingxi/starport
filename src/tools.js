@@ -16,7 +16,7 @@ export const TOOLS = [
 ];
 export const tool = { index: 0, get id() { return TOOLS[this.index].id; } };
 
-let coilMat, vmScene, vmCam, models = {}, beamCore, beamOuter, beamGlow, flash, muzzleFlash;
+let hitLight, muzzleT = 0, shakeNode = null, coilMat, vmScene, vmCam, models = {}, beamCore, beamOuter, beamGlow, flash, muzzleFlash;
 const MUZZLE = new THREE.Vector3(0.24, -0.22, -0.85);
 
 export function initTools(camera) {
@@ -82,6 +82,8 @@ export function initTools(camera) {
   beamCore.visible = beamOuter.visible = false; beamCore.frustumCulled = beamOuter.frustumCulled = false;
   G.scene.add(beamCore, beamOuter);
   beamGlow = glow(0xff9040, 1.6, G.scene); beamGlow.visible = false;
+  // 激光命中点与枪口的真实光源
+  hitLight = new THREE.PointLight(0xff8a40, 0, 6, 2); G.scene.add(hitLight);
   muzzleFlash = glow(0x66e6ff, 0.35, vmScene); muzzleFlash.visible = false;
 
   // 手电筒
@@ -166,6 +168,9 @@ export function updateTools(dt, player, camera) {
   }
 
   beamCore.visible = beamOuter.visible = beamGlow.visible = false;
+  muzzleT -= dt;
+  hitLight.intensity = Math.max(0, hitLight.intensity - dt * 120);
+  if (shakeNode) { shakeNode.mesh.position.set(shakeNode.x, shakeNode.y, shakeNode.z); shakeNode = null; }
   muzzleFlash.visible = false;
   fireCool -= dt;
   const firing = input.mouse[0] && !G.menuOpen && !player.dead && G.locked;
@@ -190,8 +195,14 @@ export function updateTools(dt, player, camera) {
       beamCore.visible = beamOuter.visible = true;
       beamGlow.position.copy(end); beamGlow.visible = true; beamGlow.scale.setScalar(1.2 + Math.random() * 0.8);
       kick = Math.max(kick, 0.15 + Math.random() * 0.1);
+      hitLight.position.copy(end).addScaledVector(dir, -0.6);
+      hitLight.color.setRGB(1, 0.55, 0.25); hitLight.intensity = 5 + Math.random() * 4;
       if (kind === 'node') {
         const n = nh.n;
+        hitLight.color.setRGB(...NODE_COLOR[n.type]);
+        // 被激光切割的矿石轻微颤动
+        shakeNode = n; n.mesh.position.set(n.x + (Math.random() - 0.5) * 0.07, n.y + (Math.random() - 0.5) * 0.05, n.z + (Math.random() - 0.5) * 0.07);
+        if (Math.random() < 0.15) fx.dustPuff(end, 1, 0.4);
         mineAcc += dt * 3.2 * (G.upgrades.overclock ? 2 : 1);
         if (Math.random() < 0.7) fx.spark(end, NODE_COLOR[n.type], 2, 5, 0.4);
         mineSoundT -= dt; if (mineSoundT <= 0) { mineSoundT = 0.09; audio.play('mine'); }
@@ -225,6 +236,7 @@ export function updateTools(dt, player, camera) {
       shoot(start, d, G.upgrades.rifle2 ? 30 : 19, 'player');
       audio.play('shoot');
       muzzleFlash.visible = true; muzzleFlash.position.set(0.24, -0.21, -0.86);
+      hitLight.position.copy(start); hitLight.color.setRGB(0.4, 0.9, 1); hitLight.intensity = 12;
     } else if (input.clicked[0]) { audio.play('deny'); G.events.emit('toast', '能量不足'); }
   }
 

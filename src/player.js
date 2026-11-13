@@ -24,7 +24,7 @@ export class Player {
     this.bob = 0; this.stepT = 0; this.landDip = 0;
     this.dead = false; this.hurtT = 0; this.flashlight = false;
     this.inLife = false; this.alarmT = 0; this.lastHitDir = 0;
-    this.moving = false; this.sprinting = false; this.jetting = false;
+    this.moving = false; this.sprinting = false; this.jetting = false; this.roll = 0;
     this.fwd = new THREE.Vector3();
   }
 
@@ -130,7 +130,11 @@ export class Player {
     this.landDip *= Math.pow(0.002, dt);
     this.bobY = Math.sin(this.bob * 2) * 0.05 * Math.min(1, hs / 6) - this.landDip;
     this.cam.position.set(this.pos.x, this.pos.y + EYE + this.bobY, this.pos.z);
-    this.cam.rotation.set(this.pitch, this.yaw, Math.sin(this.bob) * 0.006 * Math.min(1, hs / 6), 'YXZ');
+    // 冲刺时视野变宽，左右平移时镜头微倾
+    this.roll += ((-fx_ * 0.025) - this.roll) * Math.min(1, dt * 6);
+    const fovT = (G.baseFov || 72) + (this.sprinting ? 8 : 0) + (this.jetting ? 4 : 0);
+    if (Math.abs(this.cam.fov - fovT) > 0.05) { this.cam.fov += (fovT - this.cam.fov) * Math.min(1, dt * 5); this.cam.updateProjectionMatrix(); }
+    this.cam.rotation.set(this.pitch, this.yaw, this.roll + Math.sin(this.bob) * 0.006 * Math.min(1, hs / 6), 'YXZ');
     this.cam.getWorldDirection(this.fwd);
 
     // 生存：氧气、生命、能量

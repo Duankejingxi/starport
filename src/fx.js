@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { G } from './state.js';
 import { glowTexture } from './models.js';
+import { getHeight } from './terrain.js';
+
+const debris = [];
+const shardGeo = new THREE.OctahedronGeometry(0.22, 0);
 
 // 粒子池：一套加色（火花、光）与一套普通混合（尘土）
 class Particles {
@@ -69,6 +73,18 @@ export function initFx(scene) {
 }
 
 export const fx = {
+  // 实体碎片：带重力、会弹跳、慢慢消失
+  debris(p, material, n = 8, speed = 7, size = 1) {
+    for (let i = 0; i < n; i++) {
+      if (debris.length > 160) { const d = debris.shift(); G.scene.remove(d.m); }
+      const m = new THREE.Mesh(shardGeo, material); m.castShadow = true;
+      const s = size * (0.5 + Math.random() * 0.9); m.scale.set(s, s * (1 + Math.random()), s);
+      m.position.copy(p);
+      G.scene.add(m);
+      const a = Math.random() * Math.PI * 2, u = 0.4 + Math.random() * 0.8;
+      debris.push({ m, v: new THREE.Vector3(Math.cos(a) * speed * (1 - u * 0.5), speed * u, Math.sin(a) * speed * (1 - u * 0.5)), w: new THREE.Vector3(Math.random() * 10, Math.random() * 10, Math.random() * 10), life: 3 + Math.random() * 2, s });
+    }
+  },
   spark(p, color = [1, 0.6, 0.2], n = 6, speed = 4, life = 0.5) {
     for (let i = 0; i < n; i++) sparks.emit(p.x, p.y, p.z, (Math.random() - 0.5) * speed, Math.random() * speed, (Math.random() - 0.5) * speed, color[0], color[1], color[2], 1, life * (0.5 + Math.random()), 6, 1);
   },
@@ -102,6 +118,16 @@ export const fx = {
 let rainAmt = 0;
 export function updateFx(dt, cam) {
   sparks.update(dt); dust.update(dt);
+  for (let i = debris.length - 1; i >= 0; i--) {
+    const d = debris[i];
+    d.life -= dt; d.v.y -= 9 * dt;
+    d.m.position.addScaledVector(d.v, dt);
+    d.m.rotation.x += d.w.x * dt; d.m.rotation.y += d.w.y * dt; d.m.rotation.z += d.w.z * dt;
+    const gy = getHeight(d.m.position.x, d.m.position.z) + 0.1;
+    if (d.m.position.y < gy) { d.m.position.y = gy; d.v.y = Math.abs(d.v.y) * 0.35; d.v.x *= 0.6; d.v.z *= 0.6; d.w.multiplyScalar(0.5); }
+    if (d.life < 1) d.m.scale.setScalar(Math.max(0.001, d.s * d.life));
+    if (d.life <= 0) { G.scene.remove(d.m); debris.splice(i, 1); }
+  }
   const storm = G.storm;
   const ap = ambient.geometry.attributes.position, arr = ap.array;
   const wind = 1 + storm * 26;

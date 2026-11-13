@@ -42,14 +42,20 @@ export const ORDER = ['solar', 'oxygen', 'lamp', 'habitat', 'greenhouse', 'extra
 // 停电时的供电优先级
 const PRIORITY = ['oxygen', 'lifehub', 'turret', 'habitat', 'apartment', 'extractor', 'greenhouse', 'vfarm', 'beacon', 'fabricator', 'terraformer', 'launch', 'monument'];
 
-export function createBuilding(type, x, z, rot = 0, hp) {
+const scanMat = new THREE.MeshBasicMaterial({ color: 0x7fe6ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+export function createBuilding(type, x, z, rot = 0, hp, animate = false) {
   const def = DEFS[type];
   const group = new THREE.Group(), anim = {};
   BUILD_MODELS[type](group, anim);
   const y = getHeight(x, z);
   group.position.set(x, y, z); group.rotation.y = rot;
   G.scene.add(group);
-  const b = { type, def, x, z, y, rot, group, anim, hp: hp ?? def.hp, broken: hp !== undefined && hp <= 0, powered: true, t: Math.random() * 10, cool: 0 };
+  if (animate) {
+    group.scale.set(1, 0.001, 1);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(def.r * 1.05, 0.08, 6, 48), scanMat.clone());
+    ring.rotation.x = Math.PI / 2; ring.position.set(x, y, z); G.scene.add(ring); anim._scan = ring;
+  }
+  const b = { buildT: animate ? 0 : 1, type, def, x, z, y, rot, group, anim, hp: hp ?? def.hp, broken: hp !== undefined && hp <= 0, powered: true, t: Math.random() * 10, cool: 0 };
   b.collider = G.colliders.add({ x, z, r: def.r * (type === 'beacon' ? 0.15 : 0.9), kind: 'building', b });
   // 门口区域可以走进居住穹顶的范围外缘
   G.buildings.push(b);
@@ -165,7 +171,7 @@ export function tryPlace() {
   if (!placement.type || !placement.valid) { audio.play('deny'); return null; }
   const def = DEFS[placement.type];
   pay(def.cost);
-  const b = createBuilding(placement.type, placement.x, placement.z, placement.rot);
+  const b = createBuilding(placement.type, placement.x, placement.z, placement.rot, undefined, true);
   audio.play('place');
   fx.ring(new THREE.Vector3(b.x, b.y, b.z), def.r, 50);
   return b;
@@ -183,6 +189,17 @@ export function updateBuildings(dt, ctx) {
   for (const b of G.buildings) {
     const a = b.anim, on = b.powered;
     b.t += dt;
+    if (b.buildT < 1) {
+      // 建造动画：从地面升起，全息光环向上扫描
+      b.buildT = Math.min(1, b.buildT + dt / 1.3);
+      const t = b.buildT, e = 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+      b.group.scale.y = Math.max(0.001, e);
+      const h = Math.max(3, b.def.r * 1.4) * (b.type === 'apartment' || b.type === 'launch' || b.type === 'terraformer' || b.type === 'monument' ? 4 : 1);
+      a._scan.position.y = b.y + t * h; a._scan.material.opacity = 0.8 * (1 - t);
+      a._scan.scale.setScalar(1 - t * 0.25);
+      if (Math.random() < 0.5) fx.spark(new THREE.Vector3(b.x + (Math.random() - 0.5) * b.def.r * 2, b.y + t * h, b.z + (Math.random() - 0.5) * b.def.r * 2), [0.5, 0.9, 1], 1, 2, 0.6);
+      if (t >= 1) { G.scene.remove(a._scan); a._scan.geometry.dispose(); delete a._scan; }
+    }
     if (b.hp < b.def.hp && G.time.night < 0.5) {
       b.hp = Math.min(b.def.hp, b.hp + dt * (b.broken ? 5 : 2));
       if (b.broken && b.hp >= b.def.hp * 0.5) { b.broken = false; recalcColony(); G.events.emit('toast', `✓ ${b.def.name} 已修复，恢复运转`); }

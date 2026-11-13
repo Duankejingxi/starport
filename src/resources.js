@@ -105,7 +105,9 @@ export function mineNode(node, amount) {
   node.mesh.scale.setScalar(k);
   if (node.amount <= 0) {
     const p = node.mesh.position.clone(); p.y += 1;
-    fx.burst(p, NODE_COLOR[node.type], 50, 7);
+    fx.burst(p, NODE_COLOR[node.type], 40, 7);
+    const mat = node.mesh.children.find(c => c.isMesh && c !== node.mesh.children[0])?.material || node.mesh.children[0].material;
+    fx.debris(p, mat, 9, 5, 1.1);
     fx.dustPuff(p, 16, 3);
     removeNode(node);
     respawnQueue.push({ type: node.type, t: 90 + Math.random() * 60 });

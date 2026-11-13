@@ -69,7 +69,9 @@ export function damageEnemy(e, dmg, owner) {
 function killEnemy(e, owner) {
   e.dead = true;
   const p = e.pos.clone(); p.y += 1;
-  fx.burst(p, [1, 0.4, 0.1], 70, 9); fx.dustPuff(p, 12, 2);
+  fx.burst(p, [1, 0.4, 0.1], 50, 9); fx.dustPuff(p, 12, 2);
+  fx.debris(p, e.legs[0].children[0].material, 6, 5, 0.45 * e.scale);
+  fx.debris(p, e.inner.children[1].material, 8, 6, 0.5 * e.scale);
   audio.play('kill');
   G.scene.remove(e.group);
   G.stats.kills++;

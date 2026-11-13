@@ -14,7 +14,7 @@
 
 <div id="hud">
   <div id="tl">
-    <div id="planet-tag"><span class="en" id="pl-en">MARS</span><span class="cn" id="pl-cn"></span></div>
+    <div class="hidden"><span id="pl-en"></span><span id="pl-cn"></span></div>
     <div id="city"></div>
     <div id="res"></div>
     <div id="colony"></div>
@@ -49,20 +49,19 @@
 
 <div id="intro" class="screen">
   <div class="title-wrap">
-    <div class="kicker"><span class="dash"></span>ARK PROGRAM · <span id="kick-planet">MARS</span></div>
     <h1 class="logo">星港<span>：新家园</span></h1>
     <div class="en-sub">STARPORT</div>
-    <div class="story" id="story"></div>
     <nav class="menu">
       <button id="btn-continue" class="hidden"><span class="t">继续</span><small id="cont-info"></small></button>
       <button id="btn-new"><span class="t">开始新的旅程</span></button>
     </nav>
     <div class="note" id="touch-note"></div>
   </div>
-  <div class="controls-strip">
-    <span><kbd>W A S D</kbd>移动</span><span><kbd>鼠标</kbd>环视</span><span><kbd>左键</kbd>采集 / 射击 / 放置</span><span><kbd>B</kbd>建造</span><span><kbd>E</kbd>互动</span><span><kbd>F</kbd>手电</span><span><kbd>Tab</kbd>档案</span><span><kbd>P</kbd>拍照</span>
-  </div>
+  <div class="story hidden" id="story"></div>
+  <div class="kick-hidden hidden"><span id="kick-planet"></span></div>
 </div>
+
+<div id="cine" class="hidden"><div class="lines" id="cine-lines"></div><div class="skip">点击或按空格跳过</div></div>
 
 <div id="pause" class="screen hidden">
   <div class="side">

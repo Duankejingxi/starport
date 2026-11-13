@@ -24,7 +24,7 @@ export function initUI(mapCanvas) {
   $('pl-en').textContent = EN[PID]; $('pl-cn').textContent = `${PLANET.name} · ${PLANET.place}`;
   $('kick-planet').textContent = EN[PID];
   $('hotbar').innerHTML = TOOLS.map((t, i) => `<div class="slot" data-i="${i}"><span class="key">${i + 1}</span><span class="ic">${ic(t.icon)}</span><span class="nm">${t.name}</span></div>`).join('');
-  $('res').innerHTML = Object.entries(RES_INFO).map(([k, r]) => `<div class="r" id="r-${k}" style="--rc:${r.color}"><span class="ic">${ic(k)}${r.name}</span><b>0</b></div>`).join('');
+  $('res').innerHTML = Object.entries(RES_INFO).map(([k, r]) => `<div class="r" id="r-${k}" style="--rc:${r.color}"><span class="ic">${ic(k)}</span><b>0</b><span class="lbl">${r.name}</span></div>`).join('');
   G.events.on('toast', t => toast(t));
   G.events.on('pickup', p => pickup(p));
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { audio.play('ui'); closeMenus(true); }));
@@ -220,22 +220,30 @@ export function updateUI(dt, ctx) {
     for (const k in RES_INFO) $('r-' + k).querySelector('b').textContent = Math.floor(G.res[k]);
     const n = nextLevelInfo(), L = LEVELS[G.cityLevel];
     const prog = n ? Math.min(1, Math.min(C.pop / n.pop, G.buildings.length / Math.max(1, n.b))) : 1;
-    $('city').innerHTML = `<span class="lv">LV.${ROMAN[G.cityLevel]}</span><span class="nm">${L.name}</span><div class="pg"><i style="width:${prog * 100}%"></i></div>
-      <div class="nx">${n ? `下一级 ${n.name} · 人口 ${Math.min(C.pop, n.pop)}/${n.pop} · 设施 ${Math.min(G.buildings.length, n.b)}/${n.b}` : '最高等级'}</div>`;
-    const lack = v => (v < C.pop ? 'warn' : '');
-    $('colony').innerHTML = `<span class="${C.deficit ? 'warn' : ''}">${ic('power')}${Math.round(C.powerProd)}<small>/${C.powerUse}</small></span>
-      <span>${ic('pop')}${C.pop}<small>/${C.support}</small></span><span class="sep"></span>
-      <span class="${lack(C.housing)}">${ic('house')}${C.housing}</span><span class="${lack(C.o2)}">${ic('o2')}${C.o2}</span>
-      <span class="${lack(C.food)}">${ic('food')}${C.food}</span><span class="${lack(C.water)}">${ic('water')}${C.water}</span>
-      ${G.terraform > 0 ? `<span class="tf">${ic('planet')}${Math.floor(G.terraform * 100)}%</span>` : ''}`;
-    const wx = G.storm > 0.3 ? '沙尘暴' : G.raining ? '降雨' : G.time.night > 0.5 ? '夜' : '';
-    $('clock').innerHTML = clockText() + (wx ? `<span class="wx">${wx}</span>` : '');
+    const cityHTML = `<span class="lv">LV.${ROMAN[G.cityLevel]}</span><span class="nm">${L.name}</span>${n ? `<div class="pg"><i style="width:${prog * 100}%"></i></div>` : ''}`;
+    if ($('city').dataset.k !== cityHTML) { $('city').dataset.k = cityHTML; $('city').innerHTML = cityHTML; }
+    document.body.classList.toggle('newbie', G.chapter === 0 && PID === 'mars' && G.buildings.length === 0);
+    // 殖民地：只显示关键数据，短缺时才提醒
+    let col = '';
+    if (G.buildings.length) {
+      col += `<span class="${C.deficit ? 'warn' : ''}" title="电力 发电/用电">${ic('power')}${Math.round(C.powerProd)}<small>/${C.powerUse}</small></span>`;
+      if (C.housing || C.pop) col += `<span title="人口/可容纳">${ic('pop')}${C.pop}<small>/${C.support}</small></span>`;
+      if (G.terraform > 0) col += `<span class="tf">${ic('planet')}${Math.floor(G.terraform * 100)}%</span>`;
+      if (C.deficit) col += `<span class="chip">${ic('warn')}电力不足</span>`;
+      if (C.housing && G.buildings.some(b => b.type === 'beacon') && C.support <= C.pop) {
+        const need = [['housing', '住房', 'house'], ['o2', '氧气', 'o2'], ['food', '食物', 'food'], ['water', '水', 'water']].sort((a, b) => C[a[0]] - C[b[0]])[0];
+        col += `<span class="chip">${ic(need[2])}需要更多${need[1]}</span>`;
+      }
+    }
+    if ($('colony').dataset.k !== col) { $('colony').dataset.k = col; $('colony').innerHTML = col; }
+    const wx = G.storm > 0.3 ? '沙尘暴' : G.raining ? '降雨' : '';
+    $('clock').innerHTML = clockText().replace(/^.*? · /, '') + (wx ? `<span class="wx">${wx}</span>` : '');
     const ch = CHAPTERS[G.chapter], i = G.chapter;
     const gh = ch.goals.map((g, j) => {
       const done = G.goalDone?.[i + ':' + j];
       return `<div class="g ${done ? 'done' : ''}" data-j="${j}">${g.text}${g.prog && !done ? ` <small>${g.prog()}</small>` : ''}<span class="cb"></span></div>`;
     }).join('');
-    if (gh !== lastGoals) { lastGoals = gh; $('goals').innerHTML = `<div class="gt">CHAPTER ${String(i + 1).padStart(2, '0')}</div><div class="gn">${ch.title.replace(/^第.章 · |^终章 · /, '')}</div>${gh}`; }
+    if (gh !== lastGoals) { lastGoals = gh; $('goals').innerHTML = `<div class="gn">${ch.title.replace(/^第.章 · |^终章 · /, '')}</div>${gh}`; }
     document.querySelectorAll('#hotbar .slot').forEach((s, j) => {
       s.classList.toggle('on', j === tool.index);
       s.classList.toggle('lock', !!(TOOLS[j].need && !G.upgrades[TOOLS[j].need]));
@@ -244,6 +252,7 @@ export function updateUI(dt, ctx) {
   setBar('hp', P.health / P.maxHealth, `${Math.ceil(P.health)}`);
   setBar('o2', P.o2 / P.maxO2, `${Math.ceil(P.o2)}`);
   setBar('en', P.energy / 100, `${Math.ceil(P.energy)}`);
+  $('bar-en').classList.toggle('idle', P.energy > 99.5);
   const os = $('o2-state');
   const ost = P.inLife ? `${ic('o2')} 生命维持 · 补氧中` : (P.o2 < P.maxO2 * 0.2 ? `${ic('warn')} 氧气不足 · 立即返回补氧` : '');
   if (os.dataset.k !== ost) { os.dataset.k = ost; os.innerHTML = ost; }
