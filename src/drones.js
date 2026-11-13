@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G } from './state.js';
+import { has } from './systems.js';
 import { makeDrone } from './models.js';
 import { getHeight } from './terrain.js';
 import { mineNode, NODE_COLOR } from './resources.js';
@@ -11,7 +12,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 const tmp = new THREE.Vector3();
 
 function ensureDrones(hub) {
-  const want = 1 + (hub.level || 1);
+  const want = 1 + (hub.level || 1) + (has('swarm') ? 1 : 0);
   hub.drones = hub.drones || [];
   while (hub.drones.length < want) {
     const d = makeDrone();

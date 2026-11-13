@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G } from './state.js';
+import { D, has } from './systems.js';
 import { input } from './input.js';
 import { M, glow } from './models.js';
 import { raycastTerrain } from './terrain.js';
@@ -203,7 +204,7 @@ export function updateTools(dt, player, camera) {
         // 被激光切割的矿石轻微颤动
         shakeNode = n; n.mesh.position.set(n.x + (Math.random() - 0.5) * 0.07, n.y + (Math.random() - 0.5) * 0.05, n.z + (Math.random() - 0.5) * 0.07);
         if (Math.random() < 0.15) fx.dustPuff(end, 1, 0.4);
-        mineAcc += dt * 3.2 * (G.upgrades.overclock ? 2 : 1);
+        mineAcc += dt * 3.2 * (G.upgrades.overclock ? 2 : 1) * (has('laser2') ? 1.5 : 1) * D().yield;
         if (Math.random() < 0.7) fx.spark(end, NODE_COLOR[n.type], 2, 5, 0.4);
         mineSoundT -= dt; if (mineSoundT <= 0) { mineSoundT = 0.09; audio.play('mine'); }
         while (mineAcc >= 1 && G.nodes.includes(n)) {

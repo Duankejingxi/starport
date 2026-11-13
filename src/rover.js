@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { G } from './state.js';
+import { has } from './systems.js';
 import { M, glow } from './models.js';
 import { getHeight, HALF } from './terrain.js';
 import { input } from './input.js';
@@ -123,7 +124,7 @@ export function updateRover(dt, player, camera) {
   // 驾驶
   const thr = (input.down('KeyW') || input.down('ArrowUp') ? 1 : 0) - (input.down('KeyS') || input.down('ArrowDown') ? 1 : 0);
   const steer = (input.down('KeyA') || input.down('ArrowLeft') ? 1 : 0) - (input.down('KeyD') || input.down('ArrowRight') ? 1 : 0);
-  const max = input.down('ShiftLeft') ? 28 : 17;
+  const max = (input.down('ShiftLeft') ? 28 : 17) * (has('terrain') ? 1.3 : 1);
   if (!r.air) {
     if (thr > 0) r.speed += (r.speed < 0 ? 22 : 11) * dt;
     else if (thr < 0) r.speed -= (r.speed > 0 ? 22 : 7) * dt;

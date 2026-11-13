@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G } from './state.js';
+import { D, has } from './systems.js';
 import { P } from './planets.js';
 import { getHeight, HALF } from './terrain.js';
 import { input } from './input.js';
@@ -146,7 +147,7 @@ export class Player {
       this.health = Math.min(this.maxHealth, this.health + 4 * dt);
     } else {
       let drain = 0.55 + (this.sprinting ? 0.6 : 0) + (this.jetting ? 0.6 : 0);
-      drain *= 1 + G.storm * 0.8;
+      drain *= (1 + G.storm * 0.8) * D().o2 * (has('suit') ? 0.65 : 1);
       if (G.terraform >= 1) drain *= 0.5;
       this.o2 = Math.max(0, this.o2 - drain * dt);
     }

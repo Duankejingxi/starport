@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G } from './state.js';
+import { D, isFree } from './systems.js';
 import { glow, CRAWLER_MATS } from './models.js';
 import { makeCrawlerHD } from './models_hd.js';
 import { getHeight, HALF } from './terrain.js';
@@ -104,9 +105,9 @@ function colonyCenter() {
 export function updateEnemies(dt) {
   const P = G.player.pos;
   const night = G.time.night > 0.6;
-  const threat = G.chapter >= THREAT_FROM && G.terraform < 1;
+  const threat = (isFree() ? (G.buildings.some(b => b.type === 'habitat') || G.time.day >= 3) : G.chapter >= THREAT_FROM) && G.terraform < 1 && D().foe > 0;
   if (night && !wasNight && threat) {
-    nightBudget = Math.min(3 + (G.nightsSurvived || 0) * 2 + Math.floor(G.colony.pop / 4), 26);
+    nightBudget = Math.round(Math.min(3 + (G.nightsSurvived || 0) * 2 + Math.floor(G.colony.pop / 4), 26) * D().foe);
     // 晶潮之夜：每第 4 个夜晚，数量翻倍，晶母现身
     const tide = (G.nightsSurvived || 0) % 4 === 3;
     if (tide) { nightBudget = Math.min(Math.round(nightBudget * 1.8), 40); bossT = 25; }
@@ -149,7 +150,7 @@ export function updateEnemies(dt) {
       if (n.type !== 'titanium') continue;
       if (Math.hypot(n.x - P.x, n.z - P.z) < 90) continue;
       const has = G.enemies.some(e => e.guardian && !e.dead && e.home.distanceTo(n.mesh.position) < 25);
-      if (!has && G.terraform < 1) { const a = Math.random() * 6.28; spawnCrawler(n.x + Math.cos(a) * 6, n.z + Math.sin(a) * 6, true); }
+      if (!has && G.terraform < 1 && D().foe > 0) { const a = Math.random() * 6.28; spawnCrawler(n.x + Math.cos(a) * 6, n.z + Math.sin(a) * 6, true); }
     }
   }
 
@@ -219,7 +220,7 @@ export function updateEnemies(dt) {
       e.atk -= dt;
       if (e.atk <= 0) {
         e.atk = 1.0;
-        if (t.kind === 'player') G.player.damage(e.boss ? 30 : e.guardian ? 14 : 9, e.pos);
+        if (t.kind === 'player') G.player.damage((e.boss ? 30 : e.guardian ? 14 : 9) * D().dmg, e.pos);
         else { t.b.hp -= e.boss ? 70 : e.guardian ? 20 : 8; fx.spark(new THREE.Vector3(e.pos.x, e.pos.y + 1, e.pos.z), [1, 0.5, 0.2], 8, 5); if (t.b.hp <= 0) { t.b.hp = 0; t.b.broken = true; e.retarget = 0; G.events.emit('broken', t.b); recalcColony(); } }
         e.inner.position.z = 0.6;
       }

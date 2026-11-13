@@ -24,6 +24,10 @@ import { updateAmbient } from './ambient.js';
 import { ic } from './icons.js';
 import { initRelics, updateRelics, relicAt, discover } from './relics.js';
 import { initCompanion, updateCompanion } from './companion.js';
+import { updateSystems, isFree, MODES, DIFFS } from './systems.js';
+import { reqCtx } from './ui.js';
+import { relicCount } from './relics.js';
+import { unlockState } from './buildings.js';
 import { input, initInput } from './input.js';
 import { M as MAT, glow } from './models.js';
 import { makeLanderHD as makeLander } from './models_hd.js';
@@ -143,7 +147,7 @@ canvas.addEventListener('click', () => {
 function save(silent) {
   if (!G.started) return;
   const data = {
-    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [], plazaSeen: !!G.plazaSeen,
+    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [], plazaSeen: !!G.plazaSeen, mode: G.mode, diff: G.diffKey, tech: G.tech || {}, rp: G.rp || 0, requests: G.requests || [],
     time: { t: G.time.t, day: G.time.day },
     player: { x: player.pos.x, z: player.pos.z, yaw: player.yaw, o2: player.o2, hp: player.health },
     buildings: serializeBuildings(), nodes: serializeNodes(), colonists: serializeColonists(), storm: stormState(),
@@ -167,6 +171,7 @@ function applySave(d) {
   loadColonists(d.colonists || []);
   if (d.rover) spawnRover(d.rover.x, d.rover.z, d.rover.h);
   G.relicsFound = d.relics || []; G.plazaSeen = !!d.plazaSeen;
+  G.mode = d.mode || 'story'; G.diffKey = d.diff || 'normal'; G.tech = d.tech || {}; G.rp = d.rp || 0; G.requests = d.requests || [];
   G.cityLevel = d.city || 0; G.popTotal = d.pop ?? (d.colonists || []).length; G.launched = !!d.launched;
   initCity(scene);
   setStormState(d.storm);
@@ -185,7 +190,7 @@ $('story').innerHTML = STORY.map((s, i) => `<p style="animation-delay:${0.4 + i 
 const existing = loadSave();
 if (existing) {
   $('btn-continue').classList.remove('hidden');
-  $('cont-info').textContent = `${P.name} · ${CHAPTERS[existing.chapter]?.title || ''} · 第 ${existing.time.day} 日 · ${existing.pop ?? existing.colonists?.length ?? 0} 位居民`;
+  $('cont-info').textContent = `${existing.mode === 'free' ? '自由' : '剧情'} · ${P.name} · ${CHAPTERS[existing.chapter]?.title || ''} · 第 ${existing.time.day} 日 · ${existing.pop ?? existing.colonists?.length ?? 0} 位居民`;
 }
 if (matchMedia('(pointer: coarse)').matches) $('touch-note').innerHTML += '本游戏需要键盘和鼠标，请在电脑上游玩。';
 
@@ -222,8 +227,15 @@ function begin(fromSave) {
       setTimeout(() => toast('随舰物资已卸载，所有装备已同步'), 4000);
     }
     G.time.t = 0.29; // 清晨
+    G.mode = G.mode || 'story'; G.diffKey = G.diffKey || 'normal';
     startChapter(0, true);
-    playCine(() => playLanding(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); }));
+    if (isFree()) {
+      playLanding(() => {
+        chapterCard({ k: 'FREE MODE', title: P.name, sub: `自由开拓 · ${DIFFS[G.diffKey].name}` });
+        radio('方舟 · AI', '自由模式已启动。没有任务清单，这片土地完全属于你。建好第一座设施后，居民和指挥中心会陆续提出委托。');
+        radio('方舟 · AI', '提示：B 建造，T 科研，Tab 殖民地档案。祝你好运。');
+      });
+    } else playCine(() => playLanding(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); }));
   }
   initRelics();
   initCompanion();
@@ -233,10 +245,48 @@ function begin(fromSave) {
   G.started = true;
   G.requestLock();
 }
+// —— 开局设置：模式、难度、星球 ——
+const setup = { mode: 'story', diff: 'normal', planet: 'mars' };
+function renderSetup() {
+  const card = (grp, k, name, desc, on) => `<button class="opt ${on ? 'on' : ''}" data-g="${grp}" data-k="${k}"><b>${name}</b><span>${desc}</span></button>`;
+  const planets = setup.mode === 'free'
+    ? `<h3>星球</h3><div class="opts">${Object.values(PLANETS).map(p => card('planet', p.id, p.name, p.title + ' · ' + p.place, setup.planet === p.id)).join('')}</div>`
+    : '<p class="sm">剧情从火星开始。完成每颗星球的故事后，乘殖民舰前往下一颗。</p>';
+  $('intro-pane').innerHTML = `<h3>模式</h3><div class="opts">${Object.entries(MODES).map(([k, m]) => card('mode', k, m.name, m.desc, setup.mode === k)).join('')}</div>
+    <h3>难度</h3><div class="opts three">${Object.entries(DIFFS).map(([k, d]) => card('diff', k, d.name, d.desc, setup.diff === k)).join('')}</div>
+    ${planets}
+    <button class="launch" id="btn-launch">出发</button>`;
+  $('intro-pane').dataset.k = 'setup';
+  $('intro-pane').classList.remove('hidden');
+  $('intro-pane').querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => { setup[b.dataset.g] = b.dataset.k; if (b.dataset.g === 'mode' && b.dataset.k === 'story') setup.planet = 'mars'; audio.play('tick'); renderSetup(); }));
+  $('btn-launch').addEventListener('click', launchNew);
+}
+function launchNew() {
+  const target = setup.mode === 'story' ? 'mars' : setup.planet;
+  if (setup.mode === 'story') {
+    if (META.visited?.length || existing) { if (!confirm('剧情模式会从火星重新开始，并清除所有星球的进度。确定吗？')) return; }
+    clearAll();
+  } else {
+    if (hasSave(target) && !confirm(`将覆盖 ${PLANETS[target].name} 的现有存档，确定吗？`)) return;
+    try { localStorage.removeItem(target === 'mars' ? 'starport-newhome-v1' : 'starport-planet-' + target); } catch (e) { /* 忽略 */ }
+    const m = loadMeta(); delete m.carry; m.planet = target; saveMeta(m);
+  }
+  if (target === PID) { G.mode = setup.mode; G.diffKey = setup.diff; begin(false); return; }
+  try { localStorage.setItem('starport-newgame', JSON.stringify({ mode: setup.mode, diff: setup.diff })); } catch (e) { /* 忽略 */ }
+  const m = loadMeta(); m.planet = target; saveMeta(m);
+  location.href = location.pathname + (G.debug ? '?debug' : '');
+}
 $('btn-new').addEventListener('click', () => {
-  if (existing && !confirm('开始新的旅程会覆盖现有存档，确定吗？')) return;
-  begin(false);
+  audio.init();
+  // 乘殖民舰抵达的新星球：直接登陆，沿用原来的模式与难度
+  if (PID !== 'mars' && !existing && META.visited?.length && !META.freshFree) { G.mode = META.mode || 'story'; G.diffKey = META.diff || 'normal'; begin(false); return; }
+  renderSetup();
 });
+// 从设置页跳转过来的新游戏：自动开始
+try {
+  const pend = JSON.parse(localStorage.getItem('starport-newgame'));
+  if (pend) { localStorage.removeItem('starport-newgame'); G.mode = pend.mode; G.diffKey = pend.diff; setTimeout(() => begin(false), 60); }
+} catch (e) { /* 忽略 */ }
 $('btn-continue').addEventListener('click', () => begin(true));
 $('tele-planet').textContent = `${P.name} · ${P.place}`;
 const HELP = `<h3>操作</h3><div class="keys">
@@ -244,7 +294,7 @@ const HELP = `<h3>操作</h3><div class="keys">
   <div><kbd>Shift</kbd><span>冲刺</span></div><div><kbd>空格</kbd><span>跳跃 / 喷气背包</span></div>
   <div><kbd>左键</kbd><span>采矿 · 射击 · 放置建筑</span></div><div><kbd>右键</kbd><span>取消建造</span></div>
   <div><kbd>1</kbd><kbd>2</kbd><span>切换工具</span></div><div><kbd>B</kbd><span>建造蓝图</span></div>
-  <div><kbd>E</kbd><span>互动 · 交谈 · 上车</span></div><div><kbd>U</kbd><span>升级注视的建筑</span></div>
+  <div><kbd>E</kbd><span>互动 · 交谈 · 上车</span></div><div><kbd>U</kbd><span>升级注视的建筑</span></div><div><kbd>T</kbd><span>科研</span></div>
   <div><kbd>Q</kbd><span>小星扫描矿藏</span></div><div><kbd>F</kbd><span>手电筒</span></div><div><kbd>Tab</kbd><span>殖民地档案</span></div>
   <div><kbd>P</kbd><span>拍照模式</span></div><div><kbd>Esc</kbd><span>暂停</span></div></div>
   <h3>生存</h3><p>氧气会持续消耗。着陆舱、制氧站和居住穹顶附近会自动补氧。建好住房、氧气、食物、水和着陆场，移民飞船就会到来。夜里要提防锈蚀蛛。</p>`;
@@ -252,6 +302,8 @@ const togglePane = html => { const el = $('intro-pane'); if (!el.classList.conta
 $('btn-t-help').addEventListener('click', () => togglePane(HELP));
 $('btn-t-achv').addEventListener('click', () => togglePane(achievementsHTML()));
 if (PID !== 'mars' && !existing) $('btn-new').textContent = `登陆 ${P.name}`;
+if (PID !== 'mars' && !existing && META.visited?.length) $('btn-setup').classList.remove('hidden');
+$('btn-setup').addEventListener('click', () => { audio.init(); renderSetup(); });
 if (META.autoResume && existing) {
   const m = loadMeta(); delete m.autoResume; saveMeta(m);
   setTimeout(() => { begin(true); toast(`欢迎回来 · ${P.name}`); }, 50);
@@ -272,6 +324,12 @@ $('btn-endcont').addEventListener('click', () => { $('ending').classList.add('hi
 
 // —— 事件 ——
 G.events.on('chapter', ch => chapterCard(ch));
+reqCtx.unlocked = k => unlockState(k).ok;
+reqCtx.relicLeft = () => relicCount().found < relicCount().total;
+reqCtx.relicFound = () => relicCount().found;
+G.events.on('request', r => { toast(`新委托：${r.text}`, 'radio'); radio(`${r.giver} · 委托`, r.line); });
+G.events.on('requestDone', r => { toast(`委托完成：${r.text}`, 'check', 'good'); radio(r.giver, ['谢谢你！这帮了大忙。', '太好了，大家都会记得的。', '辛苦了！这是一点心意。'][Math.floor(Math.random() * 3)]); });
+G.events.on('researched', id => { if (id === 'swarm' || id === 'alloy') recalcColony(); });
 G.events.on('crafted', k => {
   if (k !== 'rover') return;
   const fab = G.buildings.find(b => b.type === 'fabricator');
@@ -380,6 +438,9 @@ window.addEventListener('keydown', e => {
     if (G.menuOpen === 'archive') closeMenus(true); else if (!G.menuOpen) openMenu('archive');
     return;
   }
+  if (e.code === 'KeyT' && !G.endingShown && !player.dead) { if (G.menuOpen === 'research') closeMenus(true); else if (!G.menuOpen) openMenu('research'); return; }
+  if (G.menuOpen === 'research' && e.code === 'Escape') { closeMenus(true); return; }
+  if (G.menuOpen === 'trade' && (e.code === 'Escape' || e.code === 'KeyE')) { closeMenus(true); return; }
   if (e.code === 'KeyP' && !G.menuOpen) { G.photo = !G.photo; G.usedPhoto = true; document.body.classList.toggle('photo', G.photo); setFilter(G.photo ? filterIdx : 0); audio.play('tick'); return; }
   if (G.photo && !G.menuOpen) {
     const n = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(e.code);
@@ -406,6 +467,8 @@ const HINTS = [
   { id: 'night', text: '天黑了，按 <kbd>F</kbd> 打开手电筒', when: () => G.time.night > 0.6 && !player.flashlight },
   { id: 'craft', text: '靠近制造工坊按 <kbd>E</kbd> 制造武器和装备——试试加压漫游车', when: () => G.buildings.some(b => b.type === 'fabricator') && !G.upgrades.rifle },
   { id: 'drive', text: '漫游车就在附近，走过去按 <kbd>E</kbd> 上车', when: () => getRover() && !G.driving && !hintSeen.drove },
+  { id: 'research', text: '研究所已建成，按 <kbd>T</kbd> 用科研点数解锁科技', when: () => G.buildings.some(b => b.type === 'lab') && (G.rp || 0) >= 20 },
+  { id: 'request', text: '居民提出了委托（右侧任务栏），完成后有奖励', when: () => (G.requests || []).length > 0 },
   { id: 'talk', text: '对准居民按 <kbd>E</kbd>，听听他们的故事', when: () => G.colonists.some(c => c.pos.distanceTo(player.pos) < 10) },
   { id: 'level', text: '人口和设施越多，城市等级越高，领地也会扩大（看左上角）', when: () => G.colony.pop >= 2 },
 ];
@@ -462,7 +525,7 @@ function updateLaunch(dt) {
 function travel(dest) {
   const meta = loadMeta();
   meta.visited = (meta.visited || []).filter(v => v.id !== PID).concat([{ id: PID, pop: G.colony.pop, day: G.time.day }]);
-  meta.planet = dest;
+  meta.planet = dest; meta.mode = G.mode || 'story'; meta.diff = G.diffKey || 'normal';
   meta.autoResume = hasSave(dest);
   const carry = {};
   for (const k in G.res) carry[k] = Math.min(Math.floor(G.res[k] * 0.4), 80);
@@ -518,6 +581,7 @@ function handleInteraction(dt) {
   const col = lookColonist(origin, dir);
   const fab = G.buildings.find(b => b.type === 'fabricator' && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < b.def.r + 6);
   demolishArm = Math.max(0, demolishArm - dt); launchArm = Math.max(0, launchArm - dt);
+  const tradeSt = G.buildings.find(b => b.type === 'trade' && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < b.def.r + 5);
   const launchPad = G.buildings.find(b => b.type === 'launch' && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < b.def.r + 8);
   if (col) {
     ctx.crossClass = 'talk';
@@ -530,6 +594,9 @@ function handleInteraction(dt) {
       ctx.prompt = `<b>殖民舰已就绪</b><br><kbd>E</kbd>打开星图`;
       if (input.hit('KeyE')) openStarmap(launchPad);
     }
+  } else if (tradeSt) {
+    ctx.prompt = `<b>星际贸易站</b>${tradeSt.powered ? '' : ' · <span class="badc">停电</span>'}<br><kbd>E</kbd>交易`;
+    if (input.hit('KeyE')) { if (tradeSt.powered) openMenu('trade'); else toast('贸易站没有电力', 'warn', 'warn'); }
   } else if (fab) {
     ctx.prompt = `<kbd>E</kbd> 打开制造工坊${fab.powered ? '' : '（停电中）'}`;
     if (input.hit('KeyE')) { if (fab.powered) openMenu('craft'); else toast('制造工坊没有电力'); }
@@ -718,6 +785,7 @@ function update(dt) {
     updateAmbient(dt);
     updateRelics(dt);
     updateCompanion(dt);
+    updateSystems(dt, reqCtx);
     updatePebbles();
     if (!G.plazaSeen && G.time.night > 0.6 && G.colonists.filter(c => c.atPlaza && !c.target).length >= 4) {
       G.plazaSeen = true;

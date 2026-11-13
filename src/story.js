@@ -1,4 +1,5 @@
 import { G } from './state.js';
+import { has, isFree } from './systems.js';
 import { count } from './buildings.js';
 import { audio } from './audio.js';
 import { PID, P } from './planets.js';
@@ -193,7 +194,7 @@ export function updateStory(dt) {
   if (!current && queue.length) { current = queue.shift(); curT = 3.5 + current[1].length * 0.11; audio.play('radio'); }
 
   checkT -= dt;
-  if (checkT <= 0 && G.chapter < CHAPTERS.length) {
+  if (checkT <= 0 && G.chapter < CHAPTERS.length && !isFree()) {
     checkT = 0.5;
     const ch = CHAPTERS[G.chapter];
     G.goalDone = G.goalDone || {};
@@ -209,7 +210,7 @@ export function updateStory(dt) {
   // 大气改造
   const tf = G.buildings.find(b => b.type === 'terraformer' && b.powered);
   if (tf && G.terraform < 1) {
-    G.terraform = Math.min(1, G.terraform + dt / 300);
+    G.terraform = Math.min(1, G.terraform + dt / 300 * (has('atmo') ? 2 : 1));
     if (G.terraform >= 1 && !endingQueued) { endingQueued = true; G.events.emit('ending'); }
   }
   G.raining = (G.terraform >= 1 || PID === 'kepler') && Math.sin(G.time.t * Math.PI * 4 + G.time.day * 1.7) > 0.45;

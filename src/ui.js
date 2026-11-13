@@ -12,6 +12,7 @@ import { ic, iconSprite } from './icons.js';
 import { buildingThumbs } from './thumbs.js';
 import { nearestRelic, allRelics, relicCount } from './relics.js';
 import { bossAlive } from './combat.js';
+import { TECHS, has, research, rpRate, tradeQuote, doTrade, isFree, requestProgress, abandonRequest, MODES, DIFFS } from './systems.js';
 
 const $ = id => document.getElementById(id);
 let mapCv, mm, mmx, thumbs = {};
@@ -97,7 +98,7 @@ export function chapterCard(ch) {
 }
 
 // —— 菜单 ——
-const MENUS = ['build', 'craft', 'pause', 'starmap', 'archive'];
+const MENUS = ['build', 'craft', 'pause', 'starmap', 'archive', 'research', 'trade'];
 export function openMenu(id) {
   closeMenus(false);
   G.menuOpen = id;
@@ -106,6 +107,8 @@ export function openMenu(id) {
   audio.play('open');
   if (id === 'build') renderBuild();
   if (id === 'craft') renderCraft();
+  if (id === 'research') renderResearch();
+  if (id === 'trade') renderTrade();
   if (id === 'archive') $('archive-body').innerHTML = archiveHTML();
   if (id === 'pause') $('pause-pane').innerHTML = '';
 }
@@ -219,6 +222,51 @@ function craft(k) {
   renderCraft();
 }
 
+export const reqCtx = { unlocked: () => true, relicLeft: () => false, relicFound: () => 0 };
+
+// —— 科研 ——
+let rsSel = null;
+function renderResearch() {
+  $('rs-res').innerHTML = `<span style="--rc:var(--cyan)">${ic('book')}${Math.floor(G.rp || 0)} 科研点</span><span style="--rc:var(--dim)"><small>+${rpRate().toFixed(2)}/秒</small></span>`;
+  const ks = Object.keys(TECHS);
+  if (!rsSel) rsSel = ks.find(k => !has(k)) || ks[0];
+  $('research-list').innerHTML = ks.map(k => {
+    const t = TECHS[k], done = has(k), ok = (G.rp || 0) >= t.cost;
+    return `<div class="tile ${done ? 'done' : ''} ${ok || done ? '' : 'poor'} ${k === rsSel ? 'sel' : ''}" data-k="${k}">${done ? '<span class="tag">已完成</span>' : ''}
+      <div class="th">${ic(t.icon)}</div><div class="nm">${t.name}</div><div class="cs"><span class="cost ${ok ? '' : 'lack'}" style="--rc:var(--cyan)">${ic('book')}${t.cost}</span> <small>${t.cat}</small></div></div>`;
+  }).join('');
+  $('research-list').querySelectorAll('.tile').forEach(el => {
+    el.addEventListener('click', () => { rsSel = el.dataset.k; audio.play('tick'); renderResearch(); });
+    el.addEventListener('dblclick', () => { if (research(el.dataset.k)) renderResearch(); });
+  });
+  const t = TECHS[rsSel], done = has(rsSel), ok = (G.rp || 0) >= t.cost;
+  const labs = G.buildings.some(b => b.type === 'lab');
+  $('research-detail').innerHTML = `<div class="pv">${ic(t.icon)}</div><div class="cat">${t.cat} · TECHNOLOGY</div><h3>${t.name}</h3>
+    <div class="ds">${t.desc}</div>
+    ${labs ? '' : '<div class="why">建造研究所来产出科研点数</div>'}
+    <div class="need"><div class="row ${ok || done ? '' : 'lack'}" style="--rc:var(--cyan)">${ic('book')}<span class="nm">科研点数</span>${Math.floor(G.rp || 0)} / ${t.cost}</div></div>
+    <button class="go" ${done || !ok ? 'disabled' : ''}>${done ? '已完成' : ok ? '开始研究' : '科研点数不足'}</button>`;
+  $('research-detail').querySelector('.go').addEventListener('click', () => { if (research(rsSel)) { rsSel = Object.keys(TECHS).find(k => !has(k)) || rsSel; renderResearch(); } });
+}
+
+// —— 星际贸易 ——
+let trFrom = 'iron', trTo = 'silicon', trN = 10;
+function renderTrade() {
+  $('tr-res').innerHTML = Object.entries(RES_INFO).map(([k, r]) => `<span style="--rc:${r.color}">${ic(k)}${Math.floor(G.res[k])}</span>`).join('');
+  const opt = sel => Object.entries(RES_INFO).map(([k, r]) => `<button class="rs ${k === sel ? 'on' : ''}" data-k="${k}" style="--rc:${r.color}">${ic(k)}<span>${r.name}</span><b>${Math.floor(G.res[k])}</b></button>`).join('');
+  const got = tradeQuote(trFrom, trTo, trN);
+  $('trade-body').innerHTML = `<div class="tcol"><h4>交出</h4><div class="rsl" id="tr-from">${opt(trFrom)}</div></div>
+    <div class="tmid"><div class="amt">${[10, 25, 50, 100].map(n => `<button class="${n === trN ? 'on' : ''}" data-n="${n}">${n}</button>`).join('')}</div>
+      <div class="deal"><span style="--rc:${RES_INFO[trFrom].color}">${ic(trFrom)}${trN}</span><i>→</i><span style="--rc:${RES_INFO[trTo].color}">${ic(trTo)}${got}</span></div>
+      <div class="note2">汇率按地球市场价计算，含 20% 运输损耗</div>
+      <button class="go" ${trFrom === trTo || got <= 0 || G.res[trFrom] < trN ? 'disabled' : ''}>交易</button></div>
+    <div class="tcol"><h4>换取</h4><div class="rsl" id="tr-to">${opt(trTo)}</div></div>`;
+  $('tr-from').querySelectorAll('.rs').forEach(b => b.addEventListener('click', () => { trFrom = b.dataset.k; audio.play('tick'); renderTrade(); }));
+  $('tr-to').querySelectorAll('.rs').forEach(b => b.addEventListener('click', () => { trTo = b.dataset.k; audio.play('tick'); renderTrade(); }));
+  $('trade-body').querySelectorAll('.amt button').forEach(b => b.addEventListener('click', () => { trN = +b.dataset.n; audio.play('tick'); renderTrade(); }));
+  $('trade-body').querySelector('.go').addEventListener('click', () => { const n = doTrade(trFrom, trTo, trN); if (n) toast(`交易完成：获得${RES_INFO[trTo].name} ${n}`, trTo, 'good'); renderTrade(); });
+}
+
 // —— 殖民地档案 ——
 export function archiveHTML() {
   const C = G.colony, s = G.stats;
@@ -266,13 +314,22 @@ export function updateUI(dt, ctx) {
     const wx = G.storm > 0.3 ? '沙尘暴' : G.raining ? '降雨' : '';
     $('clock').innerHTML = clockText().replace(/^.*? · /, '') + (wx ? `<span class="wx">${wx}</span>` : '');
     const ch = CHAPTERS[G.chapter], i = G.chapter;
-    const gh = ch.goals.map((g, j) => {
+    const goals = isFree() ? [] : ch.goals;
+    let gh = goals.map((g, j) => {
       const done = G.goalDone?.[i + ':' + j];
       const pr = g.prog && !done ? g.prog() : '';
       const m = /^(\d+)\/(\d+)$/.exec(pr);
       return `<div class="g ${done ? 'done' : ''}"><span class="cb"></span><div class="gx">${g.text}${pr ? `<small>${pr}</small>` : ''}${m ? `<div class="gp"><i style="width:${Math.min(100, m[1] / m[2] * 100)}%"></i></div>` : ''}</div></div>`;
     }).join('');
-    if (gh !== lastGoals) { lastGoals = gh; $('goals').innerHTML = gh; $('goal-ch').textContent = ch.title.replace(/ · /, ' '); }
+    const reqs = G.requests || [];
+    if (reqs.length) {
+      gh += `<div class="rq-h">居民委托</div>` + reqs.map(r => {
+        const p = requestProgress(r, reqCtx);
+        return `<div class="g rq"><span class="cb"></span><div class="gx">${r.text}<small>${r.giver}${r.n > 1 ? ` · ${p}/${r.n}` : ''}</small>${r.n > 1 ? `<div class="gp"><i style="width:${p / r.n * 100}%"></i></div>` : ''}</div></div>`;
+      }).join('');
+    } else if (isFree()) gh += '<div class="g"><div class="gx" style="color:var(--dim)">先建一座设施，居民们会开始提出委托</div></div>';
+    if (G.rp > 0.5 || G.buildings.some(b => b.type === 'lab')) gh += `<div class="rq-h">科研 <b>${Math.floor(G.rp)}</b> 点 <small>+${rpRate().toFixed(1)}/秒 · T 打开</small></div>`;
+    if (gh !== lastGoals) { lastGoals = gh; $('goals').innerHTML = gh; $('goal-ch').textContent = isFree() ? `自由模式 · ${DIFFS[G.diffKey || 'normal'].name}` : ch.title.replace(/ · /, ' '); }
     document.querySelectorAll('#hotbar .slot').forEach((s, j) => {
       s.classList.toggle('on', j === tool.index);
       s.classList.toggle('lock', !!(TOOLS[j].need && !G.upgrades[TOOLS[j].need]));

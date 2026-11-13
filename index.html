@@ -74,6 +74,7 @@
     <nav class="menu">
       <button id="btn-continue" class="hidden"><span class="t">继续</span><small id="cont-info"></small></button>
       <button id="btn-new"><span class="t">开始新的旅程</span></button>
+      <button id="btn-setup" class="hidden"><span class="t">重新开始</span></button>
       <button id="btn-t-help"><span class="t">操作说明</span></button>
       <button id="btn-t-achv"><span class="t">成就</span></button>
     </nav>
@@ -108,7 +109,7 @@
       <div><kbd>W A S D</kbd>移动 <kbd>Shift</kbd>冲刺 <kbd>空格</kbd>跳跃 / 喷气</div>
       <div><kbd>左键</kbd>采集 / 射击 / 放置 <kbd>右键</kbd>取消 <kbd>R</kbd>旋转</div>
       <div><kbd>1</kbd><kbd>2</kbd>工具 <kbd>B</kbd>建造 <kbd>E</kbd>互动 <kbd>X</kbd>拆除</div>
-      <div><kbd>Q</kbd>扫描 <kbd>F</kbd>手电 <kbd>Tab</kbd>殖民地档案 <kbd>P</kbd>拍照模式</div>
+      <div><kbd>Q</kbd>扫描 <kbd>T</kbd>科研 <kbd>F</kbd>手电 <kbd>Tab</kbd>档案 <kbd>P</kbd>拍照模式</div>
     </div>
   </div>
   <div class="pane" id="pause-pane"></div>
@@ -129,6 +130,24 @@
     <button class="x" data-close>ESC</button>
   </header>
   <div class="bp-body"><div class="bp-grid" id="build-list"></div><aside class="bp-detail" id="bp-detail"></aside></div>
+</div>
+<div id="research" class="screen menu bp hidden">
+  <header class="bp-head">
+    <div><div class="kicker"><span class="dash"></span>RESEARCH</div><h2>科研</h2></div>
+    <div class="bp-tabs"></div>
+    <div class="bp-res" id="rs-res"></div>
+    <button class="x" data-close>ESC</button>
+  </header>
+  <div class="bp-body"><div class="bp-grid" id="research-list"></div><aside class="bp-detail" id="research-detail"></aside></div>
+</div>
+<div id="trade" class="screen menu bp hidden">
+  <header class="bp-head">
+    <div><div class="kicker"><span class="dash"></span>INTERSTELLAR TRADE</div><h2>星际贸易</h2></div>
+    <div class="bp-tabs"></div>
+    <div class="bp-res" id="tr-res"></div>
+    <button class="x" data-close>ESC</button>
+  </header>
+  <div class="bp-body"><div class="trade-wrap" id="trade-body"></div></div>
 </div>
 <div id="craft" class="screen menu bp hidden">
   <header class="bp-head">

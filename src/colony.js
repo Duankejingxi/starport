@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G } from './state.js';
+import { has } from './systems.js';
 import { makeColonist, makeShuttle } from './models.js';
 import { getHeight } from './terrain.js';
 import { fx } from './fx.js';
@@ -92,7 +93,7 @@ export function updateColony(dt) {
   C.pop = G.popTotal;
   // 每位居民都在工作：缓慢产出资源
   if (C.pop) {
-    G._work = (G._work || 0) + dt * C.pop * 0.04;
+    G._work = (G._work || 0) + dt * C.pop * 0.04 * (has('culture') ? 2 : 1);
     while (G._work >= 1) { G._work -= 1; const k = Math.random() < 0.55 ? 'iron' : (Math.random() < 0.6 ? 'silicon' : 'ice'); G.res[k]++; }
   }
   // 是否满足移民条件
@@ -101,8 +102,8 @@ export function updateColony(dt) {
   if (!shuttle && pads.length && room > 0 && !G.ended) {
     arrivalT -= dt;
     if (arrivalT <= 0) {
-      arrivalT = Math.max(20, 50 / pads.length);
-      startLanding(pads[Math.floor(Math.random() * pads.length)], Math.min(room, 4 + (G.cityLevel || 0) * 2));
+      arrivalT = Math.max(20, 50 / pads.length) * (has('pr') ? 0.55 : 1);
+      startLanding(pads[Math.floor(Math.random() * pads.length)], Math.min(room, 4 + (G.cityLevel || 0) * 2 + (has('pr') ? 2 : 0)));
     }
   }
   if (shuttle) updateShuttle(dt);

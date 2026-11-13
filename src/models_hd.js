@@ -390,6 +390,51 @@ Object.assign(BUILD_MODELS, {
   },
 });
 
+Object.assign(BUILD_MODELS, {
+  lab(g, a) {
+    foundation(g, 4);
+    mk(cyl(4.1, 4.2, 0.4, 40), M.panel, 0, 0.2, 0, g);
+    mk(cyl(3.2, 3.4, 2.8, 40), M.white, 0, 1.8, 0, g);
+    mk(cyl(3.25, 3.25, 0.2, 40), M.orange, 0, 3.1, 0, g);
+    for (let i = 0; i < 10; i++) { const an = i / 10 * Math.PI * 2; const w = new THREE.Group(); w.position.set(Math.cos(an) * 3.32, 2.0, Math.sin(an) * 3.32); w.rotation.y = -an + Math.PI / 2; g.add(w); mk(rbox(0.9, 0.7, 0.1, 0.06), M.metal, 0, 0, 0, w); mk(rbox(0.78, 0.58, 0.08, 0.05), M.window, 0, 0, 0.04, w); }
+    // 观测穹顶与望远镜
+    mk(new THREE.SphereGeometry(2.2, 40, 16, 0, Math.PI * 2, 0, Math.PI / 2), M.white, 0, 3.2, 0, g);
+    mk(rbox(0.9, 2.4, 0.2, 0.05), M.dark, 0, 4.4, 1.5, g, -0.9, 0, 0);
+    const scope = mk(cyl(0.35, 0.45, 2.6, 20), M.metal, 0, 5.2, 0.9, g, -0.7, 0, 0);
+    mk(new THREE.TorusGeometry(0.37, 0.05, 8, 20), M.cyan, 0, 6.15, 1.75, g, -0.7 + Math.PI / 2, 0, 0);
+    a.scope = scope;
+    // 天线与设备
+    mk(cyl(0.05, 0.07, 3, 8), M.metal, -2.4, 4.5, -1.2, g); a.tip = glow(0x7fe6ff, 1.0, g, -2.4, 6.1, -1.2);
+    mk(rbox(1.5, 1.0, 1.0, 0.08), M.dark, 3.4, 0.7, -2.0, g); grille(g, 1.0, 0.6, 3.4, 0.7, -1.48, 0, 5);
+    mk(rbox(1.3, 2.1, 0.15, 0.1), M.metal, 0, 1.25, 3.38, g); mk(rbox(1.1, 1.9, 0.1, 0.08), M.dark, 0, 1.2, 3.44, g);
+    a.light = glow(0x7fe6ff, 2.0, g, 0, 6.3, 1.9);
+  },
+  trade(g, a) {
+    foundation(g, 4.8, true);
+    mk(rbox(9.6, 0.4, 9.6, 0.1), M.found, 0, 0.2, 0, g);
+    hazard(g, 9.6, 0.15, 0, 0.42, 4.82);
+    // 集装箱堆场
+    const cols = [M.orange, M.white, M.dark, M.red2];
+    let k = 0;
+    for (const [x, z, h] of [[-3.2, -2.6, 2], [-3.2, -0.2, 1], [-3.2, 2.2, 2], [0.2, -2.6, 1], [0.2, 2.6, 1]]) for (let i = 0; i < h; i++) {
+      const c = mk(rbox(2.2, 1.1, 2.0, 0.05), cols[k++ % cols.length], x, 0.95 + i * 1.12, z, g);
+      for (let j = 0; j < 5; j++) mk(new THREE.BoxGeometry(0.04, 0.9, 2.02), M.metal, x - 0.8 + j * 0.4, 0.95 + i * 1.12, z, g);
+    }
+    // 起重机
+    const cr = new THREE.Group(); cr.position.set(3.2, 0.4, 0); g.add(cr);
+    for (const [x, z] of [[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]]) rod(V(x, 0, z), V(x * 0.6, 6, z * 0.6), 0.06, M.orange, cr);
+    for (let y = 1; y < 6; y += 1.2) mk(new THREE.TorusGeometry(0.42 - y * 0.03, 0.03, 4, 4), M.orange, 0, y, 0, cr, Math.PI / 2, 0, Math.PI / 4);
+    const jib = new THREE.Group(); jib.position.y = 6.1; cr.add(jib);
+    mk(rbox(0.6, 0.5, 0.6, 0.06), M.dark, 0, 0, 0, jib);
+    mk(rbox(0.25, 0.25, 6.0, 0.04), M.orange, 0, 0.2, -2.0, jib);
+    mk(rbox(0.6, 0.6, 0.8, 0.05), M.dark, 0, 0.1, 1.2, jib);
+    rod(V(0, 0.1, -4.6), V(0, -3.0, -4.6), 0.015, M.metal, jib);
+    mk(rbox(0.5, 0.2, 0.5, 0.03), M.metal, 0, -3.1, -4.6, jib);
+    a.jib = jib;
+    mk(cyl(0.05, 0.05, 2.4, 6), M.metal, -4.2, 1.6, 4.2, g); a.tip = glow(0x66ff99, 1.0, g, -4.2, 2.9, 4.2);
+  },
+});
+
 // ================= 着陆舱「方舟一号」 =================
 export function makeLanderHD() {
   const g = new THREE.Group(), R = rng(5);
