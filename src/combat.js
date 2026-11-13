@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { G } from './state.js';
-import { makeCrawler, glow } from './models.js';
+import { glow, CRAWLER_MATS } from './models.js';
+import { makeCrawlerHD } from './models_hd.js';
 import { getHeight, HALF } from './terrain.js';
 import { fx } from './fx.js';
 import { audio } from './audio.js';
@@ -48,7 +49,7 @@ export function updateProjectiles(dt) {
 // —— 锈蚀蛛 ——
 export function spawnCrawler(x, z, guardian = false, boss = false) {
   const scale = boss ? 3.4 : guardian ? 1.35 : 0.85 + Math.random() * 0.35;
-  const m = makeCrawler(scale);
+  const m = makeCrawlerHD(scale, CRAWLER_MATS.crystal, CRAWLER_MATS.eye);
   const y = getHeight(x, z);
   m.group.position.set(x, y, z);
   G.scene.add(m.group);

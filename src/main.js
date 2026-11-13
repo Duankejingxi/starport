@@ -25,7 +25,8 @@ import { ic } from './icons.js';
 import { initRelics, updateRelics, relicAt, discover } from './relics.js';
 import { initCompanion, updateCompanion } from './companion.js';
 import { input, initInput } from './input.js';
-import { makeLander, M as MAT, glow } from './models.js';
+import { M as MAT, glow } from './models.js';
+import { makeLanderHD as makeLander } from './models_hd.js';
 import { P, PID, PLANETS, SAVE_KEY, META, saveMeta, loadMeta, clearAll } from './planets.js';
 import { initCity, updateCity, LEVELS } from './city.js';
 import { spawnRover, getRover, roverState, enterRover, exitRover, updateRover, roverSpeed } from './rover.js';
@@ -745,6 +746,7 @@ window.__dbg = {
   chapter: i => startChapter(i),
   look(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; },
   begin: () => begin(false),
+  slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
   step(sec, dt = 0.05) { for (let t = 0; t < sec; t += dt) { update(dt); updateFx(dt, camera.position); input.endFrame(); } },
   input,

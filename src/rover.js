@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { G } from './state.js';
 import { M, glow } from './models.js';
 import { getHeight, HALF } from './terrain.js';
@@ -14,20 +15,48 @@ const tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), fwd = new THREE.V
 
 function buildModel() {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
-  const mk = (geo, mat, x, y, z, p = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; p.add(m); return m; };
-  mk(new THREE.BoxGeometry(2.6, 0.7, 4.6), M.white, 0, 1.0, 0);
-  mk(new THREE.BoxGeometry(2.62, 0.18, 4.62), M.orange, 0, 1.3, 0);
-  mk(new THREE.BoxGeometry(2.2, 0.9, 2.2), M.panel, 0, 1.8, 0.6);
-  const cab = mk(new THREE.SphereGeometry(1.15, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), M.glass, 0, 1.75, -0.9); cab.scale.set(1, 0.85, 1.2); cab.castShadow = false;
-  mk(new THREE.BoxGeometry(2.4, 0.3, 0.5), M.dark, 0, 0.9, -2.4);
-  mk(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 4), M.metal, 0.9, 3.0, 1.4);
-  const tip = glow(0xff4040, 0.8, body, 0.9, 3.8, 1.4);
-  const heads = [-0.8, 0.8].map(x => glow(0xfff2dd, 1.4, body, x, 1.05, -2.68));
+  const mk = (geo, mat, x, y, z, p = body, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = true; m.receiveShadow = true; p.add(m); return m; };
+  const rb = (w, h, d, r = 0.08) => new RoundedBoxGeometry(w, h, d, 2, r);
+  const rod = (a, b2, r, mat, p = body) => { const d = b2.clone().sub(a), m = mk(new THREE.CylinderGeometry(r, r, d.length(), 8), mat, 0, 0, 0, p); m.position.copy(a).add(b2).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); return m; };
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  // 底盘与车身
+  mk(rb(2.5, 0.35, 4.8, 0.1), M.dark, 0, 0.85, 0);
+  mk(rb(2.6, 0.75, 3.4, 0.18), M.white, 0, 1.35, 0.5);
+  mk(rb(2.64, 0.14, 3.44, 0.05), M.orange, 0, 1.62, 0.5);
+  mk(rb(2.2, 0.5, 1.2, 0.12), M.panel, 0, 1.25, -1.9, body, -0.25, 0, 0);
+  // 驾驶舱：玻璃罩 + 框架
+  const cab = mk(new THREE.SphereGeometry(1.15, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), M.glass, 0, 1.72, -0.75); cab.scale.set(1, 0.8, 1.15); cab.castShadow = false;
+  for (let i = 0; i < 5; i++) { const t = mk(new THREE.TorusGeometry(1.16, 0.035, 6, 24, Math.PI), M.metal, 0, 1.72, -0.75, body, 0, i * Math.PI / 5, 0); t.scale.set(1, 0.8, 1.15); }
+  // 防滚架
+  for (const x of [-1.15, 1.15]) { rod(V(x, 1.7, 0.6), V(x * 0.9, 2.75, 0.9), 0.06, M.metal); rod(V(x, 1.7, 2.1), V(x * 0.9, 2.75, 1.9), 0.06, M.metal); }
+  rod(V(-1.04, 2.75, 0.9), V(1.04, 2.75, 0.9), 0.06, M.metal); rod(V(-1.04, 2.75, 1.9), V(1.04, 2.75, 1.9), 0.06, M.metal);
+  rod(V(-1.04, 2.75, 0.9), V(-1.04, 2.75, 1.9), 0.06, M.metal); rod(V(1.04, 2.75, 0.9), V(1.04, 2.75, 1.9), 0.06, M.metal);
+  // 车顶灯条
+  mk(rb(1.8, 0.16, 0.22, 0.05), M.dark, 0, 2.82, 0.9);
+  const heads = [];
+  for (let i = 0; i < 4; i++) { mk(new THREE.CircleGeometry(0.07, 12), M.lamp, -0.6 + i * 0.4, 2.82, 0.78, body, 0, Math.PI, 0); heads.push(glow(0xfff2dd, 0.9, body, -0.6 + i * 0.4, 2.82, 0.75)); }
+  for (const x of [-0.85, 0.85]) heads.push(glow(0xfff2dd, 1.2, body, x, 1.2, -2.5));
+  for (const x of [-0.85, 0.85]) mk(rb(0.35, 0.18, 0.08, 0.04), M.lamp, x, 1.2, -2.42);
+  // 货架与货箱
+  mk(rb(2.3, 0.08, 1.5, 0.03), M.metal, 0, 1.78, 1.6);
+  for (const [x, z, s] of [[-0.5, 1.4, 0.6], [0.4, 1.7, 0.7], [0.5, 1.1, 0.45]]) mk(rb(s, s * 0.8, s, 0.04), M.dark, x, 1.82 + s * 0.4, z);
+  mk(new THREE.CylinderGeometry(0.02, 0.02, 1.6, 4), M.metal, 0.9, 3.5, 1.9);
+  const tip = glow(0xff4040, 0.6, body, 0.9, 4.3, 1.9);
+  // 侧梯与工具
+  for (let i = 0; i < 3; i++) mk(rb(0.06, 0.06, 0.5, 0.02), M.metal, 1.33, 0.75 + i * 0.28, -0.2);
+  mk(rb(0.1, 0.4, 1.0, 0.04), M.orange, -1.32, 1.3, 1.0);
+  // 车轮：胎纹轮胎 + 辐条轮毂 + 悬挂摇臂
   const wheels = [];
-  const wg = new THREE.CylinderGeometry(0.55, 0.55, 0.5, 14); wg.rotateZ(Math.PI / 2);
-  for (const z of [-1.6, 0, 1.6]) for (const x of [-1.45, 1.45]) {
-    const w = mk(wg, M.dark, x, 0.55, z, g);
-    mk(new THREE.CylinderGeometry(0.25, 0.25, 0.52, 6).rotateZ(Math.PI / 2), M.metal, 0, 0, 0, w);
+  const tread = new THREE.TorusGeometry(0.46, 0.2, 12, 28);
+  for (const z of [-1.65, 0, 1.65]) for (const x of [-1.5, 1.5]) {
+    const w = new THREE.Group(); w.position.set(x, 0.62, z); g.add(w);
+    const t = mk(tread, M.rubber, 0, 0, 0, w, 0, Math.PI / 2, 0);
+    for (let k = 0; k < 14; k++) { const an = k / 14 * Math.PI * 2; mk(new THREE.BoxGeometry(0.42, 0.06, 0.1), M.rubber, 0, Math.cos(an) * 0.64, Math.sin(an) * 0.64, w, an, 0, 0); }
+    mk(new THREE.CylinderGeometry(0.34, 0.34, 0.3, 20), M.metal, 0, 0, 0, w, 0, 0, Math.PI / 2);
+    for (let k = 0; k < 5; k++) mk(new THREE.BoxGeometry(0.32, 0.06, 0.06), M.dark, x > 0 ? 0.16 : -0.16, 0, 0, w, k * Math.PI / 5, 0, 0).scale.set(0.3, 1, 9);
+    mk(new THREE.CylinderGeometry(0.1, 0.1, 0.34, 10), M.chrome, 0, 0, 0, w, 0, 0, Math.PI / 2);
+    rod(V(x * 0.62, 0.95, z), V(x * 0.95, 0.66, z), 0.07, M.metal, g);
+    rod(V(x * 0.7, 1.15, z + 0.3), V(x * 0.95, 0.75, z), 0.04, M.chrome, g);
     wheels.push(w);
   }
   const lamp = new THREE.SpotLight(0xfff2dd, 0, 60, 0.5, 0.5, 1.2);

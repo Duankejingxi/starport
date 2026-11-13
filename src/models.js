@@ -458,3 +458,5 @@ export function makeDrone() {
   const eye = glow(0x7fe6ff, 0.9, g, 0, -0.2, 0);
   return { group: g, rotors, eye };
 }
+
+export const CRAWLER_MATS = { crystal: crawlerCrystal, eye: crawlerEye };
