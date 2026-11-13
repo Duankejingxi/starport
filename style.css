@@ -394,3 +394,6 @@ body.newbie #res .r .lbl { opacity: .8; }
 #pause .side { animation: sidein .35s cubic-bezier(.2, .8, .2, 1); }
 @keyframes scrin { from { opacity: 0; transform: translateY(14px) scale(.985); } }
 @keyframes sidein { from { opacity: 0; transform: translateX(-20px); } }
+#buildhint { bottom: 204px; }
+#prompt.drive { bottom: 204px; }
+#achv-pop { top: 150px; }
