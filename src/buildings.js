@@ -23,6 +23,7 @@ export const DEFS = {
   drones:     { name: '无人机站', icon: 'drone', cat: 'industry', chapter: 2, cost: { iron: 30, silicon: 22 }, power: -3, r: 3.8, hp: 220, desc: '派出采矿无人机，自动采集 100 米内的矿点并运回。升级后无人机更多，满级可采钛。' },
   turret:     { name: '防御炮塔', icon: 'shield', cat: 'defense', chapter: 2, cost: { iron: 22, silicon: 10 }, power: -2, r: 1.9, hp: 200, range: 40, desc: '自动攻击 40 米内的锈蚀蛛。需要电力。' },
   reactor:    { name: '聚变反应堆', icon: 'power', cat: 'industry', chapter: 3, cost: { iron: 40, silicon: 20, titanium: 12 }, power: 20, r: 5.4, hp: 400, desc: '昼夜不停 +20 ⚡。用火星的钛，点亮人类的第二颗太阳。' },
+  plaza:      { name: '中央广场', icon: 'planet', cat: 'city', level: 1, cost: { iron: 20, silicon: 16 }, power: -1, r: 7.4, hp: 300, desc: '中心有一座全息地球。天黑后，居民们会来这里聚在一起，看一看故乡。' },
   apartment:  { name: '公寓塔', icon: 'tower', cat: 'city', level: 2, cost: { iron: 40, silicon: 25, titanium: 4 }, power: -3, r: 4.6, hp: 400, housing: 12, life: 12, desc: '可住 12 人。窗户里的灯光，是城市的星空。' },
   vfarm:      { name: '垂直农场', icon: 'food', cat: 'city', level: 2, cost: { iron: 30, silicon: 30, ice: 15 }, power: -4, r: 4.2, hp: 260, food: 14, desc: '十四层的立体农田。供 14 人食物。' },
   lifehub:    { name: '生态中枢', icon: 'o2', cat: 'city', level: 3, cost: { iron: 45, silicon: 30, ice: 30, titanium: 6 }, power: -5, r: 6.0, hp: 400, o2: 16, water: 16, life: 20, desc: '大型氧气与水循环系统。供 16 人氧气和用水，20 米内补氧。' },
@@ -33,7 +34,7 @@ export const DEFS = {
 // —— 建筑等级：产出、耐久、范围随等级提升 ——
 export const MAX_LV = 3;
 const MUL = [1, 1, 1.6, 2.2];
-const NO_UPGRADE = ['lamp', 'beacon', 'fabricator', 'terraformer', 'launch', 'monument'];
+const NO_UPGRADE = ['lamp', 'beacon', 'fabricator', 'plaza', 'terraformer', 'launch', 'monument'];
 export function canUpgrade(b) { return !NO_UPGRADE.includes(b.type) && (b.level || 1) < MAX_LV; }
 export function stat(b, k) {
   const d = b.def, lv = b.level || 1, v = d[k];
@@ -89,9 +90,9 @@ export function unlockState(k) {
   if (d.level && d.level > G.cityLevel) return { ok: false, why: `城市等级达到「${LEVELS[d.level].name}」解锁` };
   return { ok: true };
 }
-export const ORDER = ['solar', 'oxygen', 'lamp', 'habitat', 'greenhouse', 'extractor', 'beacon', 'fabricator', 'drones', 'turret', 'reactor', 'apartment', 'vfarm', 'lifehub', 'terraformer', 'launch', 'monument'];
+export const ORDER = ['solar', 'oxygen', 'lamp', 'habitat', 'greenhouse', 'extractor', 'beacon', 'fabricator', 'drones', 'turret', 'reactor', 'plaza', 'apartment', 'vfarm', 'lifehub', 'terraformer', 'launch', 'monument'];
 // 停电时的供电优先级
-const PRIORITY = ['oxygen', 'lifehub', 'turret', 'habitat', 'apartment', 'extractor', 'greenhouse', 'vfarm', 'beacon', 'drones', 'fabricator', 'terraformer', 'launch', 'monument'];
+const PRIORITY = ['oxygen', 'lifehub', 'turret', 'habitat', 'apartment', 'extractor', 'greenhouse', 'vfarm', 'beacon', 'plaza', 'drones', 'fabricator', 'terraformer', 'launch', 'monument'];
 
 const scanMat = new THREE.MeshBasicMaterial({ color: 0x7fe6ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 export function createBuilding(type, x, z, rot = 0, hp, animate = false, level = 1) {
@@ -107,7 +108,7 @@ export function createBuilding(type, x, z, rot = 0, hp, animate = false, level =
     ring.rotation.x = Math.PI / 2; ring.position.set(x, y, z); G.scene.add(ring); anim._scan = ring;
   }
   const b = { buildT: animate ? 0 : 1, type, def, x, z, y, rot, group, anim, hp: hp ?? def.hp, broken: hp !== undefined && hp <= 0, powered: true, t: Math.random() * 10, cool: 0 };
-  b.collider = G.colliders.add({ x, z, r: def.r * (type === 'beacon' ? 0.15 : 0.9), kind: 'building', b });
+  b.collider = G.colliders.add({ x, z, r: def.r * (type === 'beacon' ? 0.15 : type === 'plaza' ? 0.28 : 0.9), kind: 'building', b });
   // 门口区域可以走进居住穹顶的范围外缘
   b.level = level;
   b.maxHp = stat(b, 'hp'); if (hp === undefined) b.hp = b.maxHp;
@@ -240,7 +241,7 @@ export function updateBuildings(dt, ctx) {
   updateRoads();
   updateDrones(dt);
   const night = G.time.night, now = performance.now() * 0.001;
-  M.window.emissiveIntensity = 0.3 + night * 1.6;
+  M.window.emissiveIntensity = 0.3 + night * 0.85;
   M.lamp.emissiveIntensity = night * 4;
   for (const m of CITY_MATS) m.emissiveIntensity = 0.15 + night * 1.4;
   for (const b of G.buildings) {
@@ -278,6 +279,7 @@ export function updateBuildings(dt, ctx) {
       case 'apartment': a.tip.visible = Math.sin(now * 2 + b.z) > 0.3; break;
       case 'vfarm': a.light.material.opacity = on ? 0.25 + night * 0.5 : 0; break;
       case 'lifehub': if (on) a.fan.rotation.y += dt * 3; a.light.visible = on; break;
+      case 'plaza': a.earth.rotation.y += dt * 0.25; a.earth.position.y = 4 + Math.sin(now * 0.8) * 0.15; a.earth.material.opacity = on ? 0.55 - night * 0.15 : 0.15; a.halo.material.opacity = on ? 0.25 + night * 0.2 : 0; break;
       case 'monument': a.rings.forEach((r, i) => { r.rotation.x = now * (0.3 + i * 0.2); r.rotation.y = now * (0.2 + i * 0.15); }); break;
       case 'reactor': a.r1.rotation.y += dt * 0.8; a.r2.rotation.z += dt * 0.6; a.light.material.opacity = 0.5 + Math.sin(now * 3) * 0.2; break;
       case 'beacon': {
@@ -285,7 +287,7 @@ export function updateBuildings(dt, ctx) {
         a.lights.forEach((l, i) => { l.visible = on && (i === k || i === (k + 4) % 8 || night > 0.3); });
         a.tip.visible = Math.sin(now * 3) > 0; break;
       }
-      case 'lamp': a.glow.visible = night > 0.2; a.glow.material.opacity = night; break;
+      case 'lamp': a.glow.visible = night > 0.2; a.glow.material.opacity = night * 0.6; break;
       case 'turret': updateTurret(b, dt, ctx); break;
       case 'terraformer': {
         a.rings.forEach((r, i) => { r.position.y = 10 + i * 8 + Math.sin(now * 1.5 + i) * 1.5; r.rotation.x = Math.sin(now + i) * 0.2; });

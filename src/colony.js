@@ -58,7 +58,17 @@ function pickTarget(c) {
   const homes = G.buildings.filter(b => b.type !== 'lamp');
   if (!homes.length) return new THREE.Vector3(c.pos.x + (Math.random() - 0.5) * 10, 0, c.pos.z + (Math.random() - 0.5) * 10);
   let list = homes;
-  if (G.time.night > 0.5) { const h = homes.filter(b => b.type === 'habitat'); if (h.length) list = h; }
+  if (G.time.night > 0.5) {
+    // 夜里：大多数人去广场看全息地球
+    const pz = homes.filter(b => b.type === 'plaza' && b.powered);
+    if (pz.length && Math.random() < 0.85) {
+      const b = pz[c.idx % pz.length], a = (c.idx * 2.399) % (Math.PI * 2), d = 2.8 + (c.idx % 3) * 0.9;
+      c.atPlaza = b;
+      return new THREE.Vector3(b.x + Math.cos(a) * d, 0, b.z + Math.sin(a) * d);
+    }
+    const h = homes.filter(b => b.type === 'habitat' || b.type === 'apartment'); if (h.length) list = h;
+  }
+  c.atPlaza = null;
   const b = list[Math.floor(Math.random() * list.length)];
   const a = Math.random() * Math.PI * 2, d = b.def.r + 1.5 + Math.random() * 5;
   return new THREE.Vector3(b.x + Math.cos(a) * d, 0, b.z + Math.sin(a) * d);
@@ -120,6 +130,7 @@ export function updateColony(dt) {
     // 看向玩家
     const pd = Math.hypot(G.player.pos.x - c.pos.x, G.player.pos.z - c.pos.z);
     if (pd < 4 && !moving) c.group.rotation.y = Math.atan2(G.player.pos.x - c.pos.x, G.player.pos.z - c.pos.z);
+    else if (!moving && c.atPlaza) { c.group.rotation.y = Math.atan2(c.atPlaza.x - c.pos.x, c.atPlaza.z - c.pos.z); c.wait = Math.max(c.wait, 2); if (G.time.night < 0.3) c.wait = 0; }
     c.pos.y = getHeight(c.pos.x, c.pos.z);
     const ph = now * 7 + c.phase;
     const sw = moving ? Math.sin(ph) * 0.6 : 0;

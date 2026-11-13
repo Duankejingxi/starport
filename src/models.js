@@ -168,7 +168,7 @@ export const BUILD_MODELS = {
     mk(cyl(0.08, 0.1, 4.2, 6), M.metal, 0, 2.1, 0, g);
     mk(box(0.6, 0.2, 0.6), M.dark, 0, 4.3, 0, g);
     const bulb = mk(new THREE.SphereGeometry(0.2, 8, 6), M.lamp, 0, 4.15, 0, g); bulb.castShadow = false;
-    a.glow = glow(0xffd9a0, 5, g, 0, 4.1, 0);
+    a.glow = glow(0xffd9a0, 3, g, 0, 4.1, 0);
   },
   terraformer(g, a) {
     foundation(g, 7);
@@ -308,7 +308,44 @@ function towerMat(seed) {
 }
 const tm = [towerMat(7), towerMat(31)];
 
+let earthTex;
+function earthTexture() {
+  if (earthTex) return earthTex;
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#0a3a6a'; g.fillRect(0, 0, 256, 128);
+  g.strokeStyle = 'rgba(127,230,255,.35)'; g.lineWidth = 1;
+  for (let x = 0; x < 256; x += 16) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 128); g.stroke(); }
+  for (let y = 0; y < 128; y += 16) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke(); }
+  // 简化的大陆轮廓
+  g.fillStyle = '#7fffc8';
+  const land = [[40, 40, 22, 16], [52, 62, 10, 20], [70, 86, 12, 18], [118, 36, 16, 12], [128, 56, 14, 26], [150, 34, 40, 18], [176, 52, 22, 14], [206, 88, 16, 10], [96, 24, 12, 8], [190, 22, 20, 8]];
+  for (const [x, y, w, h] of land) { g.beginPath(); g.ellipse(x, y, w, h, 0.3, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 6); g.fillRect(0, 122, 256, 6);
+  earthTex = new THREE.CanvasTexture(cv); earthTex.colorSpace = THREE.SRGBColorSpace;
+  return earthTex;
+}
+
 Object.assign(BUILD_MODELS, {
+  plaza(g, a) {
+    foundation(g, 7.2);
+    mk(cyl(7.2, 7.4, 0.4, 8), M.panel, 0, 0.2, 0, g);
+    mk(new THREE.RingGeometry(5.4, 5.8, 48), M.orange, 0, 0.42, 0, g).rotation.x = -Math.PI / 2;
+    mk(cyl(1.6, 2.0, 1.1, 16), M.white, 0, 0.95, 0, g);
+    mk(cyl(1.65, 1.65, 0.15, 16), M.cyan, 0, 1.52, 0, g);
+    for (let i = 0; i < 6; i++) {
+      const an = i * Math.PI / 3 + Math.PI / 6;
+      const bench = mk(box(2.4, 0.4, 0.7), M.panel, Math.cos(an) * 5.2, 0.6, Math.sin(an) * 5.2, g); bench.rotation.y = -an + Math.PI / 2;
+      mk(box(0.12, 3.2, 0.12), M.metal, Math.cos(an + 0.5) * 6.6, 1.8, Math.sin(an + 0.5) * 6.6, g);
+      glow(0xffd9a0, 1.1, g, Math.cos(an + 0.5) * 6.6, 3.5, Math.sin(an + 0.5) * 6.6);
+    }
+    const earth = new THREE.Mesh(new THREE.SphereGeometry(1.5, 32, 20), new THREE.MeshBasicMaterial({ map: earthTexture(), transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false }));
+    earth.position.y = 4.0; g.add(earth);
+    const halo = glow(0x66c8ff, 5, g, 0, 4.0, 0);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 2.4, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0x7fe6ff, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = 2.7; g.add(beam);
+    a.earth = earth; a.halo = halo;
+  },
   drones(g, a) {
     foundation(g, 3.8, true);
     mk(box(7.4, 0.5, 7.4), M.panel, 0, 0.25, 0, g);

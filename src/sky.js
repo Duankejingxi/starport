@@ -17,6 +17,32 @@ const PAL = {
   halo: CC(PS.halo),
 };
 let extra = {};
+// 极光：按星球设定颜色与强度
+const AURORA = { mars: [0.35, [0.2, 0.9, 0.7], [0.3, 0.5, 1.0]], europa: [0.6, [0.4, 0.6, 1.0], [0.8, 0.4, 1.0]], kepler: [1.0, [0.3, 1.0, 0.5], [0.9, 0.3, 0.9]] }[P.id];
+let aurora;
+function buildAurora(scene) {
+  const g = new THREE.CylinderGeometry(1700, 1700, 900, 160, 1, true, -1.2, 2.6);
+  aurora = new THREE.Mesh(g, new THREE.ShaderMaterial({
+    uniforms: { uT: { value: 0 }, uI: { value: 0 }, uC1: { value: new THREE.Color(...AURORA[1]) }, uC2: { value: new THREE.Color(...AURORA[2]) } },
+    vertexShader: `uniform float uT; varying vec2 vUv;
+      void main(){ vUv = uv; vec3 p = position; float w = sin(uv.x * 18.0 + uT * 0.25) * 0.06 + sin(uv.x * 41.0 - uT * 0.4) * 0.025;
+        p.xz *= 1.0 + w; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+    fragmentShader: `uniform float uT, uI; uniform vec3 uC1, uC2; varying vec2 vUv;
+      void main(){
+        float x = vUv.x * 60.0 + sin(vUv.x * 9.0 + uT * 0.2) * 4.0;
+        float rays = (0.5 + 0.5 * sin(x * 2.1 + uT * 0.7)) * (0.55 + 0.45 * sin(x * 5.3 - uT * 1.1)) * (0.6 + 0.4 * sin(x * 0.7 + uT * 0.3));
+        float band = smoothstep(0.0, 0.18, vUv.y) * smoothstep(1.0, 0.35, vUv.y);
+        float edge = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
+        float glowB = exp(-pow((vUv.y - 0.12) * 9.0, 2.0)) * 0.6;
+        vec3 col = mix(uC1, uC2, smoothstep(0.15, 0.85, vUv.y));
+        float a = (rays * band + glowB * (0.5 + 0.5 * sin(x * 0.9 + uT))) * edge * uI;
+        gl_FragColor = vec4(col * a, 1.0);
+      }`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
+  }));
+  aurora.position.y = 700; aurora.rotation.y = 2.2; aurora.frustumCulled = false; aurora.renderOrder = -8;
+  scene.add(aurora);
+}
 const MOON = C(0.36, 0.42, 0.62), JUP = C(0.75, 0.65, 0.55);
 const tmpA = new THREE.Color(), tmpB = new THREE.Color();
 export const sunDir = new THREE.Vector3();
@@ -48,6 +74,7 @@ export function buildSky(scene) {
   sky = new THREE.Mesh(new THREE.SphereGeometry(4000, 32, 16), skyMat);
   sky.frustumCulled = false; sky.renderOrder = -10;
   scene.add(sky);
+  buildAurora(scene);
 
   // 星空
   const sg = new THREE.BufferGeometry(), sp = [], sc = [];
@@ -133,6 +160,9 @@ export function updateSky(dt, camPos) {
   skyMat.uniforms.uSunDir.value.copy(sunDir);
   skyMat.uniforms.uSunVis.value = smoothstep(-0.08, 0.02, el) * (1 - storm * 0.85);
   sky.position.copy(camPos); stars.position.copy(camPos);
+  aurora.position.set(camPos.x, camPos.y + 700, camPos.z);
+  aurora.material.uniforms.uT.value = performance.now() * 0.001;
+  aurora.material.uniforms.uI.value = AURORA[0] * T.night * (1 - storm) * (0.75 + 0.25 * Math.sin(performance.now() * 0.00007 + T.day));
   stars.material.opacity = Math.max(T.night, P.id === 'europa' ? 0.85 : 0) * (1 - storm);
 
   // 卫星

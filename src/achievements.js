@@ -32,7 +32,8 @@ export const ACHV = [
   { id: 'fleet', name: '无人机舰队', desc: '无人机运回 30 批物资', icon: 'drone', check: () => (G.stats.droneHauls || 0) >= 30 },
   { id: 'lv3', name: '精益求精', desc: '把一座建筑升到 3 级', icon: 'star', check: () => G.buildings.some(b => (b.level || 1) >= 3) },
   { id: 'buddy', name: '好搭档', desc: '让小星扫描 10 次', icon: 'scanner', check: () => (G.stats.scans || 0) >= 10 },
-  { id: 'photo', name: '摄影师', desc: '使用拍照模式', icon: 'camera', check: () => !!G.usedPhoto },
+  { id: 'photo', name: '摄影师', desc: '在拍照模式中保存一张照片', icon: 'camera', check: () => (G.stats.photos || 0) > 0 },
+  { id: 'gather', name: '故乡的光', desc: '夜里，居民们聚在广场上看全息地球', icon: 'planet', check: () => !!G.plazaSeen },
 ];
 
 let got = {};

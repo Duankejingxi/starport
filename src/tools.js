@@ -155,7 +155,7 @@ export function updateTools(dt, player, camera) {
   G.aimNode = id === 'laser' && !!rayNode(origin, dir, 9);
 
   // 切换工具
-  if (!G.menuOpen && !player.dead) {
+  if (!G.menuOpen && !player.dead && !G.photo) {
     if (input.hit('Digit1')) selectTool(0);
     if (input.hit('Digit2')) selectTool(1);
     if (input.hit('Digit3') || input.hit('KeyB')) selectTool(2);

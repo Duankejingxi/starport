@@ -117,7 +117,7 @@ canvas.addEventListener('click', () => {
 function save(silent) {
   if (!G.started) return;
   const data = {
-    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [],
+    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [], plazaSeen: !!G.plazaSeen,
     time: { t: G.time.t, day: G.time.day },
     player: { x: player.pos.x, z: player.pos.z, yaw: player.yaw, o2: player.o2, hp: player.health },
     buildings: serializeBuildings(), nodes: serializeNodes(), colonists: serializeColonists(), storm: stormState(),
@@ -140,7 +140,7 @@ function applySave(d) {
   player.yaw = d.player.yaw; player.o2 = d.player.o2; player.health = Math.max(30, d.player.hp);
   loadColonists(d.colonists || []);
   if (d.rover) spawnRover(d.rover.x, d.rover.z, d.rover.h);
-  G.relicsFound = d.relics || [];
+  G.relicsFound = d.relics || []; G.plazaSeen = !!d.plazaSeen;
   G.cityLevel = d.city || 0; G.popTotal = d.pop ?? (d.colonists || []).length; G.launched = !!d.launched;
   initCity(scene);
   setStormState(d.storm);
@@ -353,7 +353,12 @@ window.addEventListener('keydown', e => {
     if (G.menuOpen === 'archive') closeMenus(true); else if (!G.menuOpen) openMenu('archive');
     return;
   }
-  if (e.code === 'KeyP' && !G.menuOpen) { G.photo = !G.photo; G.usedPhoto = true; document.body.classList.toggle('photo', G.photo); return; }
+  if (e.code === 'KeyP' && !G.menuOpen) { G.photo = !G.photo; G.usedPhoto = true; document.body.classList.toggle('photo', G.photo); setFilter(G.photo ? filterIdx : 0); audio.play('tick'); return; }
+  if (G.photo && !G.menuOpen) {
+    const n = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(e.code);
+    if (n >= 0) { filterIdx = n; setFilter(n); audio.play('tick'); e.stopImmediatePropagation(); return; }
+    if (e.code === 'Enter') { G.snap = true; return; }
+  }
   if (G.menuOpen === 'archive' && e.code === 'Escape') { closeMenus(true); return; }
   if (G.menuOpen === 'build' && (e.code === 'Escape' || e.code === 'KeyB')) { closeMenus(true); if (!G.locked) showClickHint(); }
   else if (G.menuOpen === 'craft' && (e.code === 'Escape' || e.code === 'KeyE')) { closeMenus(true); }
@@ -525,6 +530,34 @@ function handleInteraction(dt) {
   return ctx;
 }
 
+// —— 拍照模式：电影遮幅、滤镜、保存照片 ——
+const FILTERS = [['原色', 'none'], ['胶片', 'sepia(.35) contrast(1.12) saturate(1.15) brightness(1.03)'], ['黑白', 'grayscale(1) contrast(1.25)'], ['冷调', 'hue-rotate(-18deg) saturate(.85) contrast(1.08) brightness(1.05)']];
+let filterIdx = 0;
+function setFilter(i) {
+  canvas.style.filter = FILTERS[i][1] === 'none' ? '' : FILTERS[i][1];
+  $('photo-bar').innerHTML = FILTERS.map((f, j) => `<span class="${j === i ? 'on' : ''}"><kbd>${j + 1}</kbd>${f[0]}</span>`).join('') + '<span class="sep"></span><span><kbd>Enter</kbd>保存照片</span><span><kbd>P</kbd>退出</span>';
+}
+function snapshot() {
+  const W = canvas.width, H = canvas.height, bar = Math.round(H * 0.1);
+  const out = document.createElement('canvas'); out.width = W; out.height = H;
+  const g = out.getContext('2d');
+  g.filter = FILTERS[filterIdx][1];
+  g.drawImage(canvas, 0, 0);
+  g.filter = 'none';
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, bar); g.fillRect(0, H - bar, W, bar);
+  const fs = Math.round(H * 0.022);
+  g.font = `300 ${fs * 1.6}px "Noto Sans SC", sans-serif`; g.fillStyle = '#fff'; g.textBaseline = 'middle';
+  g.fillText('星 港', fs * 2, H - bar / 2);
+  g.font = `400 ${fs}px "Noto Sans SC", sans-serif`; g.fillStyle = 'rgba(255,255,255,.7)'; g.textAlign = 'right';
+  g.fillText(`${P.name} · ${P.place} · 第 ${G.time.day} 日 · 人口 ${G.colony.pop}`, W - fs * 2, H - bar / 2);
+  const a = document.createElement('a');
+  a.download = `星港-${P.name}-第${G.time.day}日.png`; a.href = out.toDataURL('image/png');
+  document.body.appendChild(a); a.click(); a.remove();
+  $('shutter').classList.remove('on'); void $('shutter').offsetWidth; $('shutter').classList.add('on');
+  audio.play('shutter');
+  G.stats.photos = (G.stats.photos || 0) + 1;
+}
+
 // —— 主循环 ——
 const clock = new THREE.Clock();
 let introCam = 0;
@@ -556,6 +589,7 @@ function frame() {
   input.endFrame();
   renderScene();
   renderViewmodel(renderer);
+  if (G.snap) { G.snap = false; snapshot(); }
 }
 function update(dt) {
   {
@@ -580,6 +614,10 @@ function update(dt) {
     updateAmbient(dt);
     updateRelics(dt);
     updateCompanion(dt);
+    if (!G.plazaSeen && G.time.night > 0.6 && G.colonists.filter(c => c.atPlaza && !c.target).length >= 4) {
+      G.plazaSeen = true;
+      radio('苏念 · 教师', '今晚大家都来了。我们就这样站着，看着那颗蓝色的星球转啊转……孩子问我，那是哪里。我说，那是我们出发的地方。');
+    }
     const ctx = handleInteraction(dt);
     ctx.tip = hintPrompt(dt);
     updateUI(dt, ctx);
