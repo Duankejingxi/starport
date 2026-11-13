@@ -62,7 +62,7 @@ export function openMenu(id) {
   if (id === 'craft') renderCraft();
 }
 export function closeMenus(relock) {
-  ['build', 'craft', 'pause'].forEach(id => $(id).classList.add('hidden'));
+  ['build', 'craft', 'pause', 'starmap'].forEach(id => $(id).classList.add('hidden'));
   const was = G.menuOpen;
   G.menuOpen = false;
   if (was === 'build' && !placement.type) tool.index = 0;

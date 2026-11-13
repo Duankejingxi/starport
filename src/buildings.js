@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { G, canAfford, pay } from './state.js';
 import { BUILD_MODELS, M, CITY_MATS } from './models.js';
-import { P, PID } from './planets.js';
+import { P, PID, META } from './planets.js';
 import { LEVELS, inTerritory } from './city.js';
 import { getHeight, slopeAt, HALF } from './terrain.js';
 import { fx } from './fx.js';
@@ -24,14 +24,14 @@ export const DEFS = {
   vfarm:      { name: '垂直农场', icon: '🌾', level: 2, cost: { iron: 30, silicon: 30, ice: 15 }, power: -4, r: 4.2, hp: 260, food: 14, desc: '十四层的立体农田。供 14 人食物。' },
   lifehub:    { name: '生态中枢', icon: '🌀', level: 3, cost: { iron: 45, silicon: 30, ice: 30, titanium: 6 }, power: -5, r: 6.0, hp: 400, o2: 16, water: 16, life: 20, desc: '大型氧气与水循环系统。供 16 人氧气和用水，20 米内补氧。' },
   terraformer:{ name: '大气改造塔', icon: '🌍', chapter: 4, only: 'terraformable', cost: { iron: 100, silicon: 60, titanium: 30, ice: 50 }, power: -12, r: 7.4, hp: 800, desc: '向天空释放温室气体与水汽。让这颗星球，真正成为家。' },
-  launch:     { name: '星际发射台', icon: '🛸', chapter: 5, level: PID === 'mars' ? 5 : 4, only: 'next', cost: { iron: 160, silicon: 120, titanium: 60, ice: 60 }, power: -15, r: 9.5, hp: 900, desc: '建造殖民舰，前往下一颗星球。靠近按 E 发射。' },
+  launch:     { name: '星际发射台', icon: '🛸', chapter: 5, level: PID === 'mars' ? 5 : 4, only: 'route', cost: { iron: 160, silicon: 120, titanium: 60, ice: 60 }, power: -15, r: 9.5, hp: 900, desc: '星际航线的起点。靠近按 E 打开星图，前往新的星球或回到已开拓的家园。' },
   monument:   { name: '文明纪念碑', icon: '🗼', level: 5, only: 'final', cost: { iron: 150, silicon: 120, titanium: 80 }, power: -6, r: 6.5, hp: 900, desc: '三颗星球，一个人类。献给所有出发的人。' },
 };
 // 某座建筑当前能否建造
 export function unlockState(k) {
   const d = DEFS[k];
   if (d.only === 'terraformable' && !P.terraformable) return { hide: true };
-  if (d.only === 'next' && !P.next) return { hide: true };
+  if (d.only === 'route' && !P.next && !(META.visited || []).some(v => v.id !== PID)) return { hide: true };
   if (d.only === 'final' && P.next) return { hide: true };
   if (PID === 'mars' && d.chapter && d.chapter > G.chapter) return { ok: false, why: `剧情推进后解锁` };
   if (d.level && d.level > G.cityLevel) return { ok: false, why: `城市等级达到「${LEVELS[d.level].name}」解锁` };

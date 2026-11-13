@@ -79,6 +79,7 @@ document.addEventListener('pointerlockchange', () => {
   if (!G.locked && G.started && !G.menuOpen && !player.dead && !G.endingShown) openMenu('pause');
 });
 canvas.addEventListener('click', () => {
+  audio.init();
   if (G.started && !G.locked && !G.menuOpen && !player.dead) G.requestLock();
 });
 
@@ -158,6 +159,11 @@ $('btn-new').addEventListener('click', () => {
   begin(false);
 });
 $('btn-continue').addEventListener('click', () => begin(true));
+if (PID !== 'mars' && !existing) $('btn-new').textContent = `登陆 ${P.name}`;
+if (META.autoResume && existing) {
+  const m = loadMeta(); delete m.autoResume; saveMeta(m);
+  setTimeout(() => { begin(true); toast(`欢迎回来 · ${P.name}`); }, 50);
+}
 $('btn-save').addEventListener('click', () => save(false));
 $('btn-restart').addEventListener('click', () => { if (confirm('将删除所有星球的进度，从火星重新开始。确定吗？')) { clearAll(); G.started = false; location.href = location.pathname + (G.debug ? '?debug' : ''); } });
 $('vol').addEventListener('input', e => audio.setVolume(+e.target.value));
@@ -267,6 +273,7 @@ window.addEventListener('keydown', e => {
   if (!G.started) return;
   if (G.menuOpen === 'build' && (e.code === 'Escape' || e.code === 'KeyB')) { closeMenus(true); if (!G.locked) showClickHint(); }
   else if (G.menuOpen === 'craft' && (e.code === 'Escape' || e.code === 'KeyE')) { closeMenus(true); }
+  else if (G.menuOpen === 'starmap' && e.code === 'Escape') { closeMenus(true); }
 });
 function showClickHint() { /* 由每帧逻辑显示 */ }
 
@@ -296,11 +303,29 @@ function hintPrompt(dt) {
   for (const h of HINTS) if (!hintSeen[h.id] && h.when()) { hintCur = h; hintT = 12; return `💡 ${h.text}`; }
   return '';
 }
-function startLaunch(b) {
-  G.launching = { b, t: 0 };
+// —— 星图：前往新星球，或回到已开拓的家园 ——
+function destinations() {
+  const meta = loadMeta(), seen = new Map((meta.visited || []).map(v => [v.id, v]));
+  const list = [];
+  if (P.next) list.push({ id: P.next, fresh: !seen.has(P.next) && !hasSave(P.next) });
+  for (const id of Object.keys(PLANETS)) if (id !== PID && id !== P.next && (seen.has(id) || hasSave(id))) list.push({ id, fresh: false, info: seen.get(id) });
+  return list;
+}
+function hasSave(id) { try { return !!localStorage.getItem(id === 'mars' ? 'starport-newhome-v1' : 'starport-planet-' + id); } catch (e) { return false; } }
+function openStarmap(pad) {
+  openMenu('starmap');
+  $('starmap-list').innerHTML = destinations().map(d => {
+    const pl = PLANETS[d.id];
+    return `<div class="card" data-id="${d.id}"><div class="h"><span class="ic">${d.fresh ? '✨' : '🏠'}</span><b>${pl.name}</b><span class="pw plus">${d.fresh ? '未开拓' : '已开拓'}</span></div>
+      <div class="d">${pl.title} · ${pl.place}${d.info ? `<br>居民 ${d.info.pop} 人 · 上次离开于第 ${d.info.day} 日` : ''}${d.fresh ? '<br>装备同步，携带部分物资' : '<br>回到你建立的城市'}</div></div>`;
+  }).join('');
+  $('starmap-list').querySelectorAll('.card').forEach(el => el.addEventListener('click', () => { closeMenus(true); startLaunch(pad, el.dataset.id); }));
+}
+function startLaunch(b, dest) {
+  G.launching = { b, t: 0, dest };
   G.launched = true;
   audio.play('rumble');
-  radio('方舟 · AI', `殖民舰点火。目标：${PLANETS[P.next].name}。全体乘员，祝你们好运。`);
+  radio('方舟 · AI', `殖民舰点火。目标：${PLANETS[dest].name}。全体乘员，祝你们好运。`);
   b.anim.flame.visible = true;
 }
 function updateLaunch(dt) {
@@ -313,19 +338,20 @@ function updateLaunch(dt) {
   if (L.t < 5) fx.dustPuff(new THREE.Vector3(L.b.x + (Math.random() - 0.5) * 16, L.b.y + 1, L.b.z + (Math.random() - 0.5) * 16), 3, 4);
   player.landDip = Math.max(player.landDip, Math.min(0.15, 0.03 * L.t) * Math.random());
   if (L.t > 9 && !L.faded) { L.faded = true; $('fade').classList.add('on'); }
-  if (L.t > 11.5 && !L.done) { L.done = true; travel(); }
+  if (L.t > 11.5 && !L.done) { L.done = true; travel(L.dest); }
 }
-function travel() {
+function travel(dest) {
   const meta = loadMeta();
   meta.visited = (meta.visited || []).filter(v => v.id !== PID).concat([{ id: PID, pop: G.colony.pop, day: G.time.day }]);
-  meta.planet = P.next;
+  meta.planet = dest;
+  meta.autoResume = hasSave(dest);
   const carry = {};
   for (const k in G.res) carry[k] = Math.min(Math.floor(G.res[k] * 0.4), 80);
   meta.carry = { upgrades: G.upgrades, res: carry };
   save(true);
   saveMeta(meta);
-  const nx = PLANETS[P.next];
-  $('ending-text').innerHTML = [`曲速航行中……`, `目的地：<b>${nx.name}</b>`, `<span class="stats">${P.name}的 ${G.colony.pop} 位居民，会替你守着那里的灯火。</span>`].map((l, i) => `<p style="animation-delay:${i * 1.2}s">${l}</p>`).join('');
+  const nx = PLANETS[dest];
+  $('ending-text').innerHTML = [`曲速航行中……`, `目的地：<b>${nx.name}</b>${meta.autoResume ? '（已开拓）' : ''}`, `<span class="stats">${P.name}的 ${G.colony.pop} 位居民，会替你守着那里的灯火。</span>`].map((l, i) => `<p style="animation-delay:${i * 1.2}s">${l}</p>`).join('');
   document.querySelector('#ending .btns').classList.add('hidden');
   $('ending').classList.remove('hidden'); $('fade').classList.remove('on');
   G.endingShown = true;
@@ -367,17 +393,17 @@ function handleInteraction(dt) {
   const col = lookColonist(origin, dir);
   const fab = G.buildings.find(b => b.type === 'fabricator' && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < b.def.r + 6);
   demolishArm = Math.max(0, demolishArm - dt); launchArm = Math.max(0, launchArm - dt);
-  const launchPad = P.next && G.buildings.find(b => b.type === 'launch' && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < b.def.r + 8);
+  const launchPad = G.buildings.find(b => b.type === 'launch' && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < b.def.r + 8);
   if (col) {
     ctx.crossClass = 'talk';
     ctx.prompt = `<b>${col.name}</b> · ${col.job}<br><kbd>E</kbd> 交谈`;
     if (input.hit('KeyE')) { radio(col.name, col.line); }
   } else if (launchPad && !G.launching) {
-    const nx = PLANETS[P.next];
     if (!launchPad.powered) ctx.prompt = '星际发射台 · <span class="badc">电力不足</span>';
+    else if (!destinations().length) ctx.prompt = '星际发射台 · 暂无可用航线';
     else {
-      ctx.prompt = `🛸 殖民舰已就绪 · 目的地：<b>${nx.name}</b><br><kbd>E</kbd> ${launchArm > 0 ? '<span class="badc">再按一次确认发射</span>' : '发射（本星球殖民地会继续自主运转）'}`;
-      if (input.hit('KeyE')) { if (launchArm > 0) startLaunch(launchPad); else launchArm = 3; }
+      ctx.prompt = `🛸 殖民舰已就绪<br><kbd>E</kbd> 打开星图（本星球的城市会继续自主运转）`;
+      if (input.hit('KeyE')) openStarmap(launchPad);
     }
   } else if (fab) {
     ctx.prompt = `<kbd>E</kbd> 打开制造工坊${fab.powered ? '' : '（停电中）'}`;
