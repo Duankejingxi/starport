@@ -5,7 +5,8 @@ import { buildSky, updateSky } from './sky.js';
 import { initFx, updateFx, fx } from './fx.js';
 import { audio } from './audio.js';
 import { generateNodes, updateNodes, serializeNodes, loadNodes } from './resources.js';
-import { createBuilding, updateBuildings, serializeBuildings, recalcColony, destroyBuilding, DEFS, setGhost, placement } from './buildings.js';
+import { createBuilding, updateBuildings, serializeBuildings, recalcColony, destroyBuilding, DEFS, setGhost, placement, canUpgrade, upgradeCost, upgradeBuilding, MAX_LV } from './buildings.js';
+import { costText } from './state.js';
 import { updateProjectiles, updateEnemies, shoot, clearEnemies, rayEnemy } from './combat.js';
 import { Player, LANDER_POS } from './player.js';
 import { initTools, updateTools, renderViewmodel, tool } from './tools.js';
@@ -105,7 +106,7 @@ function applySave(d) {
   Object.assign(G.res, d.res);
   G.upgrades = d.upgrades || {};
   loadNodes(d.nodes);
-  for (const [t, x, z, r, hp] of d.buildings) if (DEFS[t]) createBuilding(t, x, z, r, hp);
+  for (const [t, x, z, r, hp, lv] of d.buildings) if (DEFS[t]) createBuilding(t, x, z, r, hp, false, lv || 1);
   G.stats = d.stats; G.goalDone = d.goalDone || {};
   G.terraform = d.terraform || 0; G.ended = !!d.ended; G.nightsSurvived = d.nights || 0;
   resetStoryEnding(G.terraform >= 1);
@@ -184,6 +185,19 @@ $('btn-new').addEventListener('click', () => {
   begin(false);
 });
 $('btn-continue').addEventListener('click', () => begin(true));
+$('tele-planet').textContent = `${P.name} · ${P.place}`;
+const HELP = `<h3>操作</h3><div class="keys">
+  <div><kbd>W A S D</kbd><span>移动</span></div><div><kbd>鼠标</kbd><span>环视</span></div>
+  <div><kbd>Shift</kbd><span>冲刺</span></div><div><kbd>空格</kbd><span>跳跃 / 喷气背包</span></div>
+  <div><kbd>左键</kbd><span>采矿 · 射击 · 放置建筑</span></div><div><kbd>右键</kbd><span>取消建造</span></div>
+  <div><kbd>1</kbd><kbd>2</kbd><span>切换工具</span></div><div><kbd>B</kbd><span>建造蓝图</span></div>
+  <div><kbd>E</kbd><span>互动 · 交谈 · 上车</span></div><div><kbd>U</kbd><span>升级注视的建筑</span></div>
+  <div><kbd>F</kbd><span>手电筒</span></div><div><kbd>Tab</kbd><span>殖民地档案</span></div>
+  <div><kbd>P</kbd><span>拍照模式</span></div><div><kbd>Esc</kbd><span>暂停</span></div></div>
+  <h3>生存</h3><p>氧气会持续消耗。着陆舱、制氧站和居住穹顶附近会自动补氧。建好住房、氧气、食物、水和着陆场，移民飞船就会到来。夜里要提防锈蚀蛛。</p>`;
+const togglePane = html => { const el = $('intro-pane'); if (!el.classList.contains('hidden') && el.dataset.k === html.slice(0, 20)) { el.classList.add('hidden'); return; } el.dataset.k = html.slice(0, 20); el.innerHTML = html; el.classList.remove('hidden'); audio.play('tick'); };
+$('btn-t-help').addEventListener('click', () => togglePane(HELP));
+$('btn-t-achv').addEventListener('click', () => togglePane(achievementsHTML()));
 if (PID !== 'mars' && !existing) $('btn-new').textContent = `登陆 ${P.name}`;
 if (META.autoResume && existing) {
   const m = loadMeta(); delete m.autoResume; saveMeta(m);
@@ -237,6 +251,13 @@ G.events.on('death', why => {
     if (document.pointerLockElement) document.exitPointerLock();
   }, 1500);
 });
+G.events.on('tide', n => {
+  audio.play('night');
+  chapterCard({ k: 'CRYSTAL TIDE', title: '晶潮之夜', sub: `雷达探测到约 ${n} 个信号 · 守住殖民地` });
+  radio('方舟 · AI', '警告：晶潮正在逼近。数量是平时的两倍……地震仪还记录到一个巨大的信号，它正在向地表移动。');
+});
+G.events.on('bossSpawn', () => { toast('晶母破土而出', 'boss', 'warn'); radio('方舟 · AI', '是晶母！体长超过十米。它的冲击波能震碎建筑——用步枪和炮塔集中火力！'); });
+G.events.on('bossDown', () => { toast('晶母陨落', 'boss', 'good'); radio('地球指挥中心 · 林舟', '……你们做到了。整个指挥中心都在欢呼。它的核心里有大量的钛，拿去建设吧。'); });
 let firstNight = true;
 G.events.on('nightfall', n => {
   audio.play('night');
@@ -458,8 +479,14 @@ function handleInteraction(dt) {
   const lb = G.lookBuilding;
   if (!ctx.prompt && lb && tool.id !== 'build') {
     const d = lb.def;
-    ctx.prompt = `<b>${d.name}</b> · 耐久 ${Math.ceil(lb.hp)}/${d.hp}${d.power < 0 ? (lb.powered ? ' · <span class="okc">供电中</span>' : ' · <span class="badc">停电</span>') : ''}<br><kbd>X</kbd>${demolishArm > 0 ? '<span class="badc">再按一次确认拆除（返还 50%）</span>' : '拆除'}`;
-    if (lb.broken) ctx.prompt = ctx.prompt.replace('<br>', ' · <span class="badc">受损停机（白天自动修复）</span><br>');
+    const lv = lb.level || 1;
+    const up = canUpgrade(lb) ? `<br><kbd>U</kbd>升级到 Lv.${lv + 1}　${costText(upgradeCost(lb))}` : '';
+    ctx.prompt = `<b>${d.name}</b>　Lv.${lv}${lv >= MAX_LV ? '（满级）' : ''} · 耐久 ${Math.ceil(lb.hp)}/${Math.round(lb.maxHp)}${d.power < 0 ? (lb.powered ? ' · <span class="okc">供电中</span>' : ' · <span class="badc">停电</span>') : ''}${up}<br><kbd>X</kbd>${demolishArm > 0 ? '<span class="badc">再按一次确认拆除（返还 50%）</span>' : '拆除'}`;
+    if (lb.broken) ctx.prompt = ctx.prompt.replace('</b>', '</b> <span class="badc">受损停机 · 白天自动修复</span>');
+    if (input.hit('KeyU') && canUpgrade(lb)) {
+      if (upgradeBuilding(lb)) toast(`${d.name} 升级到 Lv.${lb.level}`, 'star', 'good');
+      else { audio.play('deny'); toast('升级材料不足', 'warn', 'warn'); }
+    }
     if (input.hit('KeyX')) {
       if (demolishArm > 0) { destroyBuilding(lb, true); demolishArm = 0; toast(`已拆除 ${d.name}`); }
       else demolishArm = 2;

@@ -309,6 +309,20 @@ function towerMat(seed) {
 const tm = [towerMat(7), towerMat(31)];
 
 Object.assign(BUILD_MODELS, {
+  drones(g, a) {
+    foundation(g, 3.8, true);
+    mk(box(7.4, 0.5, 7.4), M.panel, 0, 0.25, 0, g);
+    for (const [x, z] of [[-1.9, -1.9], [1.9, -1.9], [-1.9, 1.9], [1.9, 1.9]]) {
+      mk(cyl(1.1, 1.1, 0.1, 16), M.dark, x, 0.55, z, g);
+      mk(new THREE.RingGeometry(0.75, 0.9, 20), M.orange, x, 0.62, z, g).rotation.x = -Math.PI / 2;
+    }
+    mk(box(1.2, 4, 1.2), M.white, 3.0, 2.2, 3.0, g);
+    mk(box(1.25, 0.3, 1.25), M.orange, 3.0, 3.6, 3.0, g);
+    const dish = new THREE.Group(); dish.position.set(3.0, 4.6, 3.0); g.add(dish);
+    const d = mk(new THREE.SphereGeometry(0.9, 12, 6, 0, Math.PI * 2, 0, Math.PI / 3), M.white, 0, 0, 0, dish); d.rotation.x = Math.PI * 0.6;
+    mk(cyl(0.05, 0.05, 0.8, 4), M.metal, 0, 0.1, 0.2, dish).rotation.x = 1.1;
+    a.dish = dish; a.light = glow(0x7fe6ff, 1.4, g, 3.0, 5.4, 3.0);
+  },
   apartment(g, a) {
     foundation(g, 4.4, true);
     mk(box(8, 1, 8), M.panel, 0, 0.5, 0, g);
@@ -375,3 +389,19 @@ Object.assign(BUILD_MODELS, {
     a.top = glow(0xffffff, 8, g, 0, 33, 0);
   },
 });
+
+// 采矿无人机
+export function makeDrone() {
+  const g = new THREE.Group();
+  const body = mk(new THREE.SphereGeometry(0.42, 14, 8), M.white, 0, 0, 0, g); body.scale.y = 0.55;
+  mk(cyl(0.44, 0.44, 0.08, 14), M.orange, 0, 0, 0, g);
+  const rotors = [];
+  for (let i = 0; i < 4; i++) {
+    const an = i * Math.PI / 2 + Math.PI / 4, x = Math.cos(an) * 0.7, z = Math.sin(an) * 0.7;
+    mk(box(0.6, 0.05, 0.08), M.dark, x * 0.55, 0, z * 0.55, g).rotation.y = -an;
+    const r = mk(cyl(0.28, 0.28, 0.02, 10), new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.45 }), x, 0.08, z, g);
+    rotors.push(r);
+  }
+  const eye = glow(0x7fe6ff, 0.9, g, 0, -0.2, 0);
+  return { group: g, rotors, eye };
+}

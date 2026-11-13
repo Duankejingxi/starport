@@ -13,31 +13,50 @@
 <canvas id="c"></canvas>
 
 <div id="hud">
-  <div id="tl">
-    <div class="hidden"><span id="pl-en"></span><span id="pl-cn"></span></div>
-    <div id="city"></div>
-    <div id="res"></div>
-    <div id="colony"></div>
+  <div id="tl" class="curve-l">
+    <section class="panel" id="p-colony">
+      <header class="ph"><span>殖民地</span><span id="pl-cn"></span></header>
+      <div id="city"></div>
+      <div id="colony"></div>
+    </section>
+    <section class="panel" id="p-res">
+      <header class="ph"><span>物资</span><span class="en">CARGO</span></header>
+      <div id="res"></div>
+    </section>
   </div>
   <div id="tc">
     <div id="compass"></div>
     <div id="clock"></div>
+    <div id="bossbar" class="hidden"><div class="bn"><span>晶母</span><small>CRYSTAL MOTHER</small></div><div class="bt"><i></i></div></div>
     <div id="toasts"></div>
   </div>
-  <div id="tr">
-    <div id="mm-wrap"><canvas id="minimap" width="200" height="200"></canvas><span class="mm-n">N</span></div>
-    <div id="goals"></div>
+  <div id="tr" class="curve-r">
+    <section class="panel nav">
+      <div id="mm-wrap"><canvas id="minimap" width="200" height="200"></canvas></div>
+      <div id="pl-en"></div>
+    </section>
+    <section class="panel" id="p-goals">
+      <header class="ph"><span>当前任务</span><span id="goal-ch"></span></header>
+      <div id="goals"></div>
+    </section>
   </div>
   <div id="crosshair"><i></i></div>
   <div id="prompt"></div>
   <div id="buildhint"></div>
   <div id="feed"></div>
   <div id="radio"><div class="wave"><i></i><i></i><i></i><i></i><i></i></div><div class="body"><div class="who"></div><div class="txt"></div></div></div>
-  <div id="bars">
-    <div id="o2-state"></div>
-    <div class="bar" id="bar-hp"><span class="lb">HP</span><div class="tr"><i></i></div><b></b></div>
-    <div class="bar" id="bar-o2"><span class="lb">O<sub>2</sub></span><div class="tr"><i></i></div><b></b></div>
-    <div class="bar" id="bar-en"><span class="lb">EN</span><div class="tr"><i></i></div><b></b></div>
+  <div id="suit" class="curve-l">
+    <svg viewBox="0 0 160 160" class="dial">
+      <circle cx="80" cy="80" r="70" class="trk"/><circle cx="80" cy="80" r="70" class="hp" id="d-hp"/>
+      <circle cx="80" cy="80" r="58" class="trk"/><circle cx="80" cy="80" r="58" class="o2" id="d-o2"/>
+      <circle cx="80" cy="80" r="47" class="trk thin"/><circle cx="80" cy="80" r="47" class="en" id="d-en"/>
+    </svg>
+    <div class="dial-c"><b id="d-o2n">100</b><span>氧气 %</span></div>
+    <div class="suit-side">
+      <div class="row hp"><span>生命</span><b id="d-hpn">100</b></div>
+      <div class="row en"><span>能量</span><b id="d-enn">100</b></div>
+      <div id="o2-state"></div>
+    </div>
   </div>
   <div id="hotbar"></div>
 </div>
@@ -54,9 +73,13 @@
     <nav class="menu">
       <button id="btn-continue" class="hidden"><span class="t">继续</span><small id="cont-info"></small></button>
       <button id="btn-new"><span class="t">开始新的旅程</span></button>
+      <button id="btn-t-help"><span class="t">操作说明</span></button>
+      <button id="btn-t-achv"><span class="t">成就</span></button>
     </nav>
     <div class="note" id="touch-note"></div>
   </div>
+  <aside id="intro-pane" class="hidden"></aside>
+  <div class="telemetry"><span>ARK OS 3.1</span><span id="tele-planet"></span><span>信号 · 稳定</span></div>
   <div class="story hidden" id="story"></div>
   <div class="kick-hidden hidden"><span id="kick-planet"></span></div>
 </div>

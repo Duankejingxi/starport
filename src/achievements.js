@@ -28,6 +28,9 @@ export const ACHV = [
   { id: 'civ', name: '星际文明', desc: '建成文明纪念碑', icon: 'monument', check: () => G.stats.built.monument > 0 },
   { id: 'relic', name: '回声', desc: '发现第一处遗迹', icon: 'radio', check: () => relicCount().found > 0 },
   { id: 'archaeo', name: '考古学家', desc: '发现一颗星球上的全部遗迹', icon: 'book', check: () => { const c = relicCount(); return c.total > 0 && c.found === c.total; } },
+  { id: 'boss', name: '晶母陨落', desc: '在晶潮之夜击败晶母', icon: 'boss', check: () => (G.stats.bossKills || 0) > 0 },
+  { id: 'fleet', name: '无人机舰队', desc: '无人机运回 30 批物资', icon: 'drone', check: () => (G.stats.droneHauls || 0) >= 30 },
+  { id: 'lv3', name: '精益求精', desc: '把一座建筑升到 3 级', icon: 'star', check: () => G.buildings.some(b => (b.level || 1) >= 3) },
   { id: 'photo', name: '摄影师', desc: '使用拍照模式', icon: 'camera', check: () => !!G.usedPhoto },
 ];
 

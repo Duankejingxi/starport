@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { G, canAfford, pay } from './state.js';
-import { BUILD_MODELS, M, CITY_MATS } from './models.js';
+import { BUILD_MODELS, M, CITY_MATS, glow } from './models.js';
 import { P, PID, META } from './planets.js';
 import { LEVELS, inTerritory } from './city.js';
 import { connectBuilding, removeRoads, updateRoads } from './roads.js';
+import { updateDrones, removeHubDrones } from './drones.js';
 import { getHeight, slopeAt, HALF } from './terrain.js';
 import { fx } from './fx.js';
 import { audio } from './audio.js';
@@ -19,6 +20,7 @@ export const DEFS = {
   extractor:  { name: '水冰提取器', icon: 'water', cat: 'life', chapter: 1, cost: { iron: 16, silicon: 4, ice: 4 }, power: -2, r: 2.8, hp: 160, water: 6, desc: '从地下冻土中钻取水。供 6 人用水。' },
   beacon:     { name: '着陆场', icon: 'ship', cat: 'city', chapter: 1, cost: { iron: 24, silicon: 14 }, power: -1, r: 7.4, hp: 250, desc: '向地球发出信号。条件满足时，移民飞船会在这里降落。' },
   fabricator: { name: '制造工坊', icon: 'wrench', cat: 'industry', chapter: 2, cost: { iron: 22, silicon: 14 }, power: -1, r: 4.6, hp: 220, desc: '靠近按 E 制造武器与装备。' },
+  drones:     { name: '无人机站', icon: 'drone', cat: 'industry', chapter: 2, cost: { iron: 30, silicon: 22 }, power: -3, r: 3.8, hp: 220, desc: '派出采矿无人机，自动采集 100 米内的矿点并运回。升级后无人机更多，满级可采钛。' },
   turret:     { name: '防御炮塔', icon: 'shield', cat: 'defense', chapter: 2, cost: { iron: 22, silicon: 10 }, power: -2, r: 1.9, hp: 200, range: 40, desc: '自动攻击 40 米内的锈蚀蛛。需要电力。' },
   reactor:    { name: '聚变反应堆', icon: 'power', cat: 'industry', chapter: 3, cost: { iron: 40, silicon: 20, titanium: 12 }, power: 20, r: 5.4, hp: 400, desc: '昼夜不停 +20 ⚡。用火星的钛，点亮人类的第二颗太阳。' },
   apartment:  { name: '公寓塔', icon: 'tower', cat: 'city', level: 2, cost: { iron: 40, silicon: 25, titanium: 4 }, power: -3, r: 4.6, hp: 400, housing: 12, life: 12, desc: '可住 12 人。窗户里的灯光，是城市的星空。' },
@@ -28,6 +30,55 @@ export const DEFS = {
   launch:     { name: '星际发射台', icon: 'ship', cat: 'stellar', chapter: 5, level: PID === 'mars' ? 5 : 4, only: 'route', cost: { iron: 160, silicon: 120, titanium: 60, ice: 60 }, power: -15, r: 9.5, hp: 900, desc: '星际航线的起点。靠近按 E 打开星图，前往新的星球或回到已开拓的家园。' },
   monument:   { name: '文明纪念碑', icon: 'monument', cat: 'stellar', level: 5, only: 'final', cost: { iron: 150, silicon: 120, titanium: 80 }, power: -6, r: 6.5, hp: 900, desc: '三颗星球，一个人类。献给所有出发的人。' },
 };
+// —— 建筑等级：产出、耐久、范围随等级提升 ——
+export const MAX_LV = 3;
+const MUL = [1, 1, 1.6, 2.2];
+const NO_UPGRADE = ['lamp', 'beacon', 'fabricator', 'terraformer', 'launch', 'monument'];
+export function canUpgrade(b) { return !NO_UPGRADE.includes(b.type) && (b.level || 1) < MAX_LV; }
+export function stat(b, k) {
+  const d = b.def, lv = b.level || 1, v = d[k];
+  if (!v) return 0;
+  if (k === 'power') return v > 0 ? v * MUL[lv] : v * (1 + 0.25 * (lv - 1));
+  if (k === 'life') return v + 3 * (lv - 1);
+  if (k === 'range') return v + 8 * (lv - 1);
+  if (k === 'hp') return v * (1 + 0.5 * (lv - 1));
+  return Math.round(v * MUL[lv]);
+}
+export function upgradeCost(b) {
+  const lv = b.level || 1, c = {};
+  for (const k in b.def.cost) c[k] = Math.ceil(b.def.cost[k] * (lv === 1 ? 0.8 : 1.3));
+  c.titanium = (c.titanium || 0) + (lv === 1 ? 3 : 8);
+  return c;
+}
+export function upgradeBuilding(b) {
+  if (!canUpgrade(b)) return false;
+  const cost = upgradeCost(b);
+  if (!canAfford(cost)) return false;
+  pay(cost);
+  b.level = (b.level || 1) + 1;
+  applyLevel(b, true);
+  audio.play('place');
+  fx.ring(new THREE.Vector3(b.x, b.y, b.z), b.def.r * 1.2, 60, [0.5, 0.9, 1]);
+  recalcColony();
+  return true;
+}
+function applyLevel(b, animate) {
+  const lv = b.level || 1;
+  b.maxHp = stat(b, 'hp'); b.hp = Math.min(b.maxHp, animate ? b.maxHp : b.hp);
+  const s = 1 + (lv - 1) * 0.12;
+  b.group.scale.set(s, b.group.scale.y, s);
+  b.baseScale = s;
+  // 屋顶等级灯
+  if (b.anim._pips) b.anim._pips.forEach(p => b.group.remove(p));
+  b.anim._pips = [];
+  const top = Math.max(2.5, b.def.r * 0.9);
+  for (let i = 1; i < lv; i++) b.anim._pips.push(glow(0xffb35c, 1.4, b.group, (i - lv / 2) * 0.9, top + 1.2, 0));
+  if (animate) {
+    b.buildT = 0.35;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(b.def.r * 1.05, 0.08, 6, 48), scanMat.clone());
+    ring.rotation.x = Math.PI / 2; ring.position.set(b.x, b.y, b.z); G.scene.add(ring); b.anim._scan = ring;
+  }
+}
 // 某座建筑当前能否建造
 export function unlockState(k) {
   const d = DEFS[k];
@@ -38,12 +89,12 @@ export function unlockState(k) {
   if (d.level && d.level > G.cityLevel) return { ok: false, why: `城市等级达到「${LEVELS[d.level].name}」解锁` };
   return { ok: true };
 }
-export const ORDER = ['solar', 'oxygen', 'lamp', 'habitat', 'greenhouse', 'extractor', 'beacon', 'fabricator', 'turret', 'reactor', 'apartment', 'vfarm', 'lifehub', 'terraformer', 'launch', 'monument'];
+export const ORDER = ['solar', 'oxygen', 'lamp', 'habitat', 'greenhouse', 'extractor', 'beacon', 'fabricator', 'drones', 'turret', 'reactor', 'apartment', 'vfarm', 'lifehub', 'terraformer', 'launch', 'monument'];
 // 停电时的供电优先级
-const PRIORITY = ['oxygen', 'lifehub', 'turret', 'habitat', 'apartment', 'extractor', 'greenhouse', 'vfarm', 'beacon', 'fabricator', 'terraformer', 'launch', 'monument'];
+const PRIORITY = ['oxygen', 'lifehub', 'turret', 'habitat', 'apartment', 'extractor', 'greenhouse', 'vfarm', 'beacon', 'drones', 'fabricator', 'terraformer', 'launch', 'monument'];
 
 const scanMat = new THREE.MeshBasicMaterial({ color: 0x7fe6ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-export function createBuilding(type, x, z, rot = 0, hp, animate = false) {
+export function createBuilding(type, x, z, rot = 0, hp, animate = false, level = 1) {
   const def = DEFS[type];
   const group = new THREE.Group(), anim = {};
   BUILD_MODELS[type](group, anim);
@@ -58,6 +109,9 @@ export function createBuilding(type, x, z, rot = 0, hp, animate = false) {
   const b = { buildT: animate ? 0 : 1, type, def, x, z, y, rot, group, anim, hp: hp ?? def.hp, broken: hp !== undefined && hp <= 0, powered: true, t: Math.random() * 10, cool: 0 };
   b.collider = G.colliders.add({ x, z, r: def.r * (type === 'beacon' ? 0.15 : 0.9), kind: 'building', b });
   // 门口区域可以走进居住穹顶的范围外缘
+  b.level = level;
+  b.maxHp = stat(b, 'hp'); if (hp === undefined) b.hp = b.maxHp;
+  if (level > 1) applyLevel(b, false);
   G.buildings.push(b);
   G.stats.built[type] = (G.stats.built[type] || 0) + 1;
   connectBuilding(b);
@@ -70,6 +124,7 @@ export function destroyBuilding(b, refund = false) {
   G.scene.remove(b.group);
   G.colliders.remove(b.collider);
   removeRoads(b);
+  if (b.type === 'drones') removeHubDrones(b);
   const i = G.buildings.indexOf(b); if (i >= 0) G.buildings.splice(i, 1);
   G.stats.built[b.type] = Math.max(0, (G.stats.built[b.type] || 0) - 1);
   const p = new THREE.Vector3(b.x, b.y + 2, b.z);
@@ -86,32 +141,33 @@ export function recalcColony() {
   let prod = 0, use = 0;
   for (const b of G.buildings) {
     if (b.broken) continue;
-    if (b.def.power > 0) prod += b.type === 'solar' ? b.def.power * solarK : b.def.power;
-    else use -= b.def.power;
+    const pw = stat(b, 'power');
+    if (pw > 0) prod += b.type === 'solar' ? pw * solarK : pw;
+    else use -= pw;
   }
   let budget = prod;
   for (const b of G.buildings) b.powered = b.def.power >= 0 && !b.broken;
   for (const type of PRIORITY) for (const b of G.buildings) {
     if (b.type !== type) continue;
-    if (!b.broken && budget >= -b.def.power) { budget += b.def.power; b.powered = true; }
+    const pw = stat(b, 'power');
+    if (!b.broken && budget >= -pw) { budget += pw; b.powered = true; }
   }
   C.powerProd = prod; C.powerUse = use; C.deficit = use > prod + 0.001;
   C.housing = 0; C.o2 = 0; C.food = 0; C.water = 0;
   for (const b of G.buildings) {
-    if (b.def.housing) C.housing += b.def.housing;
+    C.housing += stat(b, 'housing');
     if (!b.powered) continue;
-    if (b.def.o2) C.o2 += b.def.o2;
-    if (b.def.food) C.food += b.def.food;
-    if (b.def.water) C.water += b.def.water;
+    C.o2 += stat(b, 'o2'); C.food += stat(b, 'food'); C.water += stat(b, 'water');
   }
   C.support = Math.min(C.housing, C.o2, C.food, C.water);
 }
 
 export function lifeSupportAt(p) {
   for (const b of G.buildings) {
-    if (!b.def.life || !b.powered) continue;
+    const life = stat(b, 'life');
+    if (!life || !b.powered) continue;
     const dx = b.x - p.x, dz = b.z - p.z;
-    if (dx * dx + dz * dz < b.def.life * b.def.life) return b;
+    if (dx * dx + dz * dz < life * life) return b;
   }
   return null;
 }
@@ -182,6 +238,7 @@ let recalcT = 0;
 export function updateBuildings(dt, ctx) {
   recalcT -= dt; if (recalcT <= 0) { recalcT = 0.5; recalcColony(); }
   updateRoads();
+  updateDrones(dt);
   const night = G.time.night, now = performance.now() * 0.001;
   M.window.emissiveIntensity = 0.3 + night * 1.6;
   M.lamp.emissiveIntensity = night * 4;
@@ -193,16 +250,16 @@ export function updateBuildings(dt, ctx) {
       // 建造动画：从地面升起，全息光环向上扫描
       b.buildT = Math.min(1, b.buildT + dt / 1.3);
       const t = b.buildT, e = 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
-      b.group.scale.y = Math.max(0.001, e);
+      b.group.scale.y = Math.max(0.001, e) * (b.baseScale || 1);
       const h = Math.max(3, b.def.r * 1.4) * (b.type === 'apartment' || b.type === 'launch' || b.type === 'terraformer' || b.type === 'monument' ? 4 : 1);
       a._scan.position.y = b.y + t * h; a._scan.material.opacity = 0.8 * (1 - t);
       a._scan.scale.setScalar(1 - t * 0.25);
       if (Math.random() < 0.5) fx.spark(new THREE.Vector3(b.x + (Math.random() - 0.5) * b.def.r * 2, b.y + t * h, b.z + (Math.random() - 0.5) * b.def.r * 2), [0.5, 0.9, 1], 1, 2, 0.6);
       if (t >= 1) { G.scene.remove(a._scan); a._scan.geometry.dispose(); delete a._scan; }
     }
-    if (b.hp < b.def.hp && G.time.night < 0.5) {
-      b.hp = Math.min(b.def.hp, b.hp + dt * (b.broken ? 5 : 2));
-      if (b.broken && b.hp >= b.def.hp * 0.5) { b.broken = false; recalcColony(); G.events.emit('toast', `✓ ${b.def.name} 已修复，恢复运转`); }
+    if (b.hp < b.maxHp && G.time.night < 0.5) {
+      b.hp = Math.min(b.maxHp, b.hp + dt * (b.broken ? 5 : 2));
+      if (b.broken && b.hp >= b.maxHp * 0.5) { b.broken = false; recalcColony(); G.events.emit('toast', `✓ ${b.def.name} 已修复，恢复运转`); }
     }
     if (b.broken && Math.random() < dt * 6) fx.dustPuff(new THREE.Vector3(b.x + (Math.random() - 0.5) * b.def.r, b.y + 1.5, b.z + (Math.random() - 0.5) * b.def.r), 1, 0.5, [0.15, 0.13, 0.12]);
     switch (b.type) {
@@ -245,7 +302,7 @@ function updateTurret(b, dt, ctx) {
   a.eye.visible = b.powered;
   if (!b.powered) return;
   b.cool -= dt;
-  let best = null, bd = b.def.range;
+  let best = null, bd = stat(b, 'range');
   for (const e of G.enemies) {
     if (e.dead) continue;
     const d = Math.hypot(e.pos.x - b.x, e.pos.z - b.z);
@@ -261,9 +318,9 @@ function updateTurret(b, dt, ctx) {
     const to = best.pos.clone(); to.y += 1;
     const dir = to.sub(from).normalize();
     from.addScaledVector(dir, 2.2);
-    ctx.shoot(from, dir, 15, 'turret');
+    ctx.shoot(from, dir, 15 * MUL[b.level || 1], 'turret');
     audio.play('turret');
   }
 }
 
-export function serializeBuildings() { return G.buildings.map(b => [b.type, +b.x.toFixed(2), +b.z.toFixed(2), +b.rot.toFixed(3), Math.round(b.hp)]); }
+export function serializeBuildings() { return G.buildings.map(b => [b.type, +b.x.toFixed(2), +b.z.toFixed(2), +b.rot.toFixed(3), Math.round(b.hp), b.level || 1]); }

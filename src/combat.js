@@ -46,15 +46,15 @@ export function updateProjectiles(dt) {
 }
 
 // —— 锈蚀蛛 ——
-export function spawnCrawler(x, z, guardian = false) {
-  const scale = guardian ? 1.35 : 0.85 + Math.random() * 0.35;
+export function spawnCrawler(x, z, guardian = false, boss = false) {
+  const scale = boss ? 3.4 : guardian ? 1.35 : 0.85 + Math.random() * 0.35;
   const m = makeCrawler(scale);
   const y = getHeight(x, z);
   m.group.position.set(x, y, z);
   G.scene.add(m.group);
-  const hp = guardian ? 90 : 36 + G.time.day * 3;
+  const hp = boss ? 1300 + G.time.day * 40 : guardian ? 90 : 36 + G.time.day * 3;
   const e = { ...m, pos: m.group.position, hp, maxHp: hp, scale, guardian, home: guardian ? new THREE.Vector3(x, y, z) : null,
-    awake: !guardian, speed: (guardian ? 5.2 : 4.4) + Math.random() * 1.2, phase: Math.random() * 6, atk: 0, flash: 0, sink: 0, target: null, retarget: 0 };
+    boss, stomp: 4, awake: !guardian, speed: boss ? 3.4 : (guardian ? 5.2 : 4.4) + Math.random() * 1.2, phase: Math.random() * 6, atk: 0, flash: 0, sink: 0, target: null, retarget: 0 };
   G.enemies.push(e);
   return e;
 }
@@ -77,11 +77,22 @@ function killEnemy(e, owner) {
   G.stats.kills++;
   if (e.guardian) G.stats.guardKills = (G.stats.guardKills || 0) + 1;
   // 晶体残骸里含有钛
+  if (e.boss) {
+    G.stats.bossKills = (G.stats.bossKills || 0) + 1;
+    G.res.titanium += 40; G.res.silicon += 40;
+    G.events.emit('pickup', { type: 'titanium', n: 40, note: '晶母核心' });
+    G.events.emit('bossDown');
+    fx.burst(p, [1, 0.5, 0.15], 200, 20); fx.ring(new THREE.Vector3(e.pos.x, e.pos.y, e.pos.z), 4, 120, [1, 0.5, 0.2]);
+    fx.debris(p, e.inner.children[1].material, 30, 12, 1.4);
+    audio.play('rumble');
+    return;
+  }
   const drop = e.guardian ? 3 : (Math.random() < 0.5 ? 1 : 0);
   if (drop) { G.res.titanium += drop; G.stats.mined.titanium += drop; G.events.emit('pickup', { type: 'titanium', n: drop, note: '晶体残骸' }); }
 }
 
-let spawnT = 0, nightBudget = 0, wasNight = false, guardT = 5;
+let spawnT = 0, nightBudget = 0, wasNight = false, guardT = 5, bossT = -1;
+export function bossAlive() { return G.enemies.find(e => e.boss && !e.dead); }
 function colonyCenter() {
   if (!G.buildings.length) return new THREE.Vector3(0, 0, 0);
   const c = new THREE.Vector3();
@@ -95,10 +106,24 @@ export function updateEnemies(dt) {
   const threat = G.chapter >= THREAT_FROM && G.terraform < 1;
   if (night && !wasNight && threat) {
     nightBudget = Math.min(3 + (G.nightsSurvived || 0) * 2 + Math.floor(G.colony.pop / 4), 26);
+    // 晶潮之夜：每第 4 个夜晚，数量翻倍，晶母现身
+    const tide = (G.nightsSurvived || 0) % 4 === 3;
+    if (tide) { nightBudget = Math.min(Math.round(nightBudget * 1.8), 40); bossT = 25; }
     G.nightsSurvived = (G.nightsSurvived || 0) + 1;
-    G.events.emit('nightfall', nightBudget);
+    G.events.emit(tide ? 'tide' : 'nightfall', nightBudget);
   }
   wasNight = night;
+  if (bossT > 0 && night) {
+    bossT -= dt;
+    if (bossT <= 0) {
+      const c = colonyCenter(), a = Math.random() * Math.PI * 2;
+      const x = THREE.MathUtils.clamp(c.x + Math.cos(a) * 130, -HALF + 180, HALF - 180), z = THREE.MathUtils.clamp(c.z + Math.sin(a) * 130, -HALF + 180, HALF - 180);
+      const b = spawnCrawler(x, z, false, true); b.sink = -6;
+      fx.ring(new THREE.Vector3(x, getHeight(x, z), z), 6, 140); fx.dustPuff(new THREE.Vector3(x, getHeight(x, z), z), 60, 12);
+      audio.play('rumble');
+      G.events.emit('bossSpawn');
+    }
+  }
   if (night && threat && nightBudget > 0) {
     spawnT -= dt;
     if (spawnT <= 0) {
@@ -193,9 +218,20 @@ export function updateEnemies(dt) {
       e.atk -= dt;
       if (e.atk <= 0) {
         e.atk = 1.0;
-        if (t.kind === 'player') G.player.damage(e.guardian ? 14 : 9, e.pos);
-        else { t.b.hp -= e.guardian ? 20 : 8; fx.spark(new THREE.Vector3(e.pos.x, e.pos.y + 1, e.pos.z), [1, 0.5, 0.2], 8, 5); if (t.b.hp <= 0) { t.b.hp = 0; t.b.broken = true; e.retarget = 0; G.events.emit('broken', t.b); recalcColony(); } }
+        if (t.kind === 'player') G.player.damage(e.boss ? 30 : e.guardian ? 14 : 9, e.pos);
+        else { t.b.hp -= e.boss ? 70 : e.guardian ? 20 : 8; fx.spark(new THREE.Vector3(e.pos.x, e.pos.y + 1, e.pos.z), [1, 0.5, 0.2], 8, 5); if (t.b.hp <= 0) { t.b.hp = 0; t.b.broken = true; e.retarget = 0; G.events.emit('broken', t.b); recalcColony(); } }
         e.inner.position.z = 0.6;
+      }
+    }
+    if (e.boss) {
+      e.stomp -= dt;
+      const dp = Math.hypot(P.x - e.pos.x, P.z - e.pos.z);
+      if (e.stomp <= 0 && dp < 22) {
+        e.stomp = 4.5;
+        fx.ring(new THREE.Vector3(e.pos.x, e.pos.y, e.pos.z), 3, 100, [0.9, 0.45, 0.25]);
+        audio.play('rumble');
+        G.player.landDip = Math.max(G.player.landDip, 0.35);
+        if (dp < 13 && !G.driving) { G.player.damage(18, e.pos); G.player.vel.y = 4; G.player.vel.x += (P.x - e.pos.x) / dp * 8; G.player.vel.z += (P.z - e.pos.z) / dp * 8; }
       }
     }
     e.inner.position.z *= 0.85;
