@@ -460,3 +460,5 @@ export function makeDrone() {
 }
 
 export const CRAWLER_MATS = { crystal: crawlerCrystal, eye: crawlerEye };
+
+BUILD_MODELS._earthTex = earthTexture;

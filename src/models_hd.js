@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { M, glow, BUILD_MODELS } from './models.js';
+import { M, glow, BUILD_MODELS, CITY_MATS } from './models.js';
 
 // ================= 高精度建模工具 =================
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -432,6 +432,182 @@ Object.assign(BUILD_MODELS, {
     mk(rbox(0.5, 0.2, 0.5, 0.03), M.metal, 0, -3.1, -4.6, jib);
     a.jib = jib;
     mk(cyl(0.05, 0.05, 2.4, 6), M.metal, -4.2, 1.6, 4.2, g); a.tip = glow(0x66ff99, 1.0, g, -4.2, 2.9, 4.2);
+  },
+});
+
+// ================= 后期建筑 =================
+Object.assign(BUILD_MODELS, {
+  apartment(g, a) {
+    foundation(g, 4.4, true);
+    const R = rng(91), [w1, w2] = CITY_MATS;
+    mk(rbox(8.6, 0.6, 8.6, 0.15), M.panel, 0, 0.3, 0, g);
+    // 主塔：分段收分 + 楼层线
+    const tower = (x, z, w, h, mat) => {
+      mk(rbox(w, h, w, 0.25), mat, x, 0.6 + h / 2, z, g);
+      for (let y = 2.2; y < h; y += 2.2) mk(new THREE.BoxGeometry(w + 0.08, 0.12, w + 0.08), M.white, x, 0.6 + y, z, g);
+      for (const s of [-1, 1]) { mk(new THREE.BoxGeometry(0.16, h, 0.16), M.metal, x + s * w / 2, 0.6 + h / 2, z + w / 2, g); mk(new THREE.BoxGeometry(0.16, h, 0.16), M.metal, x + s * w / 2, 0.6 + h / 2, z - w / 2, g); }
+    };
+    tower(-1.3, -1.2, 4.6, 17, w1);
+    tower(2.1, 2.0, 3.6, 11, w2);
+    mk(rbox(4.0, 1.2, 4.0, 0.3), M.white, -1.3, 18.2, -1.2, g);
+    mk(rbox(3.0, 0.9, 3.0, 0.3), M.white, 2.1, 12.1, 2.0, g);
+    // 空中连廊
+    mk(rbox(2.6, 1.1, 1.4, 0.4), M.glass, 0.6, 7.4, 0.6, g, 0, Math.PI / 4, 0).castShadow = false;
+    for (const y of [6.9, 7.9]) mk(rbox(2.7, 0.1, 1.5, 0.04), M.metal, 0.6, y, 0.6, g, 0, Math.PI / 4, 0);
+    // 屋顶花园与设备
+    for (let i = 0; i < 6; i++) mk(new THREE.IcosahedronGeometry(0.35 + R() * 0.2, 0), M.leaf2, 1.4 + R() * 1.4, 12.75, 1.3 + R() * 1.4, g);
+    greebles(g, R, 8, -2.8, 0.2, 18.6, 18.9, 0.6);
+    mk(cyl(0.08, 0.1, 4, 8), M.metal, -1.3, 20.8, -1.2, g);
+    a.tip = glow(0xff4040, 1.4, g, -1.3, 22.9, -1.2);
+    // 入口雨棚
+    mk(rbox(2.4, 0.15, 1.6, 0.05), M.orange, -1.3, 3.2, 1.9, g);
+    for (const x of [-2.3, -0.3]) mk(cyl(0.05, 0.05, 2.6, 8), M.metal, x, 1.9, 2.6, g);
+    glow(0xffd9a0, 1.2, g, -1.3, 3.0, 2.2);
+  },
+  vfarm(g, a) {
+    foundation(g, 4);
+    mk(cyl(4, 4.2, 0.8, 40), M.panel, 0, 0.4, 0, g);
+    const glass = mk(cyl(3.3, 3.3, 15, 40, true), M.glass, 0, 8.3, 0, g); glass.castShadow = false;
+    for (let i = 0; i < 8; i++) { const an = i / 8 * Math.PI * 2; mk(new THREE.BoxGeometry(0.14, 15, 0.14), M.white, Math.cos(an) * 3.32, 8.3, Math.sin(an) * 3.32, g); }
+    const R = rng(55);
+    for (let f = 0; f < 6; f++) {
+      const y = 1.4 + f * 2.4;
+      mk(cyl(3.1, 3.1, 0.18, 40), M.white, 0, y, 0, g);
+      mk(new THREE.TorusGeometry(3.15, 0.06, 6, 40), M.metal, 0, y + 0.1, 0, g, Math.PI / 2, 0, 0);
+      mk(cyl(2.8, 2.8, 0.12, 40), M.soil, 0, y + 0.15, 0, g);
+      for (let k = 0; k < 16; k++) { const an = k / 16 * Math.PI * 2 + f; mk(new THREE.IcosahedronGeometry(0.22 + R() * 0.12, 0), k % 2 ? M.leaf : M.leaf2, Math.cos(an) * (1.7 + R() * 0.9), y + 0.4, Math.sin(an) * (1.7 + R() * 0.9), g).castShadow = false; }
+      mk(new THREE.TorusGeometry(2.0, 0.04, 6, 32), M.growlight, 0, y + 2.1, 0, g, Math.PI / 2, 0, 0);
+    }
+    mk(cyl(0.5, 0.5, 15, 16), M.metal, 0, 8.3, 0, g);
+    mk(new THREE.SphereGeometry(3.3, 40, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.glass, 0, 15.8, 0, g).castShadow = false;
+    mk(new THREE.TorusGeometry(3.32, 0.1, 8, 40), M.orange, 0, 15.8, 0, g, Math.PI / 2, 0, 0);
+    tube([V(3.4, 1, 1), V(4.4, 0.6, 1.4), V(5.2, 0.3, 2.2)], 0.1, M.metal, g);
+    a.light = glow(0xff66cc, 8, g, 0, 8, 0);
+  },
+  lifehub(g, a) {
+    foundation(g, 5.8);
+    mk(lathe([[0, 0], [6.0, 0], [6.1, 0.2], [5.8, 1.2], [0, 1.2]], 48), M.panel, 0, 0, 0, g);
+    mk(new THREE.SphereGeometry(4.4, 48, 20, 0, Math.PI * 2, 0, Math.PI / 2), M.white, 0, 1.2, 0, g).scale.y = 0.75;
+    mk(new THREE.TorusGeometry(4.45, 0.18, 10, 48), M.orange, 0, 1.6, 0, g, Math.PI / 2, 0, 0);
+    for (let i = 0; i < 8; i++) { const an = i / 8 * Math.PI * 2; grille(g, 1.0, 0.5, Math.cos(an) * 5.9, 0.6, Math.sin(an) * 5.9, -an + Math.PI / 2, 4); }
+    // 四座循环塔
+    for (let i = 0; i < 4; i++) {
+      const an = i * Math.PI / 2 + Math.PI / 4, x = Math.cos(an) * 5.0, z = Math.sin(an) * 5.0;
+      mk(lathe([[0, 0], [0.95, 0], [1.0, 0.2], [1.0, 4.4], [0.8, 4.8], [0, 4.85]], 28), M.white, x, 0.4, z, g);
+      mk(cyl(1.02, 1.02, 0.3, 28, true), M.cyan, x, 3.6, z, g);
+      ladder(g, x * 1.2, 0.4, z * 1.2, 4.2, -an - Math.PI / 2, 0.4);
+      tube([V(x * 0.8, 2.6, z * 0.8), V(x * 0.6, 2.8, z * 0.6), V(x * 0.45, 2.4, z * 0.45)], 0.12, M.metal, g);
+    }
+    // 顶部大风扇
+    mk(cyl(1.6, 1.8, 0.6, 32), M.dark, 0, 4.4, 0, g);
+    mk(new THREE.TorusGeometry(1.7, 0.08, 6, 32), M.metal, 0, 4.75, 0, g, Math.PI / 2, 0, 0);
+    const fan = new THREE.Group(); fan.position.y = 4.8; g.add(fan);
+    for (let i = 0; i < 5; i++) mk(rbox(1.5, 0.05, 0.4, 0.02), M.metal, Math.cos(i * 1.256) * 0.8, 0, Math.sin(i * 1.256) * 0.8, fan, 0, -i * 1.256, 0.25);
+    a.fan = fan; a.light = glow(0x66ddff, 4, g, 0, 5.2, 0);
+  },
+  plaza(g, a) {
+    foundation(g, 7.2);
+    mk(lathe([[0, 0], [7.3, 0], [7.4, 0.1], [7.2, 0.4], [0, 0.4]], 64), M.found, 0, 0, 0, g);
+    for (let r = 2.5; r < 7; r += 1.5) mk(new THREE.TorusGeometry(r, 0.03, 4, 64), M.metal, 0, 0.41, 0, g, Math.PI / 2, 0, 0);
+    mk(new THREE.RingGeometry(5.4, 5.75, 64), M.orange, 0, 0.42, 0, g, -Math.PI / 2, 0, 0);
+    mk(lathe([[0, 0], [2.1, 0], [2.0, 0.3], [1.5, 0.5], [1.4, 1.3], [1.6, 1.45], [0, 1.45]], 40), M.white, 0, 0.4, 0, g);
+    mk(new THREE.TorusGeometry(1.55, 0.06, 8, 40), M.cyan, 0, 1.85, 0, g, Math.PI / 2, 0, 0);
+    // 弧形长椅与灯柱
+    for (let i = 0; i < 6; i++) {
+      const an = i * Math.PI / 3 + Math.PI / 6;
+      const b = new THREE.Group(); b.position.set(Math.cos(an) * 5.0, 0.4, Math.sin(an) * 5.0); b.rotation.y = -an + Math.PI / 2; g.add(b);
+      mk(rbox(2.2, 0.12, 0.6, 0.05), M.panel, 0, 0.45, 0, b); mk(rbox(2.2, 0.5, 0.1, 0.04), M.panel, 0, 0.75, 0.28, b);
+      for (const x of [-0.9, 0.9]) mk(rbox(0.1, 0.45, 0.5, 0.03), M.metal, x, 0.22, 0, b);
+      const la = an + 0.52;
+      mk(lathe([[0, 0], [0.18, 0], [0.12, 0.2], [0.06, 0.3], [0.05, 3.4], [0, 3.4]], 12), M.metal, Math.cos(la) * 6.6, 0.4, Math.sin(la) * 6.6, g);
+      mk(new THREE.SphereGeometry(0.2, 12, 8), M.lamp, Math.cos(la) * 6.6, 3.95, Math.sin(la) * 6.6, g);
+      glow(0xffd9a0, 1.1, g, Math.cos(la) * 6.6, 3.95, Math.sin(la) * 6.6);
+    }
+    const earth = mk(new THREE.SphereGeometry(1.5, 40, 24), new THREE.MeshBasicMaterial({ map: BUILD_MODELS._earthTex ? BUILD_MODELS._earthTex() : null, color: 0x9fe6ff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }), 0, 4.0, 0, g);
+    earth.castShadow = false;
+    for (let i = 0; i < 2; i++) { const o = mk(new THREE.TorusGeometry(2.0 + i * 0.3, 0.015, 4, 64), M.cyan, 0, 4.0, 0, g, Math.PI / 2 + 0.3 - i * 0.6, 0, 0); o.castShadow = false; }
+    const halo = glow(0x66c8ff, 5, g, 0, 4.0, 0);
+    mk(new THREE.CylinderGeometry(1.1, 1.5, 2.2, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0x7fe6ff, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), 0, 2.95, 0, g).castShadow = false;
+    a.earth = earth; a.halo = halo;
+  },
+  drones(g, a) {
+    foundation(g, 3.8, true);
+    mk(rbox(7.6, 0.5, 7.6, 0.12), M.panel, 0, 0.25, 0, g);
+    hazard(g, 7.6, 0.14, 0, 0.42, 3.81); hazard(g, 7.6, 0.14, 0, 0.42, -3.81);
+    for (const [x, z] of [[-1.9, -1.9], [1.9, -1.9], [-1.9, 1.9], [1.9, 1.9]]) {
+      mk(cyl(1.15, 1.2, 0.12, 32), M.dark, x, 0.56, z, g);
+      mk(new THREE.RingGeometry(0.8, 0.95, 32), M.orange, x, 0.63, z, g, -Math.PI / 2, 0, 0);
+      for (let k = 0; k < 4; k++) { const an = k * Math.PI / 2; mk(cyl(0.06, 0.06, 0.06, 8), M.lamp, x + Math.cos(an) * 1.05, 0.64, z + Math.sin(an) * 1.05, g); }
+    }
+    // 控制塔
+    mk(rbox(1.4, 4.2, 1.4, 0.15), M.white, 3.0, 2.4, 3.0, g);
+    mk(rbox(1.6, 0.9, 1.6, 0.15), M.glass, 3.0, 4.6, 3.0, g).castShadow = false;
+    mk(rbox(1.7, 0.15, 1.7, 0.05), M.orange, 3.0, 5.1, 3.0, g);
+    ladder(g, 3.0, 0.5, 2.25, 4.0, 0, 0.4);
+    const dish = new THREE.Group(); dish.position.set(3.0, 5.5, 3.0); g.add(dish);
+    const d = mk(new THREE.SphereGeometry(0.9, 24, 8, 0, Math.PI * 2, 0, Math.PI / 3), M.white, 0, 0.2, 0, dish); d.rotation.x = Math.PI * 0.6;
+    mk(cyl(0.04, 0.04, 0.8, 6), M.metal, 0, 0.3, 0.25, dish).rotation.x = 1.1;
+    a.dish = dish; a.light = glow(0x7fe6ff, 1.2, g, 3.0, 6.3, 3.0);
+    mk(rbox(1.6, 1.0, 1.0, 0.08), M.dark, -3.0, 1.0, 3.0, g); grille(g, 1.0, 0.6, -3.0, 1.0, 3.51, 0, 5);
+  },
+  terraformer(g, a) {
+    foundation(g, 7);
+    mk(lathe([[0, 0], [7.4, 0], [7.5, 0.3], [7.0, 2.0], [5.5, 2.4], [0, 2.4]], 6), M.panel, 0, 0, 0, g);
+    // 主塔：收分的六棱柱，带分段
+    mk(lathe([[0, 0], [4.4, 0], [3.8, 8], [3.0, 16], [2.3, 24], [1.6, 28], [0, 28.5]], 6), M.white, 0, 2.4, 0, g);
+    for (const y of [6, 14, 22]) mk(new THREE.TorusGeometry(4.6 - y * 0.11, 0.3, 6, 6), M.orange, 0, 2.4 + y, 0, g, Math.PI / 2, 0, Math.PI / 6);
+    for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3; rod(V(Math.cos(an) * 7, 2, Math.sin(an) * 7), V(Math.cos(an) * 3.5, 14, Math.sin(an) * 3.5), 0.35, M.metal, g); }
+    for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3 + Math.PI / 6; grille(g, 1.4, 2.4, Math.cos(an) * 4.0, 5, Math.sin(an) * 4.0, -an + Math.PI / 2, 8); }
+    a.rings = [];
+    for (let i = 0; i < 3; i++) { const r = mk(new THREE.TorusGeometry(6 - i * 1.2, 0.22, 10, 64), M.cyan, 0, 10 + i * 8, 0, g); r.castShadow = false; a.rings.push(r); }
+    mk(cyl(1.2, 1.6, 2, 24), M.dark, 0, 31.5, 0, g);
+    const beam = mk(new THREE.CylinderGeometry(0.6, 1.4, 400, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x66e6ff, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), 0, 232, 0, g);
+    beam.castShadow = false; beam.receiveShadow = false;
+    a.beam = beam; a.top = glow(0x66e6ff, 9, g, 0, 32.5, 0);
+  },
+  launch(g, a) {
+    foundation(g, 9, true);
+    mk(rbox(18.4, 1.2, 18.4, 0.2), M.found, 0, 0.6, 0, g);
+    mk(new THREE.RingGeometry(4.8, 5.8, 48), M.orange, 0, 1.22, 0, g, -Math.PI / 2, 0, 0);
+    mk(cyl(3.6, 3.6, 0.3, 32), M.dark, 0, 1.3, 0, g);
+    hazard(g, 18.4, 0.2, 0, 1.25, 9.21);
+    // 发射塔架：桁架
+    const tw = new THREE.Group(); tw.position.set(7.5, 1.2, 0); g.add(tw);
+    for (const [x, z] of [[-1.5, -1.5], [1.5, -1.5], [1.5, 1.5], [-1.5, 1.5]]) rod(V(x, 0, z), V(x, 34, z), 0.14, M.orange, tw);
+    for (let y = 0; y < 34; y += 2.5) for (const [ax, az, bx, bz] of [[-1.5, -1.5, 1.5, -1.5], [1.5, -1.5, 1.5, 1.5], [1.5, 1.5, -1.5, 1.5], [-1.5, 1.5, -1.5, -1.5]]) { rod(V(ax, y, az), V(bx, y + 2.5, bz), 0.04, M.metal, tw); rod(V(ax, y, az), V(bx, y, bz), 0.05, M.metal, tw); }
+    for (const y of [12, 24]) { mk(rbox(4.2, 0.4, 1.0, 0.06), M.dark, -3.2, y, 0, tw); rod(V(-1.5, y, 0), V(-5, y, 0), 0.06, M.metal, tw); }
+    // 殖民舰
+    const ship = new THREE.Group(); ship.position.y = 1.4; g.add(ship);
+    mk(lathe([[0, 0], [2.6, 0.2], [2.8, 2], [2.7, 22], [2.4, 25], [1.6, 29], [0.6, 31.5], [0, 32]], 40), M.white, 0, 0, 0, ship);
+    for (const y of [8, 19]) mk(cyl(2.79, 2.79, 1.2, 40, true), M.orange, 0, y, 0, ship);
+    for (const y of [4, 12, 16, 23]) mk(new THREE.TorusGeometry(2.76, 0.04, 6, 40), M.metal, 0, y, 0, ship, Math.PI / 2, 0, 0);
+    for (let i = 0; i < 4; i++) porthole(ship, Math.cos(i * 1.57) * 2.62, 25.5, Math.sin(i * 1.57) * 2.62, 0.3, Math.PI / 2 - i * 1.57, 0);
+    for (let i = 0; i < 4; i++) { const an = i * Math.PI / 2; const f = mk(rbox(0.35, 7, 3.4, 0.1), M.panel, Math.cos(an) * 3.1, 3.5, Math.sin(an) * 3.1, ship); f.rotation.y = -an; }
+    for (let i = 0; i < 5; i++) { const an = i * Math.PI * 2 / 5; mk(lathe([[0.4, 0], [0.6, -0.3], [1.0, -1.4], [0.9, -1.4], [0.5, -0.35]], 20), M.metal, Math.cos(an) * 1.4, 0.2, Math.sin(an) * 1.4, ship); }
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(3, 16, 16, 1, true), M.flame); flame.rotation.x = Math.PI; flame.position.y = -8; flame.visible = false; ship.add(flame);
+    a.ship = ship; a.flame = flame; a.tip = glow(0xffffff, 3, ship, 0, 32.5, 0);
+  },
+  monument(g, a) {
+    foundation(g, 6);
+    for (let i = 0; i < 3; i++) mk(cyl(6.2 - i * 1.2, 6.4 - i * 1.2, 0.6, 8), i % 2 ? M.white : M.panel, 0, 0.3 + i * 0.6, 0, g, 0, Math.PI / 8, 0);
+    // 三面碑，各刻一颗星球
+    const names = ['火星', '木卫二', '开普勒'];
+    for (let i = 0; i < 3; i++) {
+      const an = i * Math.PI * 2 / 3;
+      const slab = new THREE.Group(); slab.position.set(Math.cos(an) * 1.0, 1.8, Math.sin(an) * 1.0); slab.rotation.y = -an + Math.PI / 2; g.add(slab);
+      mk(new THREE.BoxGeometry(1.8, 26, 0.5), M.white, 0, 13, 0, slab, 0, 0, 0).geometry.translate(0, 0, 0);
+      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 512;
+      const c = cv.getContext('2d'); c.fillStyle = '#f0ebe2'; c.fillRect(0, 0, 128, 512);
+      c.fillStyle = '#b8862e'; c.font = '600 54px sans-serif'; c.textAlign = 'center';
+      [...names[i]].forEach((ch, k) => c.fillText(ch, 64, 120 + k * 70));
+      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+      mk(new THREE.PlaneGeometry(1.4, 5.6), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 }), 0, 6, 0.26, slab);
+    }
+    a.rings = [];
+    const cols = [0xff7a2a, 0x66e6ff, 0xa0ff40];
+    for (let i = 0; i < 3; i++) { const r = mk(new THREE.TorusGeometry(3.6 - i * 0.5, 0.12, 10, 64), new THREE.MeshStandardMaterial({ color: 0x111111, emissive: cols[i], emissiveIntensity: 2 }), 0, 16 + i * 4, 0, g); r.castShadow = false; a.rings.push(r); }
+    mk(new THREE.OctahedronGeometry(1.0, 0), M.chrome, 0, 30, 0, g);
+    a.top = glow(0xffffff, 8, g, 0, 30, 0);
   },
 });
 
