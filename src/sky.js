@@ -17,6 +17,7 @@ const PAL = {
   halo: CC(PS.halo),
 };
 let extra = {};
+let envScene, envSky, pmrem, envRT = null, envT = 0;
 // 极光：按星球设定颜色与强度
 const AURORA = { mars: [0.35, [0.2, 0.9, 0.7], [0.3, 0.5, 1.0]], europa: [0.6, [0.4, 0.6, 1.0], [0.8, 0.4, 1.0]], kepler: [1.0, [0.3, 1.0, 0.5], [0.9, 0.3, 0.9]] }[P.id];
 let aurora;
@@ -124,14 +125,19 @@ export function buildSky(scene) {
 
   sun = new THREE.DirectionalLight(0xfff0dd, 3);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(G.hiShadows ? 4096 : 2048, G.hiShadows ? 4096 : 2048);
   const sc2 = sun.shadow.camera; sc2.left = -70; sc2.right = 70; sc2.top = 70; sc2.bottom = -70; sc2.near = 1; sc2.far = 400;
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.6;
   scene.add(sun, sun.target);
   hemi = new THREE.HemisphereLight(0xffd2b0, 0x5a2c1a, 1);
   amb = new THREE.AmbientLight(0x404a70, 0.3);
   scene.add(hemi, amb);
-  scene.fog = new THREE.Fog(0xd8a070, 120, 900);
+  scene.fog = new THREE.FogExp2(0xd8a070, 0.0016);
+  // 环境反射：用只含天空的小场景生成 PMREM
+  envScene = new THREE.Scene();
+  envSky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), skyMat);
+  envScene.add(envSky);
+  pmrem = new THREE.PMREMGenerator(G.renderer);
 }
 
 export function updateSky(dt, camPos) {
@@ -189,7 +195,7 @@ export function updateSky(dt, camPos) {
   sun.position.copy(camPos).addScaledVector(sunDir, 200);
   sun.target.position.copy(camPos);
   // 阴影贴图按 texel 对齐，避免移动时闪烁
-  hemi.intensity = lerp(0.55, 1.1, dayK) * (1 - storm * 0.3);
+  hemi.intensity = lerp(0.45, 0.8, dayK) * (1 - storm * 0.3);
   hemi.color.copy(hor).lerp(top, 0.3).lerp(MOON, T.night * 0.85);
   if (P.id === 'europa') hemi.color.lerp(JUP, 0.6);
   hemi.groundColor.setRGB(lerp(0.05, 0.38, dayK), lerp(0.04, 0.18, dayK), lerp(0.05, 0.10, dayK));
@@ -197,8 +203,16 @@ export function updateSky(dt, camPos) {
 
   // 雾
   G.scene.fog.color.copy(hor);
-  G.scene.fog.near = lerp(120, 12, storm);
-  G.scene.fog.far = lerp(lerp(900, 380, T.night), 90, storm);
+  G.scene.fog.density = lerp(lerp(0.0016, 0.0032, T.night), 0.03, storm) * (P.id === 'europa' ? 0.55 : 1);
+  const nowMs = performance.now();
+  if (nowMs - envT > 4000 || !envRT) {
+    envT = nowMs;
+    const old = envRT;
+    envRT = pmrem.fromScene(envScene, 0.04, 1, 1000);
+    G.scene.environment = envRT.texture;
+    G.scene.environmentIntensity = lerp(0.85, 0.35, T.night);
+    if (old) old.dispose();
+  }
   G.renderer.toneMappingExposure = lerp(1.0, 1.4, T.night);
 }
 

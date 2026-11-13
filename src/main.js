@@ -3,6 +3,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { initPebbles, updatePebbles } from './pebbles.js';
 import { G, ColliderGrid, RES_INFO } from './state.js';
 import { buildTerrain, makeMapCanvas, getHeight, applyTerraform, floraMat } from './terrain.js';
 import { buildSky, updateSky } from './sky.js';
@@ -23,7 +25,7 @@ import { ic } from './icons.js';
 import { initRelics, updateRelics, relicAt, discover } from './relics.js';
 import { initCompanion, updateCompanion } from './companion.js';
 import { input, initInput } from './input.js';
-import { makeLander } from './models.js';
+import { makeLander, M as MAT, glow } from './models.js';
 import { P, PID, PLANETS, SAVE_KEY, META, saveMeta, loadMeta, clearAll } from './planets.js';
 import { initCity, updateCity, LEVELS } from './city.js';
 import { spawnRover, getRover, roverState, enterRover, exitRover, updateRover, roverSpeed } from './rover.js';
@@ -61,12 +63,34 @@ function setupComposer() {
   bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.5, 0.88);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  // 电影调色：轻微对比、暖高光冷阴影、暗角、胶片颗粒、边缘色散
+  grade = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, uT: { value: 0 }, uNight: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uT, uNight; varying vec2 vUv;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uT) * 43758.5453); }
+      void main(){
+        vec2 d = vUv - 0.5; float r2 = dot(d, d);
+        vec2 off = d * r2 * 0.012;
+        vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+        float l = dot(c, vec3(0.299, 0.587, 0.114));
+        c = mix(vec3(l), c, 1.08);
+        c = (c - 0.5) * 1.06 + 0.5;
+        c += mix(vec3(-0.012, 0.0, 0.025), vec3(0.03, 0.012, -0.02), smoothstep(0.2, 0.8, l));
+        c *= 1.0 - r2 * mix(0.55, 0.8, uNight);
+        c += (h(vUv * 917.0) - 0.5) * mix(0.022, 0.04, uNight);
+        gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+      }`,
+  });
+  composer.addPass(grade);
 }
+let grade = null;
 function renderScene() {
   if (quality === 'high' && composer) {
     // 夜里泛光更强，白天收敛，避免天空过曝
     bloom.strength = 0.3 + G.time.night * 0.22;
     bloom.threshold = 0.9;
+    grade.uniforms.uT.value = (performance.now() * 0.001) % 100; grade.uniforms.uNight.value = G.time.night;
     composer.render();
   } else renderer.render(scene, camera);
 }
@@ -84,6 +108,7 @@ window.addEventListener('resize', () => {
 });
 
 // —— 世界生成 ——
+G.hiShadows = quality === 'high';
 buildSky(scene);
 buildTerrain(scene);
 initFx(scene);
@@ -197,10 +222,11 @@ function begin(fromSave) {
     }
     G.time.t = 0.29; // 清晨
     startChapter(0, true);
-    playCine(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); });
+    playCine(() => playLanding(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); }));
   }
   initRelics();
   initCompanion();
+  if (quality !== 'low') initPebbles();
   $('intro').classList.add('hidden');
   document.body.classList.add('playing');
   G.started = true;
@@ -558,12 +584,89 @@ function snapshot() {
   G.stats.photos = (G.stats.photos || 0) + 1;
 }
 
+// —— 开场着陆：镜头看着着陆舱从天而降，落地后推进到第一人称 ——
+let landing = null;
+const DESCENT = 9.5;
+function playLanding(done) {
+  if (G.debug && !/landing/.test(location.search)) { done(); return; }
+  G.cine = true; document.body.classList.add('cinema');
+  const lg = lander.group, gy = getHeight(LANDER_POS.x, LANDER_POS.z) + 0.1;
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(1.7, 10, 18, 1, true), MAT.flame);
+  flame.rotation.x = Math.PI; flame.position.y = -4.2; lg.add(flame);
+  const fglow = glow(0xffa040, 22, lg, 0, -0.5, 0);
+  const lamp = new THREE.PointLight(0xffa050, 0, 120, 1.4); lamp.position.y = -2; lg.add(lamp);
+  const camAt = new THREE.Vector3(LANDER_POS.x + 20, 0, LANDER_POS.z + 25);
+  camAt.y = getHeight(camAt.x, camAt.z) + 3.2;
+  G.time.t = 0.282;
+  landing = { t: 0, gy, flame, fglow, lamp, done, camAt, landed: false, shake: 0 };
+  lg.position.y = gy + 460;
+  audio.play('rumble'); audio.engine(1);
+  const skip = e => { if (e.type === 'mousedown' || e.code === 'Space' || e.code === 'Escape') { landing.t = Math.max(landing.t, DESCENT + 6); } };
+  landing.skip = skip;
+  window.addEventListener('keydown', skip); window.addEventListener('mousedown', skip);
+}
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler(), _m = new THREE.Matrix4();
+function updateLanding(dt) {
+  const L = landing; L.t += dt;
+  const lg = lander.group;
+  const k = Math.min(1, L.t / DESCENT), e = 1 - Math.pow(1 - k, 2.6);
+  lg.position.y = L.gy + 460 * (1 - e);
+  lg.rotation.z = Math.sin(L.t * 1.1) * 0.05 * (1 - k);
+  const firing = k < 1;
+  L.flame.visible = L.fglow.visible = firing;
+  L.flame.scale.set(1, 0.5 + (1 - e) * 0.9 + Math.random() * 0.15, 1);
+  L.lamp.intensity = firing ? 400 * (0.6 + Math.random() * 0.4) : 0;
+  const alt = lg.position.y - L.gy;
+  if (firing) {
+    const bottom = new THREE.Vector3(lg.position.x, lg.position.y - 1, lg.position.z);
+    for (let i = 0; i < 4; i++) fx.flame(bottom, 1.4);
+    if (alt < 40) for (let i = 0; i < 3; i++) {
+      const a = Math.random() * Math.PI * 2, d = 2 + Math.random() * (14 - alt * 0.25);
+      fx.dustPuff(new THREE.Vector3(LANDER_POS.x + Math.cos(a) * d, L.gy + 0.3, LANDER_POS.z + Math.sin(a) * d), 1, 2);
+    }
+    L.shake = Math.max(L.shake, Math.max(0, 1 - alt / 120) * 0.25);
+  } else if (!L.landed) {
+    L.landed = true; L.shake = 1;
+    fx.ring(new THREE.Vector3(LANDER_POS.x, L.gy, LANDER_POS.z), 4, 160);
+    fx.dustPuff(new THREE.Vector3(LANDER_POS.x, L.gy + 1, LANDER_POS.z), 70, 16);
+    audio.play('land'); audio.play('rumble'); audio.engine(0);
+  }
+  L.shake *= Math.pow(0.15, dt);
+  updateSky(0, camera.position);
+  updateFx(dt, camera.position);
+  // 镜头：先在地面仰望着陆舱，落地后推进到舱门旁的第一人称视角
+  const look = new THREE.Vector3(lg.position.x, lg.position.y + 3, lg.position.z);
+  const t2 = L.t - DESCENT - 2.2;
+  if (t2 < 0) {
+    camera.position.copy(L.camAt);
+    camera.position.x += Math.sin(L.t * 0.15) * 4;
+    camera.lookAt(look);
+  } else {
+    const u = Math.min(1, t2 / 3.2), s = u * u * (3 - 2 * u);
+    const eye = new THREE.Vector3(player.pos.x, player.pos.y + 1.7, player.pos.z);
+    camera.position.lerpVectors(L.camAt, eye, s);
+    _m.lookAt(L.camAt, look, camera.up); _q1.setFromRotationMatrix(_m);
+    _q2.setFromEuler(_e.set(player.pitch, player.yaw, 0, 'YXZ'));
+    camera.quaternion.slerpQuaternions(_q1, _q2, s);
+    if (u >= 1) {
+      lg.remove(L.flame, L.fglow, L.lamp); lg.position.y = L.gy; lg.rotation.z = 0;
+      window.removeEventListener('keydown', L.skip); window.removeEventListener('mousedown', L.skip);
+      document.body.classList.remove('cinema'); G.cine = false; landing = null;
+      audio.engine(0);
+      L.done();
+      return;
+    }
+  }
+  if (L.shake > 0.01) { camera.position.x += (Math.random() - 0.5) * L.shake * 0.5; camera.position.y += (Math.random() - 0.5) * L.shake * 0.4; }
+}
+
 // —— 主循环 ——
 const clock = new THREE.Clock();
 let introCam = 0;
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.05);
+  if (landing) { updateLanding(dt); renderScene(); input.endFrame(); return; }
   if (!G.started) {
     // 标题画面：缓慢环绕着陆舱
     introCam += dt * 0.05;
@@ -614,6 +717,7 @@ function update(dt) {
     updateAmbient(dt);
     updateRelics(dt);
     updateCompanion(dt);
+    updatePebbles();
     if (!G.plazaSeen && G.time.night > 0.6 && G.colonists.filter(c => c.atPlaza && !c.target).length >= 4) {
       G.plazaSeen = true;
       radio('苏念 · 教师', '今晚大家都来了。我们就这样站着，看着那颗蓝色的星球转啊转……孩子问我，那是哪里。我说，那是我们出发的地方。');
@@ -641,6 +745,7 @@ window.__dbg = {
   chapter: i => startChapter(i),
   look(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; },
   begin: () => begin(false),
+  landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
   step(sec, dt = 0.05) { for (let t = 0; t < sec; t += dt) { update(dt); updateFx(dt, camera.position); input.endFrame(); } },
   input,
   save, toast, setGhost, openMenu, closeMenus, tool, placement, rover: getRover,

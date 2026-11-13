@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { P } from './planets.js';
+import { panelSet, brushedSet, concreteSet, rockSet } from './texgen.js';
 
 // 共享材质
 export const M = {
@@ -18,6 +19,21 @@ export const M = {
   found: new THREE.MeshStandardMaterial({ color: 0x8b8378, roughness: 0.9 }),
   flame: new THREE.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }),
 };
+
+// PBR 贴图：让材质有接缝、尘垢与粗糙度变化
+{
+  const pa = panelSet(1, 4), pb = panelSet(5, 3), br = brushedSet(), cc = concreteSet(), dk = panelSet(9, 2);
+  Object.assign(M.white, { ...pa, bumpScale: 1.4, roughness: 0.75, metalness: 0.15, color: new THREE.Color(0xf2ede4) });
+  Object.assign(M.panel, { ...pb, bumpScale: 1.2, roughness: 0.8, metalness: 0.25, color: new THREE.Color(0xcfc8bc) });
+  Object.assign(M.metal, { ...br, roughness: 1, metalness: 0.85, color: new THREE.Color(0x9a9da4) });
+  Object.assign(M.dark, { ...dk, bumpScale: 1, roughness: 0.7, metalness: 0.6, color: new THREE.Color(0x3a3d44) });
+  Object.assign(M.orange, { ...panelSet(3, 2), bumpScale: 0.8, roughness: 0.7, metalness: 0.15 });
+  Object.assign(M.found, { ...cc, bumpScale: 2, roughness: 0.95, color: new THREE.Color(0xa59a8c) });
+  M.glass.roughness = 0.02; M.glass.metalness = 0.1; M.glass.opacity = 0.28; M.glass.envMapIntensity = 2.2;
+  M.solar.roughness = 0.12; M.solar.envMapIntensity = 1.8;
+  for (const k in M) M[k].needsUpdate = true;
+}
+export const ROCK_TEX = rockSet();
 
 // 太阳能板的格子纹理
 {

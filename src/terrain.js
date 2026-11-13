@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { makeNoise2D, fbm, mulberry32, smoothstep, lerp, clamp } from './noise.js';
 import { G } from './state.js';
 import { P } from './planets.js';
+import { ROCK_TEX } from './models.js';
 
 export const WORLD = 1400, HALF = WORLD / 2, SEG = 400, STEP = WORLD / SEG;
 const N = SEG + 1;
@@ -113,7 +114,49 @@ export function buildTerrain(scene) {
   colorAttr = new THREE.BufferAttribute(baseColors.slice(), 3);
   geo.setAttribute('color', colorAttr);
   geo.computeVertexNormals();
-  mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0, flatShading: true }));
+  const tmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0 });
+  tmat.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos; varying vec3 vWN;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vWPos; varying vec3 vWN;
+        float th(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float tn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(th(i), th(i + vec2(1, 0)), f.x), mix(th(i + vec2(0, 1)), th(i + vec2(1, 1)), f.x), f.y); }
+        float tf(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * tn(p); p *= 2.03; a *= 0.5; } return s; }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float camD = distance(cameraPosition, vWPos);
+        float near = 1.0 - smoothstep(25.0, 140.0, camD);
+        float slope = 1.0 - clamp(vWN.y, 0.0, 1.0);
+        float big = tf(vWPos.xz * 0.045);
+        float mid = tf(vWPos.xz * 0.35);
+        float fine = tn(vWPos.xz * 3.1) * 0.6 + tn(vWPos.xz * 7.7) * 0.4;
+        vec3 c = diffuseColor.rgb;
+        c *= 0.86 + big * 0.28;
+        c *= mix(1.0, 0.92 + mid * 0.16, 0.5 + near * 0.5);
+        c *= mix(1.0, 0.93 + fine * 0.14, near);
+        // 陡坡：分层的岩石条纹
+        float strata = 0.5 + 0.5 * sin(vWPos.y * 2.2 + mid * 4.0);
+        c = mix(c, c * (0.72 + strata * 0.3), smoothstep(0.25, 0.6, slope));
+        // 平地：风吹出的浅色沙纹
+        float rip = 0.5 + 0.5 * sin(dot(vWPos.xz, vec2(0.8, 0.35)) * 2.6 + mid * 6.0);
+        c = mix(c, c * 1.12, rip * (1.0 - smoothstep(0.05, 0.25, slope)) * near * 0.45);
+        diffuseColor.rgb = c;`)
+      .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+        {
+          float e = 0.18;
+          vec2 q = vWPos.xz;
+          float h0 = tf(q * 0.6) * 0.5 + tn(q * 5.0) * 0.12;
+          float hx = tf((q + vec2(e, 0.0)) * 0.6) * 0.5 + tn((q + vec2(e, 0.0)) * 5.0) * 0.12;
+          float hz = tf((q + vec2(0.0, e)) * 0.6) * 0.5 + tn((q + vec2(0.0, e)) * 5.0) * 0.12;
+          float k = (1.0 - smoothstep(20.0, 120.0, distance(cameraPosition, vWPos))) * 0.55;
+          vec3 nw = normalize(vWN + vec3(-(hx - h0) / e, 0.0, -(hz - h0) / e) * k);
+          normal = normalize((viewMatrix * vec4(nw, 0.0)).xyz);
+        }`);
+  };
+  mesh = new THREE.Mesh(geo, tmat);
   mesh.receiveShadow = true;
   scene.add(mesh);
   buildRocks(scene);
@@ -130,7 +173,7 @@ function buildRocks(scene) {
   }
   base.computeVertexNormals();
   const COUNT = 2600;
-  const inst = new THREE.InstancedMesh(base, new THREE.MeshStandardMaterial({ color: P.rock, roughness: P.id === 'europa' ? 0.3 : 0.95, flatShading: true }), COUNT);
+  const inst = new THREE.InstancedMesh(base, new THREE.MeshStandardMaterial({ color: P.rock, roughness: P.id === 'europa' ? 0.35 : 0.92, flatShading: true, map: ROCK_TEX.map, bumpMap: ROCK_TEX.bumpMap, bumpScale: 3 }), COUNT);
   inst.castShadow = true; inst.receiveShadow = true;
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), v = new THREE.Vector3(), e = new THREE.Euler();
   const c = new THREE.Color();

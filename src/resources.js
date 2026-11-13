@@ -2,15 +2,15 @@ import * as THREE from 'three';
 import { G } from './state.js';
 import { getHeight, slopeAt, craters, HALF } from './terrain.js';
 import { fx } from './fx.js';
-import { glow } from './models.js';
+import { glow, ROCK_TEX } from './models.js';
 
 const MAT = {
-  iron: new THREE.MeshStandardMaterial({ color: 0x5a3a2e, roughness: 0.45, metalness: 0.75, flatShading: true }),
+  iron: new THREE.MeshStandardMaterial({ color: 0x6a4a3e, roughness: 0.4, metalness: 0.8, flatShading: true, map: ROCK_TEX.map, bumpMap: ROCK_TEX.bumpMap, bumpScale: 4 }),
   ironVein: new THREE.MeshStandardMaterial({ color: 0x9c5a3a, roughness: 0.3, metalness: 0.9, flatShading: true, emissive: 0x3a1408 }),
   ice: new THREE.MeshStandardMaterial({ color: 0xcfeeff, roughness: 0.08, metalness: 0.1, flatShading: true, transparent: true, opacity: 0.9, emissive: 0x16384a }),
   silicon: new THREE.MeshStandardMaterial({ color: 0xf3e1a6, roughness: 0.15, metalness: 0.4, flatShading: true, emissive: 0x2a2208 }),
   titanium: new THREE.MeshStandardMaterial({ color: 0x9b8cff, roughness: 0.1, metalness: 0.5, flatShading: true, emissive: 0x5a3cff, emissiveIntensity: 0.6 }),
-  base: new THREE.MeshStandardMaterial({ color: 0x6e3b26, roughness: 0.95, flatShading: true }),
+  base: new THREE.MeshStandardMaterial({ color: 0x7e4b36, roughness: 0.95, flatShading: true, map: ROCK_TEX.map, bumpMap: ROCK_TEX.bumpMap, bumpScale: 4 }),
 };
 const GLOW = { iron: null, ice: 0x88ddff, silicon: 0xffe6a0, titanium: 0x8a6cff };
 export const NODE_COLOR = { iron: [1, 0.55, 0.3], ice: [0.6, 0.9, 1], silicon: [1, 0.9, 0.55], titanium: [0.7, 0.55, 1] };

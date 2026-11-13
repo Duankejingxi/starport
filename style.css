@@ -444,3 +444,7 @@ body.photo #photo-bar { display: flex; position: fixed; left: 50%; bottom: 3.2vh
 #shutter { display: block; position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 30; }
 #shutter.on { animation: shut .5s; }
 @keyframes shut { 0% { opacity: .85; } 100% { opacity: 0; } }
+body.cinema #hud, body.cinema #visor { display: none; }
+body.cinema #letterbox { display: block; position: fixed; inset: 0; pointer-events: none; z-index: 8; }
+body.cinema #letterbox i { position: absolute; left: 0; right: 0; height: 11vh; background: #000; animation: lb .8s cubic-bezier(.2, .8, .2, 1); }
+body.cinema #letterbox i:first-child { top: 0; } body.cinema #letterbox i:last-child { bottom: 0; }
