@@ -60,6 +60,7 @@ export const audio = {
       case 'hurt': this.tone(160, 0.25, 'sawtooth', 0.15, 0.6); break;
       case 'place': this.tone(220, 0.15, 'triangle', 0.2); this.tone(330, 0.15, 'triangle', 0.2, 0, 0.1); this.tone(440, 0.3, 'triangle', 0.2, 0, 0.2); this.noise(0.4, 600, 0.2); break;
       case 'ui': this.tone(880, 0.05, 'sine', 0.07); this.tone(1320, 0.08, 'sine', 0.04, 0, 0.03); break;
+      case 'scan': this.tone(300, 1.2, 'sine', 0.12, 4); this.tone(600, 0.9, 'triangle', 0.05, 3, 0.1); this.noise(0.8, 2000, 0.05, 'bandpass', 0, 3); break;
       case 'tick': this.tone(2400, 0.02, 'sine', 0.025); break;
       case 'open': this.tone(440, 0.12, 'sine', 0.05, 1.5); this.noise(0.15, 3000, 0.03, 'highpass'); break;
       case 'achv': [523, 784, 1046, 1568].forEach((f, i) => this.tone(f, 0.9, 'triangle', 0.09, 0, i * 0.09)); break;

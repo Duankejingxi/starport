@@ -55,14 +55,14 @@ export function buildSky(scene) {
     const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u);
     if (u < -0.05) continue;
     sp.push(r * Math.cos(th) * 3500, u * 3500, r * Math.sin(th) * 3500);
-    const b = 0.5 + Math.random() * 0.5, tint = Math.random();
+    const b = 0.35 + Math.random() * 0.45, tint = Math.random();
     sc.push(b * (tint > 0.8 ? 1 : 0.85), b * 0.9, b * (tint < 0.2 ? 1 : 0.95));
   }
   // 地球：夜空里一颗明亮的蓝星
   sp.push(-1800, 1500, -2400); sc.push(0.5, 0.75, 1.4);
   sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
   sg.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3));
-  stars = new THREE.Points(sg, new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false, fog: false }));
+  stars = new THREE.Points(sg, new THREE.PointsMaterial({ size: 3, map: glowTex(), sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false, fog: false }));
   stars.frustumCulled = false; stars.renderOrder = -9;
   scene.add(stars);
 

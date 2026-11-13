@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { G, ColliderGrid, RES_INFO } from './state.js';
 import { buildTerrain, makeMapCanvas, getHeight, applyTerraform, floraMat } from './terrain.js';
 import { buildSky, updateSky } from './sky.js';
@@ -17,6 +21,7 @@ import { updateAchievements, achievementsHTML } from './achievements.js';
 import { updateAmbient } from './ambient.js';
 import { ic } from './icons.js';
 import { initRelics, updateRelics, relicAt, discover } from './relics.js';
+import { initCompanion, updateCompanion } from './companion.js';
 import { input, initInput } from './input.js';
 import { makeLander } from './models.js';
 import { P, PID, PLANETS, SAVE_KEY, META, saveMeta, loadMeta, clearAll } from './planets.js';
@@ -46,16 +51,36 @@ function applyQuality(q, live) {
     renderer.shadowMap.enabled = sh;
     if (live) G.scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.needsUpdate = true; }); });
   }
+  if (composer) composer.setPixelRatio(renderer.getPixelRatio()), composer.setSize(window.innerWidth, window.innerHeight);
+}
+// 泛光后期：仅高画质开启
+let composer = null, bloom = null;
+function setupComposer() {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.5, 0.88);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+}
+function renderScene() {
+  if (quality === 'high' && composer) {
+    // 夜里泛光更强，白天收敛，避免天空过曝
+    bloom.strength = 0.3 + G.time.night * 0.22;
+    bloom.threshold = 0.9;
+    composer.render();
+  } else renderer.render(scene, camera);
 }
 applyQuality(quality, false);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 6000);
+setupComposer();
 G.scene = scene; G.camera = camera; G.renderer = renderer;
 G.colliders = new ColliderGrid(16);
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  if (composer) composer.setSize(window.innerWidth, window.innerHeight);
 });
 
 // —— 世界生成 ——
@@ -175,6 +200,7 @@ function begin(fromSave) {
     playCine(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); });
   }
   initRelics();
+  initCompanion();
   $('intro').classList.add('hidden');
   document.body.classList.add('playing');
   G.started = true;
@@ -192,7 +218,7 @@ const HELP = `<h3>操作</h3><div class="keys">
   <div><kbd>左键</kbd><span>采矿 · 射击 · 放置建筑</span></div><div><kbd>右键</kbd><span>取消建造</span></div>
   <div><kbd>1</kbd><kbd>2</kbd><span>切换工具</span></div><div><kbd>B</kbd><span>建造蓝图</span></div>
   <div><kbd>E</kbd><span>互动 · 交谈 · 上车</span></div><div><kbd>U</kbd><span>升级注视的建筑</span></div>
-  <div><kbd>F</kbd><span>手电筒</span></div><div><kbd>Tab</kbd><span>殖民地档案</span></div>
+  <div><kbd>Q</kbd><span>小星扫描矿藏</span></div><div><kbd>F</kbd><span>手电筒</span></div><div><kbd>Tab</kbd><span>殖民地档案</span></div>
   <div><kbd>P</kbd><span>拍照模式</span></div><div><kbd>Esc</kbd><span>暂停</span></div></div>
   <h3>生存</h3><p>氧气会持续消耗。着陆舱、制氧站和居住穹顶附近会自动补氧。建好住房、氧气、食物、水和着陆场，移民飞船就会到来。夜里要提防锈蚀蛛。</p>`;
 const togglePane = html => { const el = $('intro-pane'); if (!el.classList.contains('hidden') && el.dataset.k === html.slice(0, 20)) { el.classList.add('hidden'); return; } el.dataset.k = html.slice(0, 20); el.innerHTML = html; el.classList.remove('hidden'); audio.play('tick'); };
@@ -341,7 +367,7 @@ let launchArm = 0;
 let hintSeen = {}; try { hintSeen = JSON.parse(localStorage.getItem('starport-hints')) || {}; } catch (e) { /* 忽略 */ }
 let hintCur = null, hintT = 0, playT = 0;
 const HINTS = [
-  { id: 'move', text: '<kbd>W A S D</kbd>移动　<kbd>鼠标</kbd>环视　<kbd>Shift</kbd>冲刺　<kbd>空格</kbd>跳跃', when: () => playT > 0.5 && playT < 40 },
+  { id: 'move', text: '<kbd>W A S D</kbd>移动　<kbd>Shift</kbd>冲刺<br><kbd>鼠标</kbd>环视　<kbd>空格</kbd>跳跃', when: () => playT > 0.5 && playT < 40 },
   { id: 'mine', text: '对准发光的矿石，<kbd>按住左键</kbd> 用采矿激光采集', when: () => playT > 6 && G.stats.mined.iron + G.stats.mined.silicon === 0 },
   { id: 'build', text: '资源够了！按 <kbd>B</kbd> 打开建造菜单', when: () => G.buildings.length === 0 && G.res.iron >= 8 && G.res.silicon >= 6 },
   { id: 'o2', text: '氧气在持续消耗。回到着陆舱或制氧站附近会自动补氧', when: () => !player.inLife && player.o2 < player.maxO2 * 0.5 },
@@ -514,7 +540,7 @@ function frame() {
     G.time.t = 0.27 + Math.sin(introCam * 0.5) * 0.01;
     updateSky(0, camera.position);
     updateFx(dt, camera.position);
-    renderer.render(scene, camera);
+    renderScene();
     return;
   }
   if (G.debug) G.locked = true;
@@ -528,7 +554,7 @@ function frame() {
   }
   updateFx(running ? dt : 0, camera.position);
   input.endFrame();
-  renderer.render(scene, camera);
+  renderScene();
   renderViewmodel(renderer);
 }
 function update(dt) {
@@ -553,6 +579,7 @@ function update(dt) {
     updateAchievements(dt);
     updateAmbient(dt);
     updateRelics(dt);
+    updateCompanion(dt);
     const ctx = handleInteraction(dt);
     ctx.tip = hintPrompt(dt);
     updateUI(dt, ctx);
