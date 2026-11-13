@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { G } from './state.js';
 import { has, moraleMul } from './systems.js';
-import { makeColonist, makeShuttle } from './models.js';
+import { makeColonist } from './models.js';
+import { makeShuttleHD as makeShuttle } from './models_hd.js';
 import { getHeight } from './terrain.js';
 import { fx } from './fx.js';
 import { audio } from './audio.js';

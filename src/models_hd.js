@@ -719,3 +719,25 @@ export function makeCrawlerHD(scale, crystalMat, eyeMat) {
   g.scale.setScalar(scale);
   return { group: g, legs, inner };
 }
+
+// ================= 移民运输舱 =================
+export function makeShuttleHD() {
+  const g = new THREE.Group();
+  mk(lathe([[0, 0.6], [1.9, 0.7], [2.5, 1.2], [2.6, 2.0], [2.2, 4.5], [1.6, 6.6], [0.9, 7.8], [0, 8.2]], 40), M.white, 0, 0, 0, g);
+  mk(cyl(2.62, 2.62, 0.5, 40, true), M.orange, 0, 2.2, 0, g);
+  mk(lathe([[0, 0.3], [2.4, 0.35], [2.55, 0.65], [0, 0.7]], 40), M.ablative, 0, 0, 0, g);
+  for (let i = 0; i < 5; i++) porthole(g, Math.cos(i * 1.256) * 2.1, 4.4, Math.sin(i * 1.256) * 2.1, 0.22, Math.PI / 2 - i * 1.256, -0.25);
+  for (let i = 0; i < 3; i++) {
+    const an = i * Math.PI * 2 / 3, c = Math.cos(an), s2 = Math.sin(an);
+    rod(V(c * 2.2, 2.0, s2 * 2.2), V(c * 3.1, 0.1, s2 * 3.1), 0.09, M.chrome, g);
+    mk(cyl(0.45, 0.5, 0.1, 16), M.metal, c * 3.1, 0.05, s2 * 3.1, g);
+    const fin = mk(rbox(0.18, 2.4, 1.4, 0.06), M.panel, c * 2.55, 1.9, s2 * 2.55, g); fin.rotation.y = -an;
+  }
+  for (let i = 0; i < 3; i++) { const an = i * Math.PI * 2 / 3 + 1; mk(lathe([[0.3, 0], [0.45, -0.25], [0.75, -0.9], [0.65, -0.9], [0.35, -0.3]], 20), M.metal, Math.cos(an) * 0.9, 0.35, Math.sin(an) * 0.9, g); }
+  mk(cyl(0.04, 0.04, 1.2, 6), M.metal, 0, 8.6, 0, g);
+  glow(0xff4040, 0.8, g, 0, 9.2, 0);
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(1.4, 6, 14, 1, true), M.flame);
+  flame.rotation.x = Math.PI; flame.position.y = -2.6; g.add(flame);
+  const fg = glow(0xffa040, 9, g, 0, -0.5, 0);
+  return { group: g, flame, flameGlow: fg };
+}

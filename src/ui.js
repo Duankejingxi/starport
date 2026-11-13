@@ -32,7 +32,7 @@ export function initUI(mapCanvas) {
   G.events.on('pickup', p => pickup(p));
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { audio.play('ui'); closeMenus(true); }));
   document.querySelectorAll('.menu button, .bp-tabs button').forEach(b => b.addEventListener('mouseenter', () => audio.play('tick')));
-  try { thumbs = buildingThumbs(ORDER.filter(k => !unlockState(k).hide)); } catch (e) { thumbs = {}; }
+
 }
 
 // —— 通知 ——
@@ -106,7 +106,7 @@ export function openMenu(id) {
   $(id).classList.remove('hidden');
   if (document.pointerLockElement) document.exitPointerLock();
   audio.play('open');
-  if (id === 'build') renderBuild();
+  if (id === 'build') { if (!thumbs.solar) { try { thumbs = buildingThumbs(ORDER.filter(k => !unlockState(k).hide)); } catch (e) { thumbs = {}; } } renderBuild(); }
   if (id === 'craft') renderCraft();
   if (id === 'research') renderResearch();
   if (id === 'trade') renderTrade();
