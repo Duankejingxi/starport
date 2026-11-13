@@ -11,7 +11,11 @@ import { Player, LANDER_POS } from './player.js';
 import { initTools, updateTools, renderViewmodel, tool } from './tools.js';
 import { updateColony, lookColonist, serializeColonists, loadColonists } from './colony.js';
 import { updateStory, startChapter, radio, CHAPTERS, setStormState, stormState, resetStoryEnding } from './story.js';
-import { initUI, updateUI, toast, chapterCard, openMenu, closeMenus } from './ui.js';
+import { initUI, updateUI, toast, chapterCard, openMenu, closeMenus, setPausePane, archiveHTML, buildMenuKey } from './ui.js';
+import { updateAchievements, achievementsHTML } from './achievements.js';
+import { updateAmbient } from './ambient.js';
+import { ic } from './icons.js';
+import { initRelics, updateRelics, relicAt, discover } from './relics.js';
 import { input, initInput } from './input.js';
 import { makeLander } from './models.js';
 import { P, PID, PLANETS, SAVE_KEY, META, saveMeta, loadMeta, clearAll } from './planets.js';
@@ -87,7 +91,7 @@ canvas.addEventListener('click', () => {
 function save(silent) {
   if (!G.started) return;
   const data = {
-    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(),
+    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [],
     time: { t: G.time.t, day: G.time.day },
     player: { x: player.pos.x, z: player.pos.z, yaw: player.yaw, o2: player.o2, hp: player.health },
     buildings: serializeBuildings(), nodes: serializeNodes(), colonists: serializeColonists(), storm: stormState(),
@@ -110,6 +114,7 @@ function applySave(d) {
   player.yaw = d.player.yaw; player.o2 = d.player.o2; player.health = Math.max(30, d.player.hp);
   loadColonists(d.colonists || []);
   if (d.rover) spawnRover(d.rover.x, d.rover.z, d.rover.h);
+  G.relicsFound = d.relics || [];
   G.cityLevel = d.city || 0; G.popTotal = d.pop ?? (d.colonists || []).length; G.launched = !!d.launched;
   initCity(scene);
   setStormState(d.storm);
@@ -149,6 +154,7 @@ function begin(fromSave) {
     startChapter(0, true);
     setTimeout(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); }, 1200);
   }
+  initRelics();
   $('intro').classList.add('hidden');
   document.body.classList.add('playing');
   G.started = true;
@@ -165,6 +171,8 @@ if (META.autoResume && existing) {
   setTimeout(() => { begin(true); toast(`欢迎回来 · ${P.name}`); }, 50);
 }
 $('btn-save').addEventListener('click', () => save(false));
+$('btn-archive').addEventListener('click', () => setPausePane(archiveHTML()));
+$('btn-achv').addEventListener('click', () => setPausePane(achievementsHTML()));
 $('btn-restart').addEventListener('click', () => { if (confirm('将删除所有星球的进度，从火星重新开始。确定吗？')) { clearAll(); G.started = false; location.href = location.pathname + (G.debug ? '?debug' : ''); } });
 $('vol').addEventListener('input', e => audio.setVolume(+e.target.value));
 $('quality').value = quality;
@@ -187,7 +195,7 @@ G.events.on('crafted', k => {
   radio('方舟 · AI', '漫游车已出厂。车舱加压，可以在车里补氧。小心别开下悬崖。');
 });
 G.events.on('cityLevel', lv => {
-  chapterCard({ title: `${lv.icon} 城市升级：${lv.name}`, sub: `领地扩展至 ${lv.r} 米` });
+  chapterCard({ k: `COLONY LEVEL ${['I', 'II', 'III', 'IV', 'V', 'VI'][G.cityLevel]}`, title: lv.name, sub: `城市升级 · 领地扩展至 ${lv.r} 米` });
   const lines = {
     1: ['方舟 · AI', '殖民地升级为定居点。领地扩大了，更远的土地可以建造了。'],
     2: ['方舟 · AI', '小镇规模达成。公寓塔与垂直农场的设计图已解锁。'],
@@ -213,9 +221,9 @@ G.events.on('nightfall', n => {
   toast(`夜幕降临 · 雷达探测到约 ${n} 个移动信号`);
   if (firstNight) { firstNight = false; radio('方舟一号 · AI', '它们来了。锈蚀蛛会攻击建筑和人。用激光或步枪击退它们——它们的晶体残骸里含有钛。'); }
 });
-G.events.on('broken', b => toast(`⚠ ${b.def.name} 受损停机！白天会自动修复`));
+G.events.on('broken', b => toast(`${b.def.name} 受损停机，白天会自动修复`, 'warn', 'warn'));
 let firstArrival = true;
-G.events.on('shuttleIncoming', n => toast(`🚀 移民飞船正在降落 · ${n} 人`));
+G.events.on('shuttleIncoming', n => toast(`移民飞船正在降落 · ${n} 人`, 'ship'));
 G.events.on('colonistsArrived', list => {
   if (!list.length) return;
   toast(`欢迎回家：${list.map(c => c.name).join('、')}`);
@@ -271,6 +279,13 @@ function showEnding() {
 // 键盘：菜单与互动
 window.addEventListener('keydown', e => {
   if (!G.started) return;
+  buildMenuKey(e);
+  if (e.code === 'Tab' && !G.endingShown && !player.dead) {
+    if (G.menuOpen === 'archive') closeMenus(true); else if (!G.menuOpen) openMenu('archive');
+    return;
+  }
+  if (e.code === 'KeyP' && !G.menuOpen) { G.photo = !G.photo; G.usedPhoto = true; document.body.classList.toggle('photo', G.photo); return; }
+  if (G.menuOpen === 'archive' && e.code === 'Escape') { closeMenus(true); return; }
   if (G.menuOpen === 'build' && (e.code === 'Escape' || e.code === 'KeyB')) { closeMenus(true); if (!G.locked) showClickHint(); }
   else if (G.menuOpen === 'craft' && (e.code === 'Escape' || e.code === 'KeyE')) { closeMenus(true); }
   else if (G.menuOpen === 'starmap' && e.code === 'Escape') { closeMenus(true); }
@@ -298,9 +313,9 @@ function hintPrompt(dt) {
   if (hintCur) {
     hintT -= dt;
     if (hintT <= 0 || !hintCur.when()) { hintSeen[hintCur.id] = true; hintCur = null; try { localStorage.setItem('starport-hints', JSON.stringify(hintSeen)); } catch (e) { /* 忽略 */ } }
-    else return `💡 ${hintCur.text}`;
+    else return `<span class="hint">${hintCur.text}</span>`;
   }
-  for (const h of HINTS) if (!hintSeen[h.id] && h.when()) { hintCur = h; hintT = 12; return `💡 ${h.text}`; }
+  for (const h of HINTS) if (!hintSeen[h.id] && h.when()) { hintCur = h; hintT = 12; return `<span class="hint">${h.text}</span>`; }
   return '';
 }
 // —— 星图：前往新星球，或回到已开拓的家园 ——
@@ -316,10 +331,12 @@ function openStarmap(pad) {
   openMenu('starmap');
   $('starmap-list').innerHTML = destinations().map(d => {
     const pl = PLANETS[d.id];
-    return `<div class="card" data-id="${d.id}"><div class="h"><span class="ic">${d.fresh ? '✨' : '🏠'}</span><b>${pl.name}</b><span class="pw plus">${d.fresh ? '未开拓' : '已开拓'}</span></div>
-      <div class="d">${pl.title} · ${pl.place}${d.info ? `<br>居民 ${d.info.pop} 人 · 上次离开于第 ${d.info.day} 日` : ''}${d.fresh ? '<br>装备同步，携带部分物资' : '<br>回到你建立的城市'}</div></div>`;
+    const en = { mars: 'MARS', europa: 'EUROPA', kepler: 'KEPLER-442b' }[d.id];
+    return `<div class="dest" data-id="${d.id}"><div class="orb ${d.id}"></div><span class="badge ${d.fresh ? 'new' : 'home'}">${d.fresh ? 'UNCHARTED' : 'COLONY'}</span>
+      <div class="dn">${pl.name}</div><div class="de">${en}</div>
+      <div class="dst">${pl.title} · ${pl.place}${d.info ? `<br>居民 ${d.info.pop} 人 · 第 ${d.info.day} 日离开` : ''}${d.fresh ? '<br>装备同步 · 携带部分物资' : '<br>回到你建立的城市'}</div></div>`;
   }).join('');
-  $('starmap-list').querySelectorAll('.card').forEach(el => el.addEventListener('click', () => { closeMenus(true); startLaunch(pad, el.dataset.id); }));
+  $('starmap-list').querySelectorAll('.dest').forEach(el => el.addEventListener('click', () => { closeMenus(true); startLaunch(pad, el.dataset.id); }));
 }
 function startLaunch(b, dest) {
   G.launching = { b, t: 0, dest };
@@ -382,10 +399,16 @@ function finalEnding() {
 function handleInteraction(dt) {
   const ctx = { prompt: '', crossClass: '' };
   if (player.dead || G.menuOpen) return ctx;
-  if (G.driving) { ctx.prompt = `🚙 <b>${roverSpeed()}</b> km/h<br><kbd>W S</kbd> 油门 · <kbd>A D</kbd> 转向 · <kbd>Shift</kbd> 加速 · <kbd>空格</kbd> 刹车 · <kbd>E</kbd> 下车`; return ctx; }
+  if (G.driving) { ctx.prompt = `<span class="big">${roverSpeed()}</span> KM/H<br><kbd>W S</kbd> 油门 · <kbd>A D</kbd> 转向 · <kbd>Shift</kbd> 加速 · <kbd>空格</kbd> 刹车 · <kbd>E</kbd> 下车`; return ctx; }
+  const relic = relicAt(player.pos);
+  if (relic) {
+    ctx.prompt = `<b>${relic.name}</b><br><kbd>E</kbd>调查`;
+    if (input.hit('KeyE')) discover(relic);
+    return ctx;
+  }
   const rv = getRover();
   if (rv && Math.hypot(rv.x - player.pos.x, rv.z - player.pos.z) < 4.5) {
-    ctx.prompt = '🚙 加压漫游车<br><kbd>E</kbd> 上车';
+    ctx.prompt = '<b>加压漫游车</b><br><kbd>E</kbd>上车';
     if (input.hit('KeyE')) { enterRover(); input.pressed.delete('KeyE'); }
     return ctx;
   }
@@ -397,12 +420,12 @@ function handleInteraction(dt) {
   if (col) {
     ctx.crossClass = 'talk';
     ctx.prompt = `<b>${col.name}</b> · ${col.job}<br><kbd>E</kbd> 交谈`;
-    if (input.hit('KeyE')) { radio(col.name, col.line); }
+    if (input.hit('KeyE')) { radio(col.name, col.line); const t = G.stats.talked = G.stats.talked || []; if (!t.includes(col.idx)) t.push(col.idx); }
   } else if (launchPad && !G.launching) {
     if (!launchPad.powered) ctx.prompt = '星际发射台 · <span class="badc">电力不足</span>';
     else if (!destinations().length) ctx.prompt = '星际发射台 · 暂无可用航线';
     else {
-      ctx.prompt = `🛸 殖民舰已就绪<br><kbd>E</kbd> 打开星图（本星球的城市会继续自主运转）`;
+      ctx.prompt = `<b>殖民舰已就绪</b><br><kbd>E</kbd>打开星图`;
       if (input.hit('KeyE')) openStarmap(launchPad);
     }
   } else if (fab) {
@@ -412,7 +435,7 @@ function handleInteraction(dt) {
   const lb = G.lookBuilding;
   if (!ctx.prompt && lb && tool.id !== 'build') {
     const d = lb.def;
-    ctx.prompt = `<b>${d.icon} ${d.name}</b> · 耐久 ${Math.ceil(lb.hp)}/${d.hp}${d.power < 0 ? (lb.powered ? ' · <span class="okc">供电中</span>' : ' · <span class="badc">停电</span>') : ''}<br><kbd>X</kbd> ${demolishArm > 0 ? '<span class="badc">再按一次确认拆除（返还 50%）</span>' : '拆除'}`;
+    ctx.prompt = `<b>${d.name}</b> · 耐久 ${Math.ceil(lb.hp)}/${d.hp}${d.power < 0 ? (lb.powered ? ' · <span class="okc">供电中</span>' : ' · <span class="badc">停电</span>') : ''}<br><kbd>X</kbd>${demolishArm > 0 ? '<span class="badc">再按一次确认拆除（返还 50%）</span>' : '拆除'}`;
     if (lb.broken) ctx.prompt = ctx.prompt.replace('<br>', ' · <span class="badc">受损停机（白天自动修复）</span><br>');
     if (input.hit('KeyX')) {
       if (demolishArm > 0) { destroyBuilding(lb, true); demolishArm = 0; toast(`已拆除 ${d.name}`); }
@@ -420,6 +443,7 @@ function handleInteraction(dt) {
     }
   }
   if (tool.id === 'laser') {
+    if (G.aimNode && !ctx.crossClass) ctx.crossClass = 'node';
     if (rayEnemy(origin, dir, 9)) ctx.crossClass = 'enemy';
   } else if (tool.id === 'rifle' && rayEnemy(origin, dir, 120)) ctx.crossClass = 'enemy';
   return ctx;
@@ -463,7 +487,7 @@ function update(dt) {
     if (!G.driving) player.update(dt);
     updateRover(dt, player, camera);
     updateSky(dt, camera.position);
-    if (G.time.dawn) { G.time.dawn = false; toast(`☀ 第 ${G.time.day} 日的黎明 · ${P.name}`); }
+    if (G.time.dawn) { G.time.dawn = false; toast(`第 ${G.time.day} 日 · 黎明`, 'sun'); }
     updateNodes(dt);
     if (!G.driving) updateTools(dt, player, camera); else G.lookBuilding = null;
     updateBuildings(dt, { shoot });
@@ -476,6 +500,9 @@ function update(dt) {
     updateProjectiles(dt);
     updateStory(dt);
     lander.beacon.visible = Math.sin(performance.now() * 0.004) > 0;
+    updateAchievements(dt);
+    updateAmbient(dt);
+    updateRelics(dt);
     const ctx = handleInteraction(dt);
     if (!ctx.prompt) ctx.prompt = hintPrompt(dt);
     updateUI(dt, ctx);
@@ -484,7 +511,7 @@ function update(dt) {
     if (G.terraform > 0 && G.terraform <= 1) { terraT -= dt; if (terraT <= 0) { terraT = 4; applyTerraform(terraCenters(), G.terraform); } }
   }
 }
-$('loading').remove();
+$('loading').style.transition = 'opacity .8s'; $('loading').style.opacity = 0; setTimeout(() => $('loading').remove(), 900);
 frame();
 
 window.addEventListener('beforeunload', () => save(true));

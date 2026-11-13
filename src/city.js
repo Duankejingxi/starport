@@ -6,12 +6,12 @@ import { fx } from './fx.js';
 
 // 城市等级：人口与设施越多，领地越大
 export const LEVELS = [
-  { name: '前哨站', icon: '⛺', pop: 0, b: 0, r: 75 },
-  { name: '定居点', icon: '🏘', pop: 4, b: 6, r: 120 },
-  { name: '小镇', icon: '🏡', pop: 12, b: 14, r: 175 },
-  { name: '城市', icon: '🏙', pop: 24, b: 22, r: 240 },
-  { name: '大都会', icon: '🌆', pop: 36, b: 32, r: 310 },
-  { name: '星港', icon: '🚀', pop: 50, b: 42, r: 390 },
+  { name: '前哨站', pop: 0, b: 0, r: 75 },
+  { name: '定居点', pop: 4, b: 6, r: 120 },
+  { name: '小镇', pop: 12, b: 14, r: 175 },
+  { name: '城市', pop: 24, b: 22, r: 240 },
+  { name: '大都会', pop: 36, b: 32, r: 310 },
+  { name: '星港', pop: 50, b: 42, r: 390 },
 ];
 export const CENTER = { x: 0, z: 0 };
 

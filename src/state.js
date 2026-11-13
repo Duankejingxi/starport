@@ -29,10 +29,10 @@ export const G = {
 };
 
 export const RES_INFO = {
-  iron:     { name: '铁矿', icon: '⬢', color: '#d08a5e' },
-  silicon:  { name: '硅晶', icon: '◆', color: '#f1dca0' },
-  ice:      { name: '水冰', icon: '❄', color: '#a9dcff' },
-  titanium: { name: '钛矿', icon: '✦', color: '#b9a6ff' },
+  iron:     { name: '铁矿', icon: 'iron', color: '#d08a5e' },
+  silicon:  { name: '硅晶', icon: 'silicon', color: '#f1dca0' },
+  ice:      { name: '水冰', icon: 'ice', color: '#a9dcff' },
+  titanium: { name: '钛矿', icon: 'titanium', color: '#b9a6ff' },
 };
 
 export function canAfford(cost) {
@@ -44,7 +44,7 @@ export function pay(cost) {
 }
 export function costText(cost) {
   return Object.entries(cost)
-    .map(([k, v]) => `<span class="cost ${G.res[k] >= v ? '' : 'lack'}">${RES_INFO[k].icon} ${RES_INFO[k].name} ${v}</span>`)
+    .map(([k, v]) => `<span class="cost ${G.res[k] >= v ? '' : 'lack'}" style="--rc:${RES_INFO[k].color}"><svg class="ico"><use href="#i-${k}"/></svg>${v}</span>`)
     .join(' ');
 }
 

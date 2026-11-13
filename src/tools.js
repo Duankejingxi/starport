@@ -10,14 +10,14 @@ import { audio } from './audio.js';
 import { placement, updateGhost, tryPlace, setGhost } from './buildings.js';
 
 export const TOOLS = [
-  { id: 'laser', name: '采矿激光', icon: '⛏' },
-  { id: 'rifle', name: '等离子步枪', icon: '🔫', need: 'rifle' },
-  { id: 'build', name: '建造', icon: '🏗' },
+  { id: 'laser', name: '采矿激光', icon: 'laser' },
+  { id: 'rifle', name: '等离子步枪', icon: 'rifle', need: 'rifle' },
+  { id: 'build', name: '建造', icon: 'build' },
 ];
 export const tool = { index: 0, get id() { return TOOLS[this.index].id; } };
 
-let vmScene, vmCam, models = {}, beamCore, beamOuter, beamGlow, flash, muzzleFlash;
-const MUZZLE = new THREE.Vector3(0.24, -0.21, -0.82);
+let coilMat, vmScene, vmCam, models = {}, beamCore, beamOuter, beamGlow, flash, muzzleFlash;
+const MUZZLE = new THREE.Vector3(0.24, -0.22, -0.85);
 
 export function initTools(camera) {
   vmScene = new THREE.Scene();
@@ -27,26 +27,50 @@ export function initTools(camera) {
   vmScene.userData.dl = dl;
 
   const mk = (geo, mat, x, y, z, p) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); p.add(m); return m; };
-  // 采矿激光
+  const rim = new THREE.DirectionalLight(0x88ccff, 1.2); rim.position.set(-2, 1, 2); vmScene.add(rim);
+  const lathe = (pts, mat, p, seg = 20) => { const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg); g.rotateX(-Math.PI / 2); return mk(g, mat, 0, 0, 0, p); };
+  const shell = new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.35, metalness: 0.15 });
+  const gun = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.45, metalness: 0.7 });
+  const accent = new THREE.MeshStandardMaterial({ color: 0xff7a2a, roughness: 0.4, metalness: 0.2 });
+  coilMat = new THREE.MeshStandardMaterial({ color: 0x331100, emissive: 0xff8a30, emissiveIntensity: 1.2 });
+  const cyanCoil = new THREE.MeshStandardMaterial({ color: 0x002233, emissive: 0x44e6ff, emissiveIntensity: 1.5 });
+  const cyl = (r, l, mat, x, y, z, p) => { const m = mk(new THREE.CylinderGeometry(r, r, l, 16), mat, x, y, z, p); m.rotation.x = Math.PI / 2; return m; };
+  // 采矿激光：流线型枪身 + 发光聚能线圈
   const laser = new THREE.Group();
-  mk(new THREE.BoxGeometry(0.11, 0.13, 0.42), M.panel, 0, 0, 0, laser);
-  mk(new THREE.BoxGeometry(0.115, 0.04, 0.3), M.orange, 0, 0.07, 0.02, laser);
-  mk(new THREE.CylinderGeometry(0.035, 0.05, 0.2, 10), M.metal, 0, 0, -0.29, laser).rotation.x = Math.PI / 2;
-  mk(new THREE.BoxGeometry(0.06, 0.16, 0.07), M.dark, 0, -0.12, 0.1, laser).rotation.x = 0.3;
-  const lt = mk(new THREE.SphereGeometry(0.03, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffa060 }), 0, 0, -0.4, laser);
+  lathe([[0, -0.12], [0.04, -0.12], [0.056, -0.08], [0.058, 0.18], [0.05, 0.26], [0.036, 0.3], [0.03, 0.36], [0, 0.36]], shell, laser);
+  cyl(0.06, 0.02, accent, 0, 0, -0.02, laser); cyl(0.06, 0.012, accent, 0, 0, 0.1, laser);
+  cyl(0.045, 0.06, gun, 0, 0, 0.1 + 0.04, laser);
+  for (let i = 0; i < 3; i++) { const t = mk(new THREE.TorusGeometry(0.034 - i * 0.003, 0.007, 8, 20), coilMat, 0, 0, -0.33 - i * 0.035, laser); }
+  cyl(0.018, 0.14, gun, 0, 0, -0.38, laser);
+  const lt = mk(new THREE.SphereGeometry(0.02, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffc080 }), 0, 0, -0.455, laser);
+  mk(new THREE.BoxGeometry(0.018, 0.016, 0.2), gun, 0, 0.062, -0.05, laser);
+  cyl(0.026, 0.17, accent, 0.06, -0.02, -0.02, laser);
+  mk(new THREE.BoxGeometry(0.032, 0.07, 0.045), gun, 0, -0.075, 0.02, laser).rotation.x = 0.3;
+  mk(new THREE.BoxGeometry(0.03, 0.02, 0.07), gun, 0, -0.05, 0.02, laser);
+  const scr = mk(new THREE.PlaneGeometry(0.04, 0.025), new THREE.MeshBasicMaterial({ color: 0x66e6ff }), -0.0585, 0.012, 0.04, laser); scr.rotation.y = -Math.PI / 2;
   laser.userData.tip = lt;
-  // 等离子步枪
+  // 等离子步枪：长枪管 + 青色加速线圈
   const rifle = new THREE.Group();
-  mk(new THREE.BoxGeometry(0.1, 0.12, 0.6), M.white, 0, 0, -0.05, rifle);
-  mk(new THREE.BoxGeometry(0.07, 0.07, 0.3), M.dark, 0, 0.0, -0.45, rifle);
-  for (let i = 0; i < 3; i++) mk(new THREE.TorusGeometry(0.06, 0.012, 6, 14), M.cyan, 0, 0, -0.36 - i * 0.07, rifle);
-  mk(new THREE.BoxGeometry(0.06, 0.15, 0.08), M.dark, 0, -0.13, 0.12, rifle).rotation.x = 0.3;
-  mk(new THREE.BoxGeometry(0.04, 0.05, 0.2), M.orange, 0, 0.08, -0.05, rifle);
-  // 建造平板
+  lathe([[0, -0.2], [0.04, -0.2], [0.055, -0.15], [0.055, 0.2], [0.048, 0.28], [0, 0.28]], shell, rifle);
+  cyl(0.035, 0.32, gun, 0, 0, -0.36, rifle);
+  for (let i = 0; i < 4; i++) mk(new THREE.TorusGeometry(0.046, 0.009, 8, 20), cyanCoil, 0, 0, -0.27 - i * 0.065, rifle);
+  cyl(0.05, 0.03, accent, 0, 0, -0.18, rifle);
+  cyl(0.022, 0.16, gun, 0, 0.075, -0.02, rifle);
+  mk(new THREE.CylinderGeometry(0.023, 0.023, 0.005, 12), cyanCoil, 0, 0.075, -0.1, rifle).rotation.x = Math.PI / 2;
+  mk(new THREE.BoxGeometry(0.032, 0.07, 0.045), gun, 0, -0.075, 0.0, rifle).rotation.x = 0.3;
+  mk(new THREE.BoxGeometry(0.035, 0.09, 0.05), cyanCoil, 0, -0.08, -0.06, rifle);
+  // 建造平板：全息蓝图屏
   const tab = new THREE.Group();
-  mk(new THREE.BoxGeometry(0.3, 0.2, 0.02), M.dark, 0, 0, 0, tab);
-  const scr = mk(new THREE.PlaneGeometry(0.27, 0.17), new THREE.MeshBasicMaterial({ color: 0x33ccff, transparent: true, opacity: 0.85 }), 0, 0, 0.011, tab);
-  tab.userData.scr = scr;
+  mk(new THREE.BoxGeometry(0.32, 0.22, 0.018), gun, 0, 0, 0, tab);
+  mk(new THREE.BoxGeometry(0.33, 0.012, 0.022), accent, 0, 0.112, 0, tab);
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 176;
+  const g2 = cv.getContext('2d'); g2.fillStyle = '#06222e'; g2.fillRect(0, 0, 256, 176);
+  g2.strokeStyle = 'rgba(127,230,255,.25)'; for (let x = 0; x < 256; x += 16) { g2.beginPath(); g2.moveTo(x, 0); g2.lineTo(x, 176); g2.stroke(); } for (let y = 0; y < 176; y += 16) { g2.beginPath(); g2.moveTo(0, y); g2.lineTo(256, y); g2.stroke(); }
+  g2.strokeStyle = '#7fe6ff'; g2.lineWidth = 2; g2.beginPath(); g2.arc(128, 110, 50, Math.PI, 0); g2.lineTo(178, 140); g2.lineTo(78, 140); g2.closePath(); g2.stroke();
+  g2.fillStyle = '#7fe6ff'; g2.font = 'bold 14px sans-serif'; g2.fillText('BLUEPRINT', 12, 22);
+  const st = new THREE.CanvasTexture(cv); st.colorSpace = THREE.SRGBColorSpace;
+  const scr2 = mk(new THREE.PlaneGeometry(0.29, 0.195), new THREE.MeshBasicMaterial({ map: st, transparent: true, opacity: 0.95 }), 0, -0.004, 0.01, tab);
+  tab.userData.scr = scr2;
   tab.rotation.set(-0.5, 0.25, 0);
   models = { laser, rifle, build: tab };
   for (const k in models) { models[k].scale.setScalar(k === 'build' ? 0.45 : 0.6); models[k].visible = false; vmScene.add(models[k]); }
@@ -126,6 +150,7 @@ export function updateTools(dt, player, camera) {
 
   const origin = camera.position, dir = player.fwd;
   G.lookBuilding = G.menuOpen ? null : rayBuilding(origin, dir, 14);
+  G.aimNode = id === 'laser' && !!rayNode(origin, dir, 9);
 
   // 切换工具
   if (!G.menuOpen && !player.dead) {
@@ -144,6 +169,7 @@ export function updateTools(dt, player, camera) {
   muzzleFlash.visible = false;
   fireCool -= dt;
   const firing = input.mouse[0] && !G.menuOpen && !player.dead && G.locked;
+  coilMat.emissiveIntensity = id === 'laser' && firing ? 3 + Math.random() * 1.5 : 1 + Math.sin(performance.now() * 0.003) * 0.3;
 
   if (id === 'laser') {
     if (firing) {
@@ -172,6 +198,7 @@ export function updateTools(dt, player, camera) {
         while (mineAcc >= 1 && G.nodes.includes(n)) {
           mineAcc -= 1;
           G.res[n.type]++; G.stats.mined[n.type]++;
+          if (n.meteor) G.stats.meteorMined = (G.stats.meteorMined || 0) + 1;
           G.events.emit('pickup', { type: n.type, n: 1 });
           if (mineNode(n, 1)) { audio.play('deplete'); mineAcc = 0; break; }
         }
@@ -216,7 +243,7 @@ export function updateTools(dt, player, camera) {
 }
 
 export function renderViewmodel(renderer) {
-  if (G.player.dead || G.driving) return;
+  if (G.player.dead || G.driving || G.photo) return;
   renderer.autoClear = false;
   renderer.clearDepth();
   renderer.render(vmScene, vmCam);

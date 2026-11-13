@@ -4,38 +4,42 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>星港：新家园</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <canvas id="c"></canvas>
 
 <div id="hud">
-  <div id="topleft">
+  <div id="tl">
+    <div id="planet-tag"><span class="en" id="pl-en">MARS</span><span class="cn" id="pl-cn"></span></div>
+    <div id="city"></div>
     <div id="res"></div>
     <div id="colony"></div>
   </div>
-  <div id="topcenter">
+  <div id="tc">
     <div id="compass"></div>
     <div id="clock"></div>
     <div id="toasts"></div>
   </div>
-  <div id="topright">
-    <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="tr">
+    <div id="mm-wrap"><canvas id="minimap" width="200" height="200"></canvas><span class="mm-n">N</span></div>
     <div id="goals"></div>
   </div>
-  <div id="crosshair"></div>
+  <div id="crosshair"><i></i></div>
   <div id="prompt"></div>
   <div id="buildhint"></div>
   <div id="feed"></div>
-  <div id="radio"></div>
+  <div id="radio"><div class="wave"><i></i><i></i><i></i><i></i><i></i></div><div class="body"><div class="who"></div><div class="txt"></div></div></div>
   <div id="bars">
     <div id="o2-state"></div>
-    <div class="bar" id="bar-hp"><span>生命</span><div><i></i></div><b></b></div>
-    <div class="bar" id="bar-o2"><span>氧气</span><div><i></i></div><b></b></div>
-    <div class="bar" id="bar-en"><span>能量</span><div><i></i></div><b></b></div>
+    <div class="bar" id="bar-hp"><span class="lb">HP</span><div class="tr"><i></i></div><b></b></div>
+    <div class="bar" id="bar-o2"><span class="lb">O<sub>2</sub></span><div class="tr"><i></i></div><b></b></div>
+    <div class="bar" id="bar-en"><span class="lb">EN</span><div class="tr"><i></i></div><b></b></div>
   </div>
   <div id="hotbar"></div>
-  <div id="keys">WASD 移动 · Shift 冲刺 · 空格 跳跃 · B 建造 · E 互动 · F 手电 · Esc 暂停</div>
 </div>
 <div id="visor"></div>
 <div id="hurt"></div>
@@ -44,81 +48,99 @@
 <div id="fade"></div>
 
 <div id="intro" class="screen">
-  <div class="inner">
-    <div class="logo">星港<span>：新家园</span></div>
+  <div class="title-wrap">
+    <div class="kicker"><span class="dash"></span>ARK PROGRAM · <span id="kick-planet">MARS</span></div>
+    <h1 class="logo">星港<span>：新家园</span></h1>
+    <div class="en-sub">STARPORT</div>
     <div class="story" id="story"></div>
-    <div class="btns">
-      <button id="btn-new" class="primary">开始新的旅程</button>
-      <button id="btn-continue" class="hidden">继续：<span id="cont-info"></span></button>
-    </div>
-    <div class="ctrl">
-      <div><kbd>W A S D</kbd> 移动　<kbd>Shift</kbd> 冲刺　<kbd>空格</kbd> 跳跃 / 喷气</div>
-      <div><kbd>鼠标</kbd> 环视　<kbd>左键</kbd> 采矿 / 射击 / 放置　<kbd>右键</kbd> 取消建造</div>
-      <div><kbd>1</kbd> 采矿激光　<kbd>2</kbd> 等离子步枪　<kbd>B</kbd> 建造　<kbd>E</kbd> 互动 / 交谈　<kbd>F</kbd> 手电筒</div>
-    </div>
+    <nav class="menu">
+      <button id="btn-continue" class="hidden"><span class="t">继续</span><small id="cont-info"></small></button>
+      <button id="btn-new"><span class="t">开始新的旅程</span></button>
+    </nav>
     <div class="note" id="touch-note"></div>
+  </div>
+  <div class="controls-strip">
+    <span><kbd>W A S D</kbd>移动</span><span><kbd>鼠标</kbd>环视</span><span><kbd>左键</kbd>采集 / 射击 / 放置</span><span><kbd>B</kbd>建造</span><span><kbd>E</kbd>互动</span><span><kbd>F</kbd>手电</span><span><kbd>Tab</kbd>档案</span><span><kbd>P</kbd>拍照</span>
   </div>
 </div>
 
 <div id="pause" class="screen hidden">
-  <div class="inner small">
+  <div class="side">
+    <div class="kicker"><span class="dash"></span>SYSTEM PAUSED</div>
     <h2>暂停</h2>
-    <div class="btns col">
-      <button class="primary" data-close>继续</button>
-      <button id="btn-save">保存游戏</button>
-      <button id="btn-restart" class="danger">放弃存档，重新开始</button>
+    <nav class="menu">
+      <button data-close><span class="t">继续</span></button>
+      <button id="btn-archive"><span class="t">殖民地档案</span></button>
+      <button id="btn-achv"><span class="t">成就</span></button>
+      <button id="btn-save"><span class="t">保存游戏</span></button>
+      <button id="btn-restart" class="danger"><span class="t">删除全部进度</span></button>
+    </nav>
+    <div class="settings">
+      <label>音量<input type="range" id="vol" min="0" max="1" step="0.05" value="0.7"></label>
+      <label>鼠标灵敏度<input type="range" id="sens" min="0.0008" max="0.005" step="0.0002" value="0.0022"></label>
+      <label>画质<select id="quality"><option value="high">高</option><option value="mid">中</option><option value="low">低</option></select></label>
     </div>
-    <label class="vol">音量 <input type="range" id="vol" min="0" max="1" step="0.05" value="0.7"></label>
-    <label class="vol">画质 <select id="quality"><option value="high">高（阴影 + 高分辨率）</option><option value="mid">中</option><option value="low">低（流畅优先）</option></select></label>
-    <label class="vol">鼠标灵敏度 <input type="range" id="sens" min="0.0008" max="0.005" step="0.0002" value="0.0022"></label>
     <div class="ctrl">
-      <div><kbd>W A S D</kbd> 移动　<kbd>Shift</kbd> 冲刺　<kbd>空格</kbd> 跳跃 / 喷气</div>
-      <div><kbd>左键</kbd> 采矿 / 射击 / 放置　<kbd>右键</kbd> 取消　<kbd>R</kbd> 旋转建筑</div>
-      <div><kbd>1 2</kbd> 切换工具　<kbd>B</kbd> 建造　<kbd>E</kbd> 互动　<kbd>X</kbd> 拆除　<kbd>F</kbd> 手电</div>
+      <div><kbd>W A S D</kbd>移动 <kbd>Shift</kbd>冲刺 <kbd>空格</kbd>跳跃 / 喷气</div>
+      <div><kbd>左键</kbd>采集 / 射击 / 放置 <kbd>右键</kbd>取消 <kbd>R</kbd>旋转</div>
+      <div><kbd>1</kbd><kbd>2</kbd>工具 <kbd>B</kbd>建造 <kbd>E</kbd>互动 <kbd>X</kbd>拆除</div>
+      <div><kbd>F</kbd>手电 <kbd>Tab</kbd>殖民地档案 <kbd>P</kbd>拍照模式</div>
     </div>
   </div>
+  <div class="pane" id="pause-pane"></div>
 </div>
 
-<div id="build" class="screen menu hidden">
-  <div class="inner wide">
-    <h2>🏗 建造 <small>选择要建造的设施</small></h2>
-    <div class="grid" id="build-list"></div>
-    <div class="btns"><button data-close>关闭（Esc）</button></div>
-  </div>
-</div>
-<div id="craft" class="screen menu hidden">
-  <div class="inner wide">
-    <h2>🔧 制造工坊 <small>武器与装备</small></h2>
-    <div class="grid" id="craft-list"></div>
-    <div class="btns"><button data-close>关闭（Esc）</button></div>
+<div id="archive" class="screen menu hidden">
+  <div class="sheet">
+    <header><div class="kicker"><span class="dash"></span>COLONY ARCHIVE</div><h2>殖民地档案</h2><button class="x" data-close>ESC</button></header>
+    <div id="archive-body"></div>
   </div>
 </div>
 
+<div id="build" class="screen menu bp hidden">
+  <header class="bp-head">
+    <div><div class="kicker"><span class="dash"></span>BLUEPRINTS</div><h2>建造蓝图</h2></div>
+    <div class="bp-tabs" id="bp-tabs"></div>
+    <div class="bp-res" id="bp-res"></div>
+    <button class="x" data-close>ESC</button>
+  </header>
+  <div class="bp-body"><div class="bp-grid" id="build-list"></div><aside class="bp-detail" id="bp-detail"></aside></div>
+</div>
+<div id="craft" class="screen menu bp hidden">
+  <header class="bp-head">
+    <div><div class="kicker"><span class="dash"></span>FABRICATOR</div><h2>制造工坊</h2></div>
+    <div class="bp-tabs"></div>
+    <div class="bp-res" id="cr-res"></div>
+    <button class="x" data-close>ESC</button>
+  </header>
+  <div class="bp-body"><div class="bp-grid" id="craft-list"></div><aside class="bp-detail" id="craft-detail"></aside></div>
+</div>
 <div id="starmap" class="screen menu hidden">
-  <div class="inner wide">
-    <h2>🌌 星图 <small>选择航线目的地</small></h2>
-    <div class="grid" id="starmap-list"></div>
-    <div class="btns"><button data-close>关闭（Esc）</button></div>
+  <div class="sm">
+    <header><div class="kicker"><span class="dash"></span>INTERSTELLAR ROUTES</div><h2>星图</h2><button class="x" data-close>ESC</button></header>
+    <div id="starmap-list"></div>
   </div>
 </div>
 
 <div id="death" class="screen hidden">
-  <div class="inner small">
+  <div class="cine">
+    <div class="kicker red"><span class="dash"></span>VITAL SIGNS LOST</div>
     <h2 id="death-why">你倒下了</h2>
     <p>救援无人机把你送回了基地。背包里四分之一的资源遗失在了荒野中。</p>
-    <div class="btns"><button class="primary" id="btn-respawn">重新站起来</button></div>
+    <nav class="menu center"><button id="btn-respawn"><span class="t">重新站起来</span></button></nav>
   </div>
 </div>
 
 <div id="ending" class="screen hidden">
-  <div class="inner">
+  <div class="cine wide">
     <div class="ending-text" id="ending-text"></div>
-    <div class="btns"><button class="primary" id="btn-endcont">继续建设家园</button></div>
+    <nav class="menu center btns"><button id="btn-endcont"><span class="t">继续建设家园</span></button></nav>
   </div>
 </div>
 
+<div id="achv-pop"></div>
 <div id="clickhint" class="hidden">点击画面继续</div>
-<div id="loading">正在生成火星地表……</div>
+<div id="loading"><div class="ld-t">ARK OS</div><div class="ld-s">正在生成星球地表</div><div class="ld-bar"><i></i></div></div>
 
 <script src="dist/game.js"></script>
 </body>

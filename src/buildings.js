@@ -3,6 +3,7 @@ import { G, canAfford, pay } from './state.js';
 import { BUILD_MODELS, M, CITY_MATS } from './models.js';
 import { P, PID, META } from './planets.js';
 import { LEVELS, inTerritory } from './city.js';
+import { connectBuilding, removeRoads, updateRoads } from './roads.js';
 import { getHeight, slopeAt, HALF } from './terrain.js';
 import { fx } from './fx.js';
 import { audio } from './audio.js';
@@ -10,22 +11,22 @@ import { sunDir } from './sky.js';
 
 // chapter: 第几章解锁
 export const DEFS = {
-  solar:      { name: '太阳能阵列', icon: '☀️', chapter: 0, cost: { iron: 8, silicon: 6 }, power: 4, r: 2.6, hp: 120, desc: '白天发电 +4 ⚡，夜间降至 +1.6。殖民地的心跳从这里开始。' },
-  oxygen:     { name: '制氧站', icon: '🫧', chapter: 0, cost: { iron: 12, silicon: 4, ice: 6 }, power: -2, r: 3.0, hp: 160, o2: 6, life: 14, desc: '电解水冰制造氧气。为 6 位居民供氧，并在 14 米内为你的宇航服补氧。' },
-  lamp:       { name: '照明灯', icon: '💡', chapter: 0, cost: { iron: 3 }, power: 0, r: 0.6, hp: 60, desc: '照亮火星的长夜。' },
-  habitat:    { name: '居住穹顶', icon: '🏠', chapter: 1, cost: { iron: 25, silicon: 12 }, power: -1, r: 6.4, hp: 300, housing: 4, life: 12, desc: '可住 4 人。穹顶里有暖光、植物和家人的照片。' },
-  greenhouse: { name: '温室', icon: '🌱', chapter: 1, cost: { iron: 14, silicon: 16, ice: 8 }, power: -2, r: 5.4, hp: 160, food: 5, desc: '在火星土壤里种出第一棵土豆。供 5 人食物。' },
-  extractor:  { name: '水冰提取器', icon: '💧', chapter: 1, cost: { iron: 16, silicon: 4, ice: 4 }, power: -2, r: 2.8, hp: 160, water: 6, desc: '从地下冻土中钻取水。供 6 人用水。' },
-  beacon:     { name: '着陆场', icon: '🛬', chapter: 1, cost: { iron: 24, silicon: 14 }, power: -1, r: 7.4, hp: 250, desc: '向地球发出信号。条件满足时，移民飞船会在这里降落。' },
-  fabricator: { name: '制造工坊', icon: '🔧', chapter: 2, cost: { iron: 22, silicon: 14 }, power: -1, r: 4.6, hp: 220, desc: '靠近按 E 制造武器与装备。' },
-  turret:     { name: '防御炮塔', icon: '🛡️', chapter: 2, cost: { iron: 22, silicon: 10 }, power: -2, r: 1.9, hp: 200, range: 40, desc: '自动攻击 40 米内的锈蚀蛛。需要电力。' },
-  reactor:    { name: '聚变反应堆', icon: '⚛️', chapter: 3, cost: { iron: 40, silicon: 20, titanium: 12 }, power: 20, r: 5.4, hp: 400, desc: '昼夜不停 +20 ⚡。用火星的钛，点亮人类的第二颗太阳。' },
-  apartment:  { name: '公寓塔', icon: '🏢', level: 2, cost: { iron: 40, silicon: 25, titanium: 4 }, power: -3, r: 4.6, hp: 400, housing: 12, life: 12, desc: '可住 12 人。窗户里的灯光，是城市的星空。' },
-  vfarm:      { name: '垂直农场', icon: '🌾', level: 2, cost: { iron: 30, silicon: 30, ice: 15 }, power: -4, r: 4.2, hp: 260, food: 14, desc: '十四层的立体农田。供 14 人食物。' },
-  lifehub:    { name: '生态中枢', icon: '🌀', level: 3, cost: { iron: 45, silicon: 30, ice: 30, titanium: 6 }, power: -5, r: 6.0, hp: 400, o2: 16, water: 16, life: 20, desc: '大型氧气与水循环系统。供 16 人氧气和用水，20 米内补氧。' },
-  terraformer:{ name: '大气改造塔', icon: '🌍', chapter: 4, only: 'terraformable', cost: { iron: 100, silicon: 60, titanium: 30, ice: 50 }, power: -12, r: 7.4, hp: 800, desc: '向天空释放温室气体与水汽。让这颗星球，真正成为家。' },
-  launch:     { name: '星际发射台', icon: '🛸', chapter: 5, level: PID === 'mars' ? 5 : 4, only: 'route', cost: { iron: 160, silicon: 120, titanium: 60, ice: 60 }, power: -15, r: 9.5, hp: 900, desc: '星际航线的起点。靠近按 E 打开星图，前往新的星球或回到已开拓的家园。' },
-  monument:   { name: '文明纪念碑', icon: '🗼', level: 5, only: 'final', cost: { iron: 150, silicon: 120, titanium: 80 }, power: -6, r: 6.5, hp: 900, desc: '三颗星球，一个人类。献给所有出发的人。' },
+  solar:      { name: '太阳能阵列', icon: 'sun', cat: 'life', chapter: 0, cost: { iron: 8, silicon: 6 }, power: 4, r: 2.6, hp: 120, desc: '白天发电 4 单位，夜间降至 1.6。殖民地的心跳从这里开始。' },
+  oxygen:     { name: '制氧站', icon: 'o2', cat: 'life', chapter: 0, cost: { iron: 12, silicon: 4, ice: 6 }, power: -2, r: 3.0, hp: 160, o2: 6, life: 14, desc: '电解水冰制造氧气。为 6 位居民供氧，并在 14 米内为你的宇航服补氧。' },
+  lamp:       { name: '照明灯', icon: 'star', cat: 'life', chapter: 0, cost: { iron: 3 }, power: 0, r: 0.6, hp: 60, desc: '照亮火星的长夜。' },
+  habitat:    { name: '居住穹顶', icon: 'dome', cat: 'life', chapter: 1, cost: { iron: 25, silicon: 12 }, power: -1, r: 6.4, hp: 300, housing: 4, life: 12, desc: '可住 4 人。穹顶里有暖光、植物和家人的照片。' },
+  greenhouse: { name: '温室', icon: 'food', cat: 'life', chapter: 1, cost: { iron: 14, silicon: 16, ice: 8 }, power: -2, r: 5.4, hp: 160, food: 5, desc: '在火星土壤里种出第一棵土豆。供 5 人食物。' },
+  extractor:  { name: '水冰提取器', icon: 'water', cat: 'life', chapter: 1, cost: { iron: 16, silicon: 4, ice: 4 }, power: -2, r: 2.8, hp: 160, water: 6, desc: '从地下冻土中钻取水。供 6 人用水。' },
+  beacon:     { name: '着陆场', icon: 'ship', cat: 'city', chapter: 1, cost: { iron: 24, silicon: 14 }, power: -1, r: 7.4, hp: 250, desc: '向地球发出信号。条件满足时，移民飞船会在这里降落。' },
+  fabricator: { name: '制造工坊', icon: 'wrench', cat: 'industry', chapter: 2, cost: { iron: 22, silicon: 14 }, power: -1, r: 4.6, hp: 220, desc: '靠近按 E 制造武器与装备。' },
+  turret:     { name: '防御炮塔', icon: 'shield', cat: 'defense', chapter: 2, cost: { iron: 22, silicon: 10 }, power: -2, r: 1.9, hp: 200, range: 40, desc: '自动攻击 40 米内的锈蚀蛛。需要电力。' },
+  reactor:    { name: '聚变反应堆', icon: 'power', cat: 'industry', chapter: 3, cost: { iron: 40, silicon: 20, titanium: 12 }, power: 20, r: 5.4, hp: 400, desc: '昼夜不停 +20 ⚡。用火星的钛，点亮人类的第二颗太阳。' },
+  apartment:  { name: '公寓塔', icon: 'tower', cat: 'city', level: 2, cost: { iron: 40, silicon: 25, titanium: 4 }, power: -3, r: 4.6, hp: 400, housing: 12, life: 12, desc: '可住 12 人。窗户里的灯光，是城市的星空。' },
+  vfarm:      { name: '垂直农场', icon: 'food', cat: 'city', level: 2, cost: { iron: 30, silicon: 30, ice: 15 }, power: -4, r: 4.2, hp: 260, food: 14, desc: '十四层的立体农田。供 14 人食物。' },
+  lifehub:    { name: '生态中枢', icon: 'o2', cat: 'city', level: 3, cost: { iron: 45, silicon: 30, ice: 30, titanium: 6 }, power: -5, r: 6.0, hp: 400, o2: 16, water: 16, life: 20, desc: '大型氧气与水循环系统。供 16 人氧气和用水，20 米内补氧。' },
+  terraformer:{ name: '大气改造塔', icon: 'planet', cat: 'stellar', chapter: 4, only: 'terraformable', cost: { iron: 100, silicon: 60, titanium: 30, ice: 50 }, power: -12, r: 7.4, hp: 800, desc: '向天空释放温室气体与水汽。让这颗星球，真正成为家。' },
+  launch:     { name: '星际发射台', icon: 'ship', cat: 'stellar', chapter: 5, level: PID === 'mars' ? 5 : 4, only: 'route', cost: { iron: 160, silicon: 120, titanium: 60, ice: 60 }, power: -15, r: 9.5, hp: 900, desc: '星际航线的起点。靠近按 E 打开星图，前往新的星球或回到已开拓的家园。' },
+  monument:   { name: '文明纪念碑', icon: 'monument', cat: 'stellar', level: 5, only: 'final', cost: { iron: 150, silicon: 120, titanium: 80 }, power: -6, r: 6.5, hp: 900, desc: '三颗星球，一个人类。献给所有出发的人。' },
 };
 // 某座建筑当前能否建造
 export function unlockState(k) {
@@ -53,6 +54,7 @@ export function createBuilding(type, x, z, rot = 0, hp) {
   // 门口区域可以走进居住穹顶的范围外缘
   G.buildings.push(b);
   G.stats.built[type] = (G.stats.built[type] || 0) + 1;
+  connectBuilding(b);
   recalcColony();
   return b;
 }
@@ -61,6 +63,7 @@ export function destroyBuilding(b, refund = false) {
   if (refund) for (const k in b.def.cost) G.res[k] += Math.floor(b.def.cost[k] * 0.5);
   G.scene.remove(b.group);
   G.colliders.remove(b.collider);
+  removeRoads(b);
   const i = G.buildings.indexOf(b); if (i >= 0) G.buildings.splice(i, 1);
   G.stats.built[b.type] = Math.max(0, (G.stats.built[b.type] || 0) - 1);
   const p = new THREE.Vector3(b.x, b.y + 2, b.z);
@@ -172,6 +175,7 @@ export function tryPlace() {
 let recalcT = 0;
 export function updateBuildings(dt, ctx) {
   recalcT -= dt; if (recalcT <= 0) { recalcT = 0.5; recalcColony(); }
+  updateRoads();
   const night = G.time.night, now = performance.now() * 0.001;
   M.window.emissiveIntensity = 0.3 + night * 1.6;
   M.lamp.emissiveIntensity = night * 4;
@@ -181,7 +185,7 @@ export function updateBuildings(dt, ctx) {
     b.t += dt;
     if (b.hp < b.def.hp && G.time.night < 0.5) {
       b.hp = Math.min(b.def.hp, b.hp + dt * (b.broken ? 5 : 2));
-      if (b.broken && b.hp >= b.def.hp * 0.5) { b.broken = false; recalcColony(); G.events.emit('toast', `🔧 ${b.def.name} 已修复，恢复运转`); }
+      if (b.broken && b.hp >= b.def.hp * 0.5) { b.broken = false; recalcColony(); G.events.emit('toast', `✓ ${b.def.name} 已修复，恢复运转`); }
     }
     if (b.broken && Math.random() < dt * 6) fx.dustPuff(new THREE.Vector3(b.x + (Math.random() - 0.5) * b.def.r, b.y + 1.5, b.z + (Math.random() - 0.5) * b.def.r), 1, 0.5, [0.15, 0.13, 0.12]);
     switch (b.type) {

@@ -73,6 +73,7 @@ function killEnemy(e, owner) {
   audio.play('kill');
   G.scene.remove(e.group);
   G.stats.kills++;
+  if (e.guardian) G.stats.guardKills = (G.stats.guardKills || 0) + 1;
   // 晶体残骸里含有钛
   const drop = e.guardian ? 3 : (Math.random() < 0.5 ? 1 : 0);
   if (drop) { G.res.titanium += drop; G.stats.mined.titanium += drop; G.events.emit('pickup', { type: 'titanium', n: drop, note: '晶体残骸' }); }

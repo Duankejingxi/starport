@@ -105,6 +105,7 @@ export function updateRover(dt, player, camera) {
     r.h += steer * dt * 1.5 * THREE.MathUtils.clamp(r.speed / 5, -1, 1);
   }
   fwd.set(-Math.sin(r.h), 0, -Math.cos(r.h));
+  G.stats.driven = (G.stats.driven || 0) + Math.abs(r.speed) * dt;
   r.x = THREE.MathUtils.clamp(r.x + fwd.x * r.speed * dt, -HALF + 125, HALF - 125);
   r.z = THREE.MathUtils.clamp(r.z + fwd.z * r.speed * dt, -HALF + 125, HALF - 125);
   // 碰撞
