@@ -232,15 +232,34 @@ const visorMats = [0xff9a3a, 0x3ac0ff, 0x7dff8a, 0xff6fb5, 0xffe14a].map(c => ne
 const suitMats = [0xece6dc, 0xd9dde4, 0xe8d6c4].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 }));
 export function makeColonist(seed) {
   const g = new THREE.Group();
-  const suit = suitMats[seed % suitMats.length];
-  const body = mk(new THREE.CapsuleGeometry(0.28, 0.6, 4, 8), suit, 0, 1.0, 0, g);
-  const head = mk(new THREE.SphereGeometry(0.24, 12, 8), suit, 0, 1.62, 0, g);
-  const visor = mk(new THREE.SphereGeometry(0.2, 12, 8, -Math.PI * 0.4, Math.PI * 0.8, Math.PI * 0.3, Math.PI * 0.35), visorMats[seed % visorMats.length], 0, 1.62, 0.06, g);
-  mk(box(0.42, 0.5, 0.2), M.orange, 0, 1.1, -0.28, g);
-  const legL = mk(cyl(0.1, 0.09, 0.6, 6), suit, -0.13, 0.3, 0, g);
-  const legR = mk(cyl(0.1, 0.09, 0.6, 6), suit, 0.13, 0.3, 0, g);
-  const armL = mk(cyl(0.08, 0.07, 0.55, 6), suit, -0.36, 1.05, 0, g);
-  const armR = mk(cyl(0.08, 0.07, 0.55, 6), suit, 0.36, 1.05, 0, g);
+  const suit = suitMats[seed % suitMats.length], vm = visorMats[seed % visorMats.length];
+  const part = (geo, mat, x, y, z, p = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; p.add(m); return m; };
+  // 躯干：上宽下窄的宇航服
+  const torso = new THREE.LatheGeometry([[0, 0], [0.2, 0], [0.24, 0.12], [0.27, 0.42], [0.25, 0.55], [0.12, 0.62], [0, 0.62]].map(([x, y]) => new THREE.Vector2(x, y)), 12);
+  const body = part(torso, suit, 0, 0.72, 0);
+  body.scale.z = 0.8;
+  part(new THREE.TorusGeometry(0.2, 0.04, 6, 16), M.orange, 0, 0.77, 0).rotation.x = Math.PI / 2;
+  part(new THREE.CylinderGeometry(0.16, 0.18, 0.06, 12), M.dark, 0, 1.36, 0);
+  // 头盔与发光面罩
+  const head = part(new THREE.SphereGeometry(0.21, 16, 12), suit, 0, 1.58, 0);
+  const visor = part(new THREE.SphereGeometry(0.19, 16, 10, Math.PI * 0.12, Math.PI * 0.76, Math.PI * 0.28, Math.PI * 0.4), vm, 0, 1.58, 0.035);
+  part(new THREE.BoxGeometry(0.02, 0.12, 0.02), M.metal, 0.12, 1.82, -0.05).rotation.z = -0.3;
+  // 背包与指示灯
+  part(new THREE.BoxGeometry(0.36, 0.42, 0.18), M.panel, 0, 1.08, -0.24);
+  part(new THREE.BoxGeometry(0.3, 0.06, 0.19), M.orange, 0, 1.25, -0.24);
+  glow(0x8dffb0, 0.25, g, 0.12, 0.96, -0.34);
+  // 四肢：从关节处摆动
+  const limb = (x, y, len, r, isLeg) => {
+    const pivot = new THREE.Group(); pivot.position.set(x, y, 0); g.add(pivot);
+    const m = part(new THREE.CapsuleGeometry(r, len, 4, 8), suit, 0, -len / 2 - r, 0, pivot);
+    part(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.05, 8), isLeg ? M.orange : M.dark, 0, -len * 0.45, 0, pivot);
+    if (isLeg) part(new THREE.BoxGeometry(r * 2.4, 0.1, r * 3.4), M.dark, 0, -len - r * 1.6, 0.04, pivot);
+    else part(new THREE.SphereGeometry(r * 1.2, 8, 6), M.dark, 0, -len - r * 1.6, 0, pivot);
+    return pivot;
+  };
+  const legL = limb(-0.11, 0.74, 0.5, 0.075, true), legR = limb(0.11, 0.74, 0.5, 0.075, true);
+  const armL = limb(-0.33, 1.27, 0.42, 0.06, false), armR = limb(0.33, 1.27, 0.42, 0.06, false);
+  armL.rotation.z = -0.12; armR.rotation.z = 0.12;
   return { group: g, legL, legR, armL, armR, body, head, visor };
 }
 

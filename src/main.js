@@ -176,6 +176,8 @@ $('btn-achv').addEventListener('click', () => setPausePane(achievementsHTML()));
 $('btn-restart').addEventListener('click', () => { if (confirm('将删除所有星球的进度，从火星重新开始。确定吗？')) { clearAll(); G.started = false; location.href = location.pathname + (G.debug ? '?debug' : ''); } });
 $('vol').addEventListener('input', e => audio.setVolume(+e.target.value));
 $('quality').value = quality;
+try { const f = +localStorage.getItem('starport-fov'); if (f >= 60 && f <= 100) { camera.fov = f; camera.updateProjectionMatrix(); $('fov').value = f; } } catch (e) { /* 忽略 */ }
+$('fov').addEventListener('input', e => { camera.fov = +e.target.value; camera.updateProjectionMatrix(); try { localStorage.setItem('starport-fov', e.target.value); } catch (err) { /* 忽略 */ } });
 $('quality').addEventListener('change', e => { applyQuality(e.target.value, true); try { localStorage.setItem('starport-quality', e.target.value); } catch (err) { /* 忽略 */ } });
 $('sens').addEventListener('input', e => { input.sens = +e.target.value; });
 $('btn-respawn').addEventListener('click', () => { if (G.driving) exitRover(player); player.respawn(); $('death').classList.add('hidden'); G.requestLock(); });

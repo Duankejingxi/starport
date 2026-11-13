@@ -125,7 +125,7 @@ export function updateColony(dt) {
     const sw = moving ? Math.sin(ph) * 0.6 : 0;
     c.legL.rotation.x = sw; c.legR.rotation.x = -sw; c.armL.rotation.x = -sw * 0.8; c.armR.rotation.x = sw * 0.8;
     if (!moving && pd < 4) c.armR.rotation.x = -2.6 + Math.sin(now * 6) * 0.3; // 挥手
-    c.body.position.y = 1.0 + (moving ? Math.abs(Math.sin(ph)) * 0.05 : 0);
+    c.body.position.y = 0.72 + (moving ? Math.abs(Math.sin(ph)) * 0.04 : 0);
     c.talked = Math.max(0, c.talked - dt);
   }
 }
