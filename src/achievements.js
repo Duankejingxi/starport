@@ -35,6 +35,8 @@ export const ACHV = [
   { id: 'helper', name: '好邻居', desc: '完成 10 个居民委托', icon: 'radio', check: () => (G.stats.requests || 0) >= 10 },
   { id: 'science', name: '科学家', desc: '完成 6 项科研', icon: 'book', check: () => Object.keys(G.tech || {}).length >= 6 },
   { id: 'trader', name: '星际商人', desc: '完成 10 次星际贸易', icon: 'ship', check: () => (G.stats.traded || 0) >= 10 },
+  { id: 'mail', name: '来自地球的信', desc: '打开 5 个补给舱', icon: 'ship', check: () => (G.stats.pods || 0) >= 5 },
+  { id: 'happy', name: '安居乐业', desc: '居民幸福度达到 90', icon: 'star', check: () => G.colony.pop >= 4 && (G.morale || 0) >= 90 },
   { id: 'photo', name: '摄影师', desc: '在拍照模式中保存一张照片', icon: 'camera', check: () => (G.stats.photos || 0) > 0 },
   { id: 'gather', name: '故乡的光', desc: '夜里，居民们聚在广场上看全息地球', icon: 'planet', check: () => !!G.plazaSeen },
 ];

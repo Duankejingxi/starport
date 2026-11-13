@@ -34,7 +34,7 @@ import { makeLanderHD as makeLander } from './models_hd.js';
 import { P, PID, PLANETS, SAVE_KEY, META, saveMeta, loadMeta, clearAll } from './planets.js';
 import { initCity, updateCity, LEVELS } from './city.js';
 import { spawnRover, getRover, roverState, enterRover, exitRover, updateRover, roverSpeed } from './rover.js';
-import { updateEvents } from './events.js';
+import { updateEvents, podAt, openPod, dropPod } from './events.js';
 
 const $ = id => document.getElementById(id);
 G.debug = /[?&]debug/.test(location.search);
@@ -147,7 +147,7 @@ canvas.addEventListener('click', () => {
 function save(silent) {
   if (!G.started) return;
   const data = {
-    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [], plazaSeen: !!G.plazaSeen, mode: G.mode, diff: G.diffKey, tech: G.tech || {}, rp: G.rp || 0, requests: G.requests || [],
+    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [], plazaSeen: !!G.plazaSeen, mode: G.mode, diff: G.diffKey, morale: G.morale, tech: G.tech || {}, rp: G.rp || 0, requests: G.requests || [],
     time: { t: G.time.t, day: G.time.day },
     player: { x: player.pos.x, z: player.pos.z, yaw: player.yaw, o2: player.o2, hp: player.health },
     buildings: serializeBuildings(), nodes: serializeNodes(), colonists: serializeColonists(), storm: stormState(),
@@ -171,7 +171,7 @@ function applySave(d) {
   loadColonists(d.colonists || []);
   if (d.rover) spawnRover(d.rover.x, d.rover.z, d.rover.h);
   G.relicsFound = d.relics || []; G.plazaSeen = !!d.plazaSeen;
-  G.mode = d.mode || 'story'; G.diffKey = d.diff || 'normal'; G.tech = d.tech || {}; G.rp = d.rp || 0; G.requests = d.requests || [];
+  G.morale = d.morale; G.mode = d.mode || 'story'; G.diffKey = d.diff || 'normal'; G.tech = d.tech || {}; G.rp = d.rp || 0; G.requests = d.requests || [];
   G.cityLevel = d.city || 0; G.popTotal = d.pop ?? (d.colonists || []).length; G.launched = !!d.launched;
   initCity(scene);
   setStormState(d.storm);
@@ -565,6 +565,8 @@ function handleInteraction(dt) {
   const ctx = { prompt: '', crossClass: '' };
   if (player.dead || G.menuOpen) return ctx;
   if (G.driving) { ctx.prompt = `<span class="big">${roverSpeed()}</span> KM/H<br><kbd>W S</kbd> 油门 · <kbd>A D</kbd> 转向 · <kbd>Shift</kbd> 加速 · <kbd>空格</kbd> 刹车 · <kbd>E</kbd> 下车`; return ctx; }
+  const pod = podAt(player.pos);
+  if (pod) { ctx.prompt = '<b>地球补给舱</b><br><kbd>E</kbd>打开'; if (input.hit('KeyE')) openPod(pod); return ctx; }
   const relic = relicAt(player.pos);
   if (relic) {
     ctx.prompt = `<b>${relic.name}</b><br><kbd>E</kbd>调查`;
@@ -814,6 +816,7 @@ window.__dbg = {
   chapter: i => startChapter(i),
   look(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; },
   begin: () => begin(false),
+  pod: () => { const p = dropPod(); return { x: p.x, z: p.z }; },
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
   step(sec, dt = 0.05) { for (let t = 0; t < sec; t += dt) { update(dt); updateFx(dt, camera.position); input.endFrame(); } },

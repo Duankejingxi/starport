@@ -128,6 +128,7 @@ export function requestProgress(r, ctx) { return Math.max(0, Math.min(r.n, progr
 
 let reqT = 25, chkT = 0;
 export function updateSystems(dt, ctx) {
+  updateMorale(dt);
   // 科研点
   G.rp = (G.rp || 0) + rpRate() * dt;
   // 委托：殖民地有了第一座建筑之后开始出现
@@ -158,3 +159,26 @@ export function updateSystems(dt, ctx) {
   }
 }
 export function abandonRequest(i) { G.requests.splice(i, 1); reqT = Math.min(reqT, 20); }
+
+// ================= 居民幸福度 =================
+// 0~100。影响居民工作产出与移民到来的速度
+let moraleT = 0;
+export function updateMorale(dt) {
+  moraleT -= dt; if (moraleT > 0) return;
+  moraleT = 2;
+  const C = G.colony, pop = Math.max(1, C.pop);
+  const f = [];
+  let m = 55;
+  const sur = k => Math.max(-1, Math.min(1, (C[k] - C.pop) / pop));
+  const res = (sur('food') + sur('o2') + sur('water')) * 6; m += res; f.push(['生活物资', res]);
+  const lamps = G.buildings.filter(b => b.type === 'lamp').length, plaza = G.buildings.some(b => b.type === 'plaza' && b.powered);
+  const lit = Math.min(8, lamps * 1.5) + (plaza ? 12 : 0); m += lit; f.push(['照明与广场', lit]);
+  const green = Math.min(10, G.buildings.filter(b => b.type === 'greenhouse' || b.type === 'vfarm').length * 3); m += green; f.push(['绿色植物', green]);
+  const broken = G.buildings.filter(b => b.broken).length * -6 + (C.deficit ? -10 : 0); m += broken; f.push(['损坏与停电', broken]);
+  const safe = G.buildings.some(b => b.type === 'turret') ? 6 : (D().foe > 0 && (G.nightsSurvived || 0) > 0 ? -8 : 0); m += safe; f.push(['安全感', safe]);
+  const crowd = C.housing && C.pop > C.housing * 0.9 ? -8 : 0; m += crowd; f.push(['住房拥挤', crowd]);
+  if (has('culture')) { m += 10; f.push(['殖民地文化', 10]); }
+  G.morale = Math.round(Math.max(0, Math.min(100, m)));
+  G.moraleFactors = f.filter(x => Math.abs(x[1]) >= 0.5);
+}
+export const moraleMul = () => 0.5 + (G.morale ?? 60) / 100;

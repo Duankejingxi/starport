@@ -11,6 +11,7 @@ import { WORLD } from './terrain.js';
 import { ic, iconSprite } from './icons.js';
 import { buildingThumbs } from './thumbs.js';
 import { nearestRelic, allRelics, relicCount } from './relics.js';
+import { nearestPod, allPods } from './events.js';
 import { bossAlive } from './combat.js';
 import { TECHS, has, research, rpRate, tradeQuote, doTrade, isFree, requestProgress, abandonRequest, MODES, DIFFS } from './systems.js';
 
@@ -272,7 +273,7 @@ export function archiveHTML() {
   const C = G.colony, s = G.stats;
   const mined = s.mined.iron + s.mined.silicon + s.mined.ice + s.mined.titanium;
   const kv = [['人口', C.pop], ['城市等级', LEVELS[G.cityLevel].name], ['设施', G.buildings.length], ['火星日', G.time.day],
-    ['电力', `${Math.round(C.powerProd)} / ${C.powerUse}`], ['遗迹', `${relicCount().found} / ${relicCount().total}`], ['可容纳', C.support], ['采集资源', mined], ['击退锈蚀蛛', s.kills], ['行驶里程', `${((s.driven || 0) / 1000).toFixed(1)} km`], ['居民交谈', (s.talked || []).length]];
+    ['电力', `${Math.round(C.powerProd)} / ${C.powerUse}`], ['遗迹', `${relicCount().found} / ${relicCount().total}`], ['可容纳', C.support], ['采集资源', mined], ['击退锈蚀蛛', s.kills], ['行驶里程', `${((s.driven || 0) / 1000).toFixed(1)} km`], ['居民交谈', (s.talked || []).length], ['幸福度', G.morale ?? '—'], ['补给舱', s.pods || 0]];
   const meta = META.visited || [];
   const planets = Object.keys(PLANETS).map(id => {
     const v = id === PID ? { pop: C.pop } : meta.find(m => m.id === id);
@@ -281,6 +282,7 @@ export function archiveHTML() {
   const people = G.colonists.map(c => `<div class="person" data-i="${[...c.name][0]}"><span class="pn">${c.name}</span><span class="pj">${c.job}</span><div class="pl">“${c.line}”</div></div>`).join('');
   const more = C.pop - G.colonists.length;
   return `<h3>概况 · ${PLANET.name}</h3><div class="kv">${kv.map(x => `<div><small>${x[0]}</small><b>${x[1]}</b></div>`).join('')}</div>
+    ${G.moraleFactors && C.pop ? `<h3>幸福度构成</h3><div class="kv">${G.moraleFactors.map(f => `<div><small>${f[0]}</small><b style="color:${f[1] >= 0 ? 'var(--green)' : 'var(--red)'}">${f[1] > 0 ? '+' : ''}${Math.round(f[1])}</b></div>`).join('')}</div>` : ''}
     <h3>人类的足迹</h3><div class="kv">${planets}<div><small>星际总人口</small><b>${meta.filter(m => m.id !== PID).reduce((a, m) => a + m.pop, 0) + C.pop}</b></div></div>
     <h3>居民名册</h3>${people ? `<div class="people">${people}</div>` : '<p style="color:var(--dim)">还没有居民。建好住房、氧气、食物、水和着陆场，移民飞船就会到来。</p>'}
     ${more > 0 ? `<p style="color:var(--dim);margin-top:14px">……以及另外 ${more} 位居民。</p>` : ''}`;
@@ -303,6 +305,7 @@ export function updateUI(dt, ctx) {
     if (G.buildings.length) {
       col += `<div class="st ${C.deficit ? 'warn' : ''}">${ic('power')}<div><small>电力</small><b>${Math.round(C.powerProd)}<em>/${C.powerUse}</em></b></div></div>`;
       col += `<div class="st">${ic('pop')}<div><small>人口</small><b>${C.pop}<em>/${C.support}</em></b></div></div>`;
+      if (C.pop > 0 && G.morale !== undefined) { const mo = G.morale; col += `<div class="st ${mo < 35 ? 'warn' : mo >= 75 ? 'tf' : ''}">${ic('star')}<div><small>幸福</small><b>${mo}</b></div></div>`; if (mo < 35) col += `<div class="chip">${ic('warn')}居民不开心：建照明灯、广场、温室，修好受损设施</div>`; }
       if (G.terraform > 0) col += `<div class="st tf">${ic('planet')}<div><small>大气改造</small><b>${Math.floor(G.terraform * 100)}%</b></div></div>`;
       if (C.deficit) col += `<div class="chip">${ic('warn')}电力不足：多建太阳能或反应堆</div>`;
       if (C.housing && G.buildings.some(b => b.type === 'beacon') && C.support <= C.pop) {
@@ -407,6 +410,8 @@ function drawCompass() {
     for (const n of G.nodes) if (n.type === 'titanium') { const d = Math.hypot(n.x - P.pos.x, n.z - P.pos.z); if (d < bd) { bd = d; best = n; } }
     if (best) marks.push({ c: 'ti', t: `${ic('titanium')}${Math.round(bd)}m`, a: bearing(best.x, best.z) });
   }
+  const np = nearestPod(P.pos);
+  if (np) marks.push({ c: 'home', t: `${ic('ship')}补给 ${Math.round(np.d)}m`, a: bearing(np.p.x, np.p.z) });
   const nr = nearestRelic(P.pos);
   if (nr) marks.push({ c: 'ship', t: `? ${Math.round(nr.d)}m`, a: bearing(nr.r.x, nr.r.z) });
   for (const m of marks) {
@@ -450,6 +455,7 @@ function drawMinimap() {
   const blink = Math.sin(performance.now() * 0.008) > 0;
   for (const e of G.enemies) dot(e.pos.x, e.pos.z, e.guardian ? 3.5 : 2.6, blink ? '#ff5a45' : '#a02818');
   dot(LANDER_POS.x, LANDER_POS.z, 3, '#8dffb0');
+  for (const p of allPods()) { mmx.fillStyle = '#8bf0a9'; mmx.beginPath(); mmx.arc(tx(p.x), tz(p.z), 4.5, 0, Math.PI * 2); mmx.fill(); }
   for (const r of allRelics()) {
     if (Math.abs(r.x - P.pos.x) > range * 1.2 || Math.abs(r.z - P.pos.z) > range * 1.2) continue;
     mmx.strokeStyle = r.found ? 'rgba(255,210,138,.4)' : '#ffd28a'; mmx.lineWidth = 1.5;

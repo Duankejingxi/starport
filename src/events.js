@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { G } from './state.js';
-import { glow } from './models.js';
+import { glow, M } from './models.js';
 import { getHeight, HALF } from './terrain.js';
 import { fx } from './fx.js';
 import { audio } from './audio.js';
@@ -48,6 +48,7 @@ function launchMeteor(impact) {
 }
 
 export function updateEvents(dt) {
+  updatePods(dt);
   const night = G.time.night > 0.7;
   // 每个夜晚掷一次骰子
   if (night && rolledNight !== G.time.day && G.time.day >= 2 && G.storm < 0.1 && !G.ended) {
@@ -85,4 +86,72 @@ function impact(p) {
     n.meteor = true;
   }
   G.events.emit('toast', `☄ 陨石坠落在 ${Math.round(d)} 米外`);
+}
+
+// —— 地球补给舱：定期从天而降，落点有信标，按 E 打开 ——
+const pods = [];
+let podT = 150;
+function buildPod() {
+  const g = new THREE.Group();
+  const mk = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = true; g.add(m); return m; };
+  mk(new THREE.CylinderGeometry(0.9, 1.2, 1.8, 20), M.white, 1.2);
+  mk(new THREE.CylinderGeometry(0.92, 0.92, 0.25, 20), M.orange, 1.6);
+  mk(new THREE.ConeGeometry(0.9, 0.9, 20), M.white, 2.55);
+  mk(new THREE.CylinderGeometry(1.25, 1.1, 0.3, 20), M.dark, 0.2);
+  for (let i = 0; i < 4; i++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.1, 6), M.metal); const a = i * Math.PI / 2; l.position.set(Math.cos(a) * 1.1, 0.25, Math.sin(a) * 1.1); l.rotation.set(Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6); g.add(l); }
+  const beacon = glow(0x66ff99, 2.4, g, 0, 3.4, 0);
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.8, 4, 12, 1, true), M.flame); flame.rotation.x = Math.PI; flame.position.y = -1.8; g.add(flame);
+  return { g, beacon, flame };
+}
+export function dropPod(nearPlayer = true) {
+  const P = G.player.pos;
+  let x = 0, z = 0;
+  for (let i = 0; i < 30; i++) {
+    const a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 130;
+    x = THREE.MathUtils.clamp(P.x + Math.cos(a) * d, -HALF + 180, HALF - 180); z = THREE.MathUtils.clamp(P.z + Math.sin(a) * d, -HALF + 180, HALF - 180);
+    if (!G.colliders.overlaps(x, z, 4)) break;
+  }
+  const m = buildPod(), y = getHeight(x, z);
+  m.g.position.set(x, y + 320, z);
+  G.scene.add(m.g);
+  const pod = { ...m, x, z, y, t: 0, landed: false, life: 300 };
+  pods.push(pod);
+  audio.play('rumble');
+  G.events.emit('toast', `地球补给舱正在降落 · ${Math.round(Math.hypot(x - P.x, z - P.z))} 米外`);
+  return pod;
+}
+export function updatePods(dt) {
+  if (G.buildings.length && !G.ended && G.time.night < 0.5) { podT -= dt; if (podT <= 0) { podT = 240 + Math.random() * 180; dropPod(); } }
+  const now = performance.now() * 0.001;
+  for (let i = pods.length - 1; i >= 0; i--) {
+    const p = pods[i];
+    if (!p.landed) {
+      p.t += dt;
+      const k = Math.min(1, p.t / 8), e = 1 - Math.pow(1 - k, 2.4);
+      p.g.position.y = p.y + 320 * (1 - e);
+      p.flame.scale.y = 0.6 + (1 - e) + Math.random() * 0.2;
+      for (let j = 0; j < 2; j++) fx.flame(p.g.position);
+      if (k >= 1) { p.landed = true; p.flame.visible = false; fx.ring(new THREE.Vector3(p.x, p.y, p.z), 2, 70); audio.play('land'); }
+    } else {
+      p.life -= dt;
+      p.beacon.material.opacity = 0.55 + Math.sin(now * 4) * 0.4;
+      if (p.life <= 0) { G.scene.remove(p.g); pods.splice(i, 1); }
+    }
+  }
+}
+export function podAt(pos) { return pods.find(p => p.landed && Math.hypot(p.x - pos.x, p.z - pos.z) < 3.5); }
+export function nearestPod(pos) { let b = null, bd = 1e9; for (const p of pods) { const d = Math.hypot(p.x - pos.x, p.z - pos.z); if (d < bd) { bd = d; b = p; } } return b ? { p: b, d: bd } : null; }
+export function allPods() { return pods; }
+export function openPod(p) {
+  const scale = 1 + (G.cityLevel || 0) * 0.4;
+  const loot = { iron: Math.round((20 + Math.random() * 20) * scale), silicon: Math.round((15 + Math.random() * 15) * scale), ice: Math.round((10 + Math.random() * 15) * scale) };
+  if (Math.random() < 0.6) loot.titanium = Math.round((3 + Math.random() * 5) * scale);
+  for (const k in loot) { G.res[k] += loot[k]; G.events.emit('pickup', { type: k, n: loot[k], note: '补给舱' }); }
+  const rp = Math.round(10 * scale); G.rp = (G.rp || 0) + rp;
+  G.stats.pods = (G.stats.pods || 0) + 1;
+  const notes = ['包裹里夹着一张孩子画的画：一座红色星球，上面有很多小房子。', '附言：「地球这边一切都好。照顾好自己。」', '箱子底部有一包种子，标签上写着：向日葵。', '一封手写信：「我儿子在你们的殖民地。请替我告诉他，妈妈为他骄傲。」', '补给清单最后一行：「巧克力 ×2——给第一个拆箱的人。」'];
+  radio('地球指挥中心 · 补给', notes[Math.floor(Math.random() * notes.length)] + ` 附带科研数据 ${rp} 点。`);
+  audio.play('craft');
+  fx.burst(new THREE.Vector3(p.x, p.y + 1.5, p.z), [0.5, 1, 0.7], 50, 6);
+  G.scene.remove(p.g); pods.splice(pods.indexOf(p), 1);
 }
