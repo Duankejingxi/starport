@@ -32,6 +32,22 @@ export function initUI(mapCanvas) {
   $('res').innerHTML = Object.entries(RES_INFO).map(([k, r]) => `<div class="r" id="r-${k}" style="--rc:${r.color}"><span class="ic">${ic(k)}</span><span class="tx"><small>${r.name}</small><b>0</b></span></div>`).join('');
   G.events.on('toast', t => toast(t));
   G.events.on('pickup', p => pickup(p));
+  // 命中标记：准星四角短线收拢；击杀时变红并放大
+  let hmT = 0;
+  G.events.on('enemyHit', h => {
+    const now = performance.now(); if (!h.kill && now - hmT < 90) return; hmT = now;
+    const el = $('hitmark'); el.classList.toggle('kill', !!h.kill);
+    el.animate([{ opacity: 1, transform: `translate(-50%,-50%) scale(${h.kill ? 1.5 : 1.25})` }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1)', offset: 0.25 }, { opacity: 0, transform: 'translate(-50%,-50%) scale(1)' }], { duration: h.kill ? 520 : 260, easing: 'ease-out' });
+    if (!h.kill) audio.tone(2400, 0.03, 'square', 0.015);
+  });
+  // 受伤方向：屏幕边缘出现指向伤害来源的红色弧光
+  G.events.on('hurt', () => {
+    const P = G.player; if (!P || P.lastHitDir === undefined) return;
+    const rel = P.lastHitDir - P.yaw - Math.PI;
+    const d = document.createElement('div'); d.className = 'dd'; d.style.transform = `rotate(${-rel}rad)`;
+    $('dmgdir').appendChild(d);
+    d.animate([{ opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 0 }], { duration: 1300, easing: 'ease-out' }).onfinish = () => d.remove();
+  });
   G.events.on('hurt', n => { document.body.classList.remove('glitch'); void document.body.offsetWidth; document.body.classList.add('glitch'); clearTimeout(G._gl); G._gl = setTimeout(() => document.body.classList.remove('glitch'), 320); });
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { audio.play('ui'); closeMenus(true); }));
   document.querySelectorAll('.menu button, .bp-tabs button').forEach(b => b.addEventListener('mouseenter', () => audio.play('tick')));

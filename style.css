@@ -684,3 +684,16 @@ body.glitch #hud { animation: glitchH .32s steps(3) both; }
 #hotbar .slot.gad .cdf { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--cd, 0) * 100%); background: linear-gradient(180deg, rgba(10, 8, 8, .55), rgba(10, 8, 8, .8)); transition: height .1s linear; pointer-events: none; }
 #hotbar .slot.gad.ready .ic { color: #ffb36a; filter: drop-shadow(0 0 6px rgba(255, 150, 60, .6)); }
 #hotbar .slot.hidden { display: none; }
+
+/* —— 命中标记与受伤方向 —— */
+#hitmark { position: fixed; left: 50%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%); pointer-events: none; opacity: 0; z-index: 9; }
+#hitmark i { position: absolute; width: 9px; height: 2px; background: #fff; box-shadow: 0 0 4px rgba(0, 0, 0, .6); border-radius: 1px; }
+#hitmark i:nth-child(1) { left: 0; top: 4px; transform: rotate(45deg); }
+#hitmark i:nth-child(2) { right: 0; top: 4px; transform: rotate(-45deg); }
+#hitmark i:nth-child(3) { left: 0; bottom: 4px; transform: rotate(-45deg); }
+#hitmark i:nth-child(4) { right: 0; bottom: 4px; transform: rotate(45deg); }
+#hitmark.kill i { background: #ff5a3a; width: 11px; box-shadow: 0 0 8px rgba(255, 80, 40, .8); }
+#dmgdir { position: fixed; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 9; }
+#dmgdir .dd { position: absolute; left: -160px; top: -160px; width: 320px; height: 320px; opacity: 0; }
+#dmgdir .dd::before { content: ''; position: absolute; left: 50%; top: 0; width: 150px; height: 46px; transform: translateX(-50%); border-radius: 50% 50% 0 0 / 100% 100% 0 0; border-top: 4px solid rgba(255, 60, 40, .9); filter: drop-shadow(0 0 10px rgba(255, 40, 20, .8)); -webkit-mask: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent); mask: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent); }
+body.cinema #hitmark, body.cinema #dmgdir { display: none; }

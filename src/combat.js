@@ -74,6 +74,7 @@ export function damageEnemy(e, dmg, owner) {
   if (e.dead) return;
   e.hp -= dmg; e.flash = 0.12; e.awake = true;
   if (owner === 'player') audio.play('hit');
+  if (owner === 'player' || owner === 'laser') G.events.emit('enemyHit', { kill: e.hp <= 0 });
   if (e.hp <= 0) killEnemy(e, owner);
 }
 
