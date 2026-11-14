@@ -47,7 +47,8 @@ function buildFlare(scene) {
   const lf = new Lensflare();
   const add = (kind, size, dist, col) => { const e = new LensflareElement(flareTex(kind), size, dist, new THREE.Color(col)); e.base = new THREE.Color(col); lf.addElement(e); flareEls.push(e); };
   add('glow', 380, 0, 0xffe8cc); add('streak', 1600, 0, 0x9ad8ff); add('streak', 900, 0, 0xffd0a0);
-  add('hex', 70, 0.35, 0x6fa8ff); add('ring', 140, 0.55, 0xffb070); add('hex', 110, 0.75, 0x86ffc8); add('glow', 60, 0.9, 0xff9a60); add('ring', 260, 1.15, 0x6a8cff);
+  // 鬼影克制：只留几枚很淡的暖色光斑和一圈若有若无的光环，像真实镜头而不是游戏贴图
+  add('glow', 46, 0.4, 0x3a2c22); add('ring', 130, 0.62, 0x241c1a); add('glow', 80, 0.86, 0x2a2018); add('ring', 240, 1.12, 0x161a22);
   flareAnchor.add(lf);
 }
 let envScene, envSky, pmrem, envRT = null, envT = 0;
@@ -184,11 +185,45 @@ export function buildSky(scene) {
   amb = new THREE.AmbientLight(0x404a70, 0.3);
   scene.add(hemi, amb);
   scene.fog = new THREE.FogExp2(0xd8a070, 0.0016);
+  buildClouds(scene);
   // 环境反射：用只含天空的小场景生成 PMREM
   envScene = new THREE.Scene();
   envSky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), skyMat);
   envScene.add(envSky);
   pmrem = new THREE.PMREMGenerator(G.renderer);
+}
+
+// —— 高空云层：把视线投射到一个高空平面上采样分形噪声，随风缓慢移动 ——
+let clouds = null;
+function buildClouds(scene) {
+  if (P.id === 'europa') return;
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uT: { value: 0 }, uHor: { value: new THREE.Color() }, uSunC: { value: new THREE.Color() }, uSunD: { value: new THREE.Vector3() }, uNight: { value: 0 }, uStorm: { value: 0 }, uCov: { value: P.id === 'kepler' ? 0.58 : 0.5 }, uTint: { value: new THREE.Color(P.id === 'kepler' ? 0xffffff : 0xf2d6c0) } },
+    vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
+    fragmentShader: `uniform float uT, uNight, uStorm, uCov; uniform vec3 uHor, uSunC, uSunD, uTint; varying vec3 vD;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
+      float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++){ v += a * n(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return v; }
+      void main(){
+        vec3 d = normalize(vD); if (d.y < 0.0) discard;
+        vec2 uv = d.xz / (d.y + 0.12) * 1.6;
+        vec2 w = vec2(uT * 0.012, uT * 0.004);
+        // 拉长的卷云：x 方向拉伸
+        float c = fbm(uv * vec2(0.7, 1.6) + w) * 0.65 + fbm(uv * 3.1 - w * 1.7) * 0.35;
+        float cov = uCov + uStorm * 0.35;
+        float a = smoothstep(1.0 - cov, 1.0 - cov + 0.26, c);
+        a *= smoothstep(0.0, 0.22, d.y) * (1.0 - uStorm * 0.4);
+        float s = max(dot(d, normalize(uSunD)), 0.0);
+        vec3 lit = mix(uHor * 1.05, uSunC * 1.25, 0.35 + pow(s, 6.0) * 0.6) * uTint;
+        lit += uSunC * pow(s, 24.0) * (1.0 - a) * 1.5; // 云边银光
+        vec3 col = mix(lit, vec3(0.05, 0.06, 0.09), uNight * 0.85);
+        gl_FragColor = vec4(col, a * mix(0.9, 0.4, uNight));
+      }`,
+    transparent: true, depthWrite: false, fog: false, side: THREE.BackSide,
+  });
+  clouds = new THREE.Mesh(new THREE.SphereGeometry(3000, 48, 24), mat);
+  clouds.frustumCulled = false; clouds.renderOrder = -2; clouds.userData.noAO = true;
+  scene.add(clouds);
 }
 
 export function updateSky(dt, camPos) {
@@ -265,6 +300,11 @@ export function updateSky(dt, camPos) {
 
   // 雾
   G.scene.fog.color.copy(hor);
+  if (clouds) {
+    const U = clouds.material.uniforms; clouds.position.copy(camPos);
+    U.uT.value += dt * 60; U.uHor.value.copy(hor); U.uSunC.value.copy(sun.color).multiplyScalar(Math.max(0.15, sunK)); U.uSunD.value.copy(sunDir);
+    U.uNight.value = T.night; U.uStorm.value = storm;
+  }
   G.scene.fog.density = lerp(lerp(0.0016, 0.0032, T.night), 0.03, storm) * (P.id === 'europa' ? 0.55 : 1);
   const nowMs = performance.now();
   if (nowMs - envT > 4000 || !envRT) {

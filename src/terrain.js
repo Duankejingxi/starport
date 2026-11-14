@@ -293,7 +293,7 @@ export function buildSkyline(scene) {
     const mat = new THREE.ShaderMaterial({
       uniforms: { uFog: { value: new THREE.Color() }, uTint: { value: new THREE.Color(tint) }, uD: { value: depth }, uSky: { value: new THREE.Color() } },
       vertexShader: 'attribute float k; varying float vK; void main(){ vK = k; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform vec3 uFog, uTint; uniform float uD; varying float vK; void main(){ float m = uD * smoothstep(0.0, 1.0, vK); gl_FragColor = vec4(mix(uFog, uTint * (0.55 + 0.45 * uFog), m), 1.0); }',
+      fragmentShader: 'uniform vec3 uFog, uTint; uniform float uD; varying float vK; void main(){ float m = uD * smoothstep(0.0, 1.0, vK); vec3 t = uFog * uTint * 1.7; gl_FragColor = vec4(mix(uFog, t, m), 1.0); }',
       fog: false, depthWrite: true,
     });
     const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.renderOrder = -1; m.userData.noAO = true;
