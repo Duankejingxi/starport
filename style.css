@@ -430,7 +430,7 @@ body.photo #letterbox, body.cinema #letterbox { display: block; position: fixed;
 body.photo #letterbox i, body.cinema #letterbox i { position: absolute; left: 0; right: 0; height: 10vh; background: #000; animation: lb .6s var(--ease); }
 body.photo #letterbox i:first-child, body.cinema #letterbox i:first-child { top: 0; }
 body.photo #letterbox i:last-child, body.cinema #letterbox i:last-child { bottom: 0; }
-body.cinema #hud, body.cinema #visor { display: none; }
+body.cinema #hud, body.cinema #visor, body.cinema #achv-pop, body.cinema #chapter { display: none; }
 @keyframes lb { from { height: 0; } }
 body.photo #photo-bar { display: flex; position: fixed; left: 50%; bottom: 3.2vh; transform: translateX(-50%); z-index: 9; gap: 24px; align-items: center; font-size: 14px; color: rgba(255, 255, 255, .5); letter-spacing: 2px; }
 #photo-bar span { display: flex; align-items: center; gap: 4px; }
@@ -658,3 +658,22 @@ body.glitch #c { animation: glitch .32s steps(3) both; }
 body.glitch #hud { animation: glitchH .32s steps(3) both; }
 @keyframes glitch { 0% { transform: translate(-6px, 2px); filter: hue-rotate(-25deg) saturate(1.6) contrast(1.2); } 33% { transform: translate(5px, -3px) skewX(-1deg); filter: hue-rotate(20deg); } 66% { transform: translate(-2px, 1px); } 100% { transform: none; filter: none; } }
 @keyframes glitchH { 0% { transform: translateX(4px); text-shadow: -3px 0 rgba(255, 0, 60, .7), 3px 0 rgba(0, 220, 255, .7); } 50% { transform: translateX(-3px); } 100% { transform: none; } }
+
+/* —— 曲速穿越 —— */
+#warp { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 60; animation: warpIn 1.2s ease-out both; }
+@keyframes warpIn { from { opacity: 0; filter: brightness(3); } to { opacity: 1; filter: none; } }
+#warp-cap { position: fixed; left: 0; right: 0; bottom: 13vh; z-index: 61; text-align: center; pointer-events: none; font-family: 'Rajdhani', 'PingFang SC', 'Microsoft YaHei', sans-serif; color: #eaf3ff; text-shadow: 0 0 18px rgba(120, 180, 255, .5); }
+#warp-cap p { margin: .45em 0; font-size: 22px; letter-spacing: .32em; opacity: 0; animation: capIn 1.4s cubic-bezier(.2, .7, .2, 1) both; }
+#warp-cap p:first-child { font-size: 13px; letter-spacing: .6em; color: #8fb8ff; }
+#warp-cap p b { font-size: 40px; font-weight: 600; letter-spacing: .25em; color: #fff; }
+#warp-cap .stats { font-size: 15px; letter-spacing: .12em; color: rgba(220, 232, 255, .7); }
+@keyframes capIn { from { opacity: 0; transform: translateY(14px); filter: blur(6px); letter-spacing: .6em; } to { opacity: 1; transform: none; filter: none; } }
+#warp-flash { position: fixed; inset: 0; z-index: 62; background: #fff; opacity: 0; pointer-events: none; transition: opacity .6s cubic-bezier(.5, 0, .9, .4); }
+#warp-flash.on { opacity: 1; }
+#launch-cap { position: fixed; left: 0; right: 0; bottom: 14vh; z-index: 30; text-align: center; pointer-events: none; font-family: 'Rajdhani', sans-serif; color: #fff; }
+#launch-cap .lc-k { font-size: 12px; letter-spacing: .55em; color: rgba(255, 210, 160, .8); }
+#launch-cap .lc-n { font-size: 54px; font-weight: 600; letter-spacing: .1em; line-height: 1.1; text-shadow: 0 0 24px rgba(255, 170, 90, .6); }
+#launch-cap .lc-n.pop { animation: lcPop .9s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes lcPop { from { opacity: 0; transform: scale(1.35); filter: blur(8px); } 30% { opacity: 1; filter: none; } to { opacity: .85; transform: scale(1); } }
+#launch-cap.out { transition: opacity .8s; opacity: 0; }
+#fade.white { background: #fff8ec; transition: opacity 1.4s cubic-bezier(.6, 0, .9, .5); }

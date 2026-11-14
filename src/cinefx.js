@@ -126,6 +126,21 @@ export function explode(pos, scale = 1, color = 0xff8a3a) {
   fx.burst(pos, [1, 0.55, 0.15], Math.round(40 * scale), 14 * Math.sqrt(scale));
   shake(Math.min(1, 0.35 * scale), pos);
 }
+// 火箭尾焰卷起的地面烟云：沿地面向外翻涌，逐渐变大变淡
+export function billow(pos, scale = 1, tint = [0.78, 0.6, 0.48]) {
+  if (live.length > 420) return;
+  const a = Math.random() * Math.PI * 2, sp = (10 + Math.random() * 14) * scale;
+  const g = 0.75 + Math.random() * 0.35;
+  const s = sprite(smokeTex, new THREE.Color().setRGB(tint[0] * g, tint[1] * g, tint[2] * g), THREE.NormalBlending, 0);
+  s.position.set(pos.x + Math.cos(a) * 1.5 * scale, pos.y + 0.8 + Math.random() * 1.5, pos.z + Math.sin(a) * 1.5 * scale);
+  s.material.rotation = Math.random() * 6;
+  const v = new THREE.Vector3(Math.cos(a) * sp, 0.6 + Math.random() * 2.2, Math.sin(a) * sp), sz = (4 + Math.random() * 4) * scale, dur = 4 + Math.random() * 3;
+  live.push({ o: s, t: 0, dur, upd: (k, o, dt) => {
+    o.position.addScaledVector(v, dt); v.multiplyScalar(Math.pow(0.42, dt)); v.y += dt * 0.5;
+    o.scale.setScalar(sz * (0.4 + Math.sqrt(k) * 1.8)); o.material.rotation += dt * 0.15;
+    o.material.opacity = Math.min(1, k * 8) * (1 - k) * 0.75;
+  } });
+}
 // 小型命中：闪光 + 小冲击环
 export function impact(pos, color = 0x8ee7ff, size = 1) {
   flash(pos, color, 18 * size, 8 * size, 0.18);

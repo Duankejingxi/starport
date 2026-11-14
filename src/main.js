@@ -40,7 +40,8 @@ import { spawnRover, getRover, roverState, enterRover, exitRover, updateRover, r
 import { updateEvents, podAt, openPod, dropPod } from './events.js';
 import { updateFestival, startFestival } from './festival.js';
 import { updateMega } from './mega.js';
-import { initCineFx, updateCineFx, explode } from './cinefx.js';
+import { initCineFx, updateCineFx, explode, billow, shockwave, shake as cineShake } from './cinefx.js';
+import { playWarp } from './warp.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -563,24 +564,91 @@ function openStarmap(pad) {
   }).join('');
   $('starmap-list').querySelectorAll('.dest').forEach(el => el.addEventListener('click', () => { closeMenus(true); startLaunch(pad, el.dataset.id); }));
 }
+// —— 星际发射：倒计时 → 点火 → 地面烟云翻涌 → 升空追踪镜头 → 白光 → 虫洞穿越 ——
 function startLaunch(b, dest) {
-  G.launching = { b, t: 0, dest };
-  G.launched = true;
+  const pad = new THREE.Vector3(b.x, b.y, b.z);
+  // 选机位：背对太阳（顺光），视线上没有建筑和山体遮挡
+  const sunA = Math.atan2(sunDir.z, sunDir.x);
+  let dir = null, cam = null;
+  for (let i = 0; i < 24 && !cam; i++) {
+    const a = sunA + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.26, D = 74;
+    const d = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+    const c = pad.clone().addScaledVector(d, D); c.y = getHeight(c.x, c.z) + 2.6;
+    let ok = !G.colliders.overlaps(c.x, c.z, 6);
+    for (let k = 0.05; ok && k < 0.85; k += 0.05) {
+      const x = c.x + (pad.x - c.x) * k, z = c.z + (pad.z - c.z) * k;
+      if (G.colliders.overlaps(x, z, 2.5) || getHeight(x, z) > c.y + (b.y + 10 - c.y) * k) ok = false;
+    }
+    if (ok) { dir = d; cam = c; }
+  }
+  if (!cam) { dir = new THREE.Vector3(Math.cos(sunA), 0, Math.sin(sunA)); cam = pad.clone().addScaledVector(dir, 74); cam.y = getHeight(cam.x, cam.z) + 2.6; }
+  const light = new THREE.PointLight(0xffa860, 0, 260, 1.3); scene.add(light);
+  const cap = document.createElement('div'); cap.id = 'launch-cap'; cap.innerHTML = '<div class="lc-k">LAUNCH SEQUENCE · ' + PLANETS[dest].name + '</div><div class="lc-n"></div>'; document.body.appendChild(cap);
+  G.launching = { b, t: 0, dest, pad, dir, cam, light, cap, n: -1, look: pad.clone().setY(b.y + 14), fov: camera.fov, v: 0 };
+  G.launched = true; G.cine = true;
+  document.body.classList.add('cinema');
+  if (document.pointerLockElement) document.exitPointerLock();
   audio.play('rumble');
-  radio('方舟 · AI', `殖民舰点火。目标：${PLANETS[dest].name}。全体乘员，祝你们好运。`);
-  b.anim.flame.visible = true;
+  radio('方舟 · AI', `殖民舰进入发射程序。目标：${PLANETS[dest].name}。全体乘员，祝你们好运。`);
+  const skip = e => { if (e.type === 'mousedown' || e.code === 'Space' || e.code === 'Escape') G.launching.t = Math.max(G.launching.t, 11); };
+  G.launching.skip = skip;
+  setTimeout(() => { window.addEventListener('keydown', skip); window.addEventListener('mousedown', skip); }, 300);
 }
+const _lv = new THREE.Vector3();
 function updateLaunch(dt) {
   const L = G.launching; if (!L) return;
   L.t += dt;
-  const ship = L.b.anim.ship;
-  if (L.t > 2) ship.position.y += dt * (2 + (L.t - 2) * 9);
-  const base = new THREE.Vector3(L.b.x, L.b.y + ship.position.y, L.b.z);
-  for (let i = 0; i < 6; i++) fx.flame(base);
-  if (L.t < 5) fx.dustPuff(new THREE.Vector3(L.b.x + (Math.random() - 0.5) * 16, L.b.y + 1, L.b.z + (Math.random() - 0.5) * 16), 3, 4);
-  player.landDip = Math.max(player.landDip, Math.min(0.15, 0.03 * L.t) * Math.random());
-  if (L.t > 9 && !L.faded) { L.faded = true; $('fade').classList.add('on'); }
-  if (L.t > 11.5 && !L.done) { L.done = true; travel(L.dest); }
+  const ship = L.b.anim.ship, flame = L.b.anim.flame;
+  const IGN = 3.6, LIFT = 5.2;
+  // 倒计时字幕
+  const n = L.t < 0.3 ? -1 : L.t < 1.4 ? 3 : L.t < 2.5 ? 2 : L.t < IGN ? 1 : L.t < LIFT + 1.5 ? 0 : -2;
+  if (n !== L.n) {
+    L.n = n; const el = L.cap.querySelector('.lc-n');
+    if (n === -2) L.cap.classList.add('out');
+    else if (n >= 0) { el.textContent = n > 0 ? 'T – ' + n : '点火'; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); if (n > 0) audio.play('click'); }
+  }
+  ship.getWorldPosition(_lv);
+  const base = _lv.clone();
+  if (L.t < IGN) {
+    // 发射前：底部排气、白色蒸汽
+    if (Math.random() < dt * 14) fx.dustPuff(new THREE.Vector3(L.pad.x + (Math.random() - 0.5) * 6, L.pad.y + 2 + Math.random() * 3, L.pad.z + (Math.random() - 0.5) * 6), 1, 1.2, [0.9, 0.9, 0.92]);
+  } else {
+    if (!L.ign) {
+      L.ign = true; flame.visible = true;
+      shockwave(base.clone().setY(L.pad.y + 1.5), 0xffd0a0, 18, 1.4);
+      cineShake(1.2); audio.play('kill'); audio.engine(1);
+    }
+    const burn = Math.min(1, (L.t - IGN) / 1.2);
+    flame.scale.set(0.6 + burn * 0.5, 0.4 + burn * 1.1 + Math.random() * 0.15, 0.6 + burn * 0.5);
+    const alt = base.y - L.pad.y;
+    const rate = Math.max(0, 1 - alt / 70);
+    for (let i = 0; i < Math.round(4 * rate); i++) billow(L.pad.clone().setY(L.pad.y + 0.5), 1.5);
+    for (let i = 0; i < 4; i++) fx.flame(base);
+    L.light.position.copy(base).y -= 4;
+    L.light.intensity = (2500 + Math.random() * 900) * burn;
+    G.shake = Math.max(G.shake || 0, 0.35 * rate + 0.08);
+    if (L.t > LIFT) { L.v += dt * (1.2 + (L.t - LIFT) * 3.2); ship.position.y += L.v * dt; }
+  }
+  // 镜头：缓慢推近 → 仰拍追踪，焦距逐渐拉长
+  const push = Math.min(1, L.t / 6);
+  const cp = L.cam.clone().addScaledVector(L.dir, -push * 10);
+  camera.position.copy(cp);
+  const tgt = base.clone(); tgt.y += 14;
+  L.look.lerp(tgt, 1 - Math.pow(0.02, dt));
+  camera.lookAt(L.look);
+  // 长焦跟拍：让飞船在画面里保持一定大小
+  const dist = camera.position.distanceTo(tgt);
+  const want = THREE.MathUtils.radToDeg(2 * Math.atan(48 / dist));
+  camera.fov = THREE.MathUtils.clamp(want, 9, L.fov); camera.updateProjectionMatrix();
+  const sh = G.shake || 0;
+  if (sh > 0.01) { camera.position.x += (Math.random() - 0.5) * sh * 0.6; camera.position.y += (Math.random() - 0.5) * sh * 0.5; }
+  G.shake = sh * Math.pow(0.1, dt);
+  if (L.t > 11 && !L.faded) { L.faded = true; $('fade').classList.add('white', 'on'); audio.engine(0); }
+  if (L.t > 12.6 && !L.done) {
+    L.done = true;
+    window.removeEventListener('keydown', L.skip); window.removeEventListener('mousedown', L.skip);
+    travel(L.dest);
+  }
 }
 function travel(dest) {
   const meta = loadMeta();
@@ -593,12 +661,14 @@ function travel(dest) {
   save(true);
   saveMeta(meta);
   const nx = PLANETS[dest];
-  $('ending-text').innerHTML = [`曲速航行中……`, `目的地：<b>${nx.name}</b>${meta.autoResume ? '（已开拓）' : ''}`, `<span class="stats">${P.name}的 ${G.colony.pop} 位居民，会替你守着那里的灯火。</span>`].map((l, i) => `<p style="animation-delay:${i * 1.2}s">${l}</p>`).join('');
-  document.querySelector('#ending .btns').classList.add('hidden');
-  $('ending').classList.remove('hidden'); $('fade').classList.remove('on');
   G.endingShown = true;
   if (document.pointerLockElement) document.exitPointerLock();
-  setTimeout(() => { location.href = location.pathname + (G.debug ? '?debug' : ''); }, 5000);
+  audio.play('chapter');
+  setTimeout(() => { G.warping = true; }, 1300);
+  playWarp([`WORMHOLE TRANSIT · 虫洞穿越`, `<b>${nx.name}</b>`, `${nx.title}${meta.autoResume ? ' · 已开拓' : ''}`, `<span class="stats">${P.name}的 ${G.colony.pop} 位居民，会替你守着那里的灯火。</span>`], () => {
+    location.href = location.pathname + (G.debug ? '?debug' : '');
+  }, 7.5);
+  setTimeout(() => $('fade').classList.remove('on', 'white'), 400);
 }
 function finalEnding() {
   G.endingShown = true;
@@ -796,7 +866,9 @@ let introCam = 0;
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.05);
+  if (G.warping) return; // 虫洞画面接管屏幕时不再渲染场景
   if (landing) { updateLanding(dt); updateCineFx(dt); renderScene(); input.endFrame(); return; }
+  if (G.launching && !G.endingShown) { updateLaunch(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (!G.started) {
     // 标题画面：缓慢环绕着陆舱
     introCam += dt * 0.05;
@@ -837,7 +909,6 @@ function update(dt) {
     updateLightPool(dt);
     updateColony(dt);
     updateCity(dt, tool.id === 'build' && !!placement.type);
-    updateLaunch(dt);
     floraMat.emissiveIntensity = 0.06 + G.time.night * (0.55 + Math.sin(performance.now() * 0.0015) * 0.15);
     updateEnemies(dt);
     updateEvents(dt);
@@ -884,6 +955,8 @@ window.__dbg = {
   pod: () => dropPod(),
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
+  launch(d = "europa") { const b = G.buildings.find(b => b.type === "launch"); startLaunch(b, d); },
+  launchStep(sec) { for (let t = 0; t < sec && G.launching && !G.endingShown; t += 0.05) { updateLaunch(0.05); updateFx(0.05, camera.position); updateCineFx(0.05); } return G.launching.t; },
   step(sec, dt = 0.05) { for (let t = 0; t < sec; t += dt) { update(dt); updateFx(dt, camera.position); input.endFrame(); } },
   input,
   save, toast, setGhost, openMenu, closeMenus, tool, placement, rover: getRover,
