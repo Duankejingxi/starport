@@ -1,3 +1,4 @@
+import { scanWhales } from './skywhales.js';
 import * as THREE from 'three';
 import { G } from './state.js';
 import { M, glow, glowTexture } from './models.js';
@@ -75,6 +76,11 @@ function scan() {
   const names = { iron: '铁矿', silicon: '硅晶', ice: '水冰', titanium: '钛矿' };
   const txt = Object.entries(counts).map(([k, v]) => `${names[k]} ${v}`).join(' · ');
   G.events.emit('toast', txt ? `扫描完成 · ${txt}` : '扫描完成 · 附近没有矿藏');
+  const wn = scanWhales(P, SCAN_R);
+  if (wn) {
+    G.rp = (G.rp || 0) + 30 * wn; G.stats.whales = (G.stats.whales || 0) + wn;
+    radio('小星', wn > 1 ? `扫到了 ${wn} 头天鲸！它们在用次声波交谈……记录完毕，科研点 +${30 * wn}。` : `扫到一头天鲸！体长四十多米，靠体内的轻质气囊浮在空中。记录完毕，科研点 +30。`);
+  }
   G.stats.scans = (G.stats.scans || 0) + 1;
 }
 
