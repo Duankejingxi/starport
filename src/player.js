@@ -131,7 +131,8 @@ export class Player {
     }
     this.landDip *= Math.pow(0.002, dt);
     this.bobY = Math.sin(this.bob * 2) * 0.05 * Math.min(1, hs / 6) - this.landDip;
-    this.cam.position.set(this.pos.x, this.pos.y + EYE + this.bobY, this.pos.z);
+    const sh = G.shake || 0, tt = performance.now() * 0.05;
+    this.cam.position.set(this.pos.x + Math.sin(tt * 1.7) * sh * 0.25, this.pos.y + EYE + this.bobY + Math.sin(tt * 2.3) * sh * 0.2, this.pos.z + Math.cos(tt * 1.3) * sh * 0.25);
     // 冲刺时视野变宽，左右平移时镜头微倾
     this.roll += ((-fx_ * 0.025) - this.roll) * Math.min(1, dt * 6);
     const fovT = (G.baseFov || 72) + (this.sprinting ? 8 : 0) + (this.jetting ? 4 : 0);

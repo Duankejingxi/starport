@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G } from './state.js';
+import { explode, impact as cfImpact } from './cinefx.js';
 import { D, isFree } from './systems.js';
 import { glow, CRAWLER_MATS } from './models.js';
 import { makeCrawlerHD } from './models_hd.js';
@@ -11,11 +12,18 @@ import { THREAT_FROM } from './story.js';
 
 // —— 弹道 ——
 const projectiles = [];
+const boltGeo = new THREE.CylinderGeometry(0.05, 0.11, 2.6, 8, 1); boltGeo.translate(0, -1.3, 0);
+const boltMatP = new THREE.MeshBasicMaterial({ color: 0xb8f4ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+const boltMatT = new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
 const COLORS = { player: 0x66e6ff, turret: 0xffb040 };
 export function shoot(from, dir, dmg, owner) {
-  const s = glow(COLORS[owner], owner === 'player' ? 1.1 : 0.9, G.scene);
+  const s = glow(COLORS[owner], owner === 'player' ? 1.4 : 1.1, G.scene);
   s.position.copy(from);
-  projectiles.push({ pos: from.clone(), vel: dir.clone().multiplyScalar(owner === 'player' ? 110 : 80), life: 1.4, dmg, owner, s });
+  // 拉长的发光弹体
+  const bolt = new THREE.Mesh(boltGeo, owner === 'player' ? boltMatP : boltMatT);
+  bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); bolt.position.copy(from); bolt.frustumCulled = false;
+  G.scene.add(bolt);
+  projectiles.push({ pos: from.clone(), vel: dir.clone().multiplyScalar(owner === 'player' ? 110 : 80), life: 1.4, dmg, owner, s, bolt });
 }
 
 function hitEnemy(p, radiusBonus = 0) {
@@ -38,12 +46,13 @@ export function updateProjectiles(dt) {
     for (let k = 0; k < steps && !dead; k++) {
       pr.pos.addScaledVector(pr.vel, dt / steps);
       const e = hitEnemy(pr.pos);
-      if (e) { damageEnemy(e, pr.dmg, pr.owner); fx.spark(pr.pos, [0.5, 0.9, 1], 10, 6); dead = true; }
-      else if (pr.pos.y < getHeight(pr.pos.x, pr.pos.z)) { fx.spark(pr.pos, [1, 0.7, 0.4], 6, 4); fx.dustPuff(pr.pos, 3, 0.5); dead = true; }
+      const col = pr.owner === 'player' ? 0x8ee7ff : 0xffb060;
+      if (e) { damageEnemy(e, pr.dmg, pr.owner); fx.spark(pr.pos, pr.owner === 'player' ? [0.5, 0.9, 1] : [1, 0.7, 0.4], 14, 8); cfImpact(pr.pos, col, 1.2); dead = true; }
+      else if (pr.pos.y < getHeight(pr.pos.x, pr.pos.z)) { fx.spark(pr.pos, [1, 0.7, 0.4], 8, 5); fx.dustPuff(pr.pos, 5, 0.8); cfImpact(pr.pos, col, 0.8); dead = true; }
     }
-    pr.s.position.copy(pr.pos);
+    pr.s.position.copy(pr.pos); pr.bolt.position.copy(pr.pos);
     if (Math.random() < 0.8) fx.trail(pr.pos, pr.owner === 'player' ? [0.3, 0.8, 1] : [1, 0.6, 0.2], 0.6);
-    if (dead) { G.scene.remove(pr.s); projectiles.splice(i, 1); }
+    if (dead) { G.scene.remove(pr.s); G.scene.remove(pr.bolt); projectiles.splice(i, 1); }
   }
 }
 
@@ -71,7 +80,7 @@ export function damageEnemy(e, dmg, owner) {
 function killEnemy(e, owner) {
   e.dead = true;
   const p = e.pos.clone(); p.y += 1;
-  fx.burst(p, [1, 0.4, 0.1], 50, 9); fx.dustPuff(p, 12, 2);
+  fx.burst(p, [1, 0.4, 0.1], 40, 9); fx.dustPuff(p, 12, 2); explode(p, e.boss ? 3.5 : e.guardian ? 1.4 : 0.9, 0xff6a2a);
   fx.debris(p, e.legs[0].children[0].material, 6, 5, 0.45 * e.scale);
   fx.debris(p, e.inner.children[1].material, 8, 6, 0.5 * e.scale);
   audio.play('kill');

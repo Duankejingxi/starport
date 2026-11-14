@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G, canAfford, pay } from './state.js';
+import { explode } from './cinefx.js';
 import { BUILD_MODELS, M, CITY_MATS, glow } from './models.js';
 import { P, PID, META } from './planets.js';
 import { LEVELS, inTerritory } from './city.js';
@@ -133,7 +134,7 @@ export function destroyBuilding(b, refund = false) {
   const i = G.buildings.indexOf(b); if (i >= 0) G.buildings.splice(i, 1);
   G.stats.built[b.type] = Math.max(0, (G.stats.built[b.type] || 0) - 1);
   const p = new THREE.Vector3(b.x, b.y + 2, b.z);
-  fx.burst(p, [1, 0.6, 0.3], 60, 10); fx.dustPuff(p, 30, b.def.r * 2);
+  fx.burst(p, [1, 0.6, 0.3], 60, 10); fx.dustPuff(p, 30, b.def.r * 2); explode(p, Math.min(3, b.def.r * 0.45), 0xffa050);
   recalcColony();
 }
 

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G, RES_INFO } from './state.js';
+import { beamMaterial, impact as cfImpact, shake } from './cinefx.js';
 import { D, has } from './systems.js';
 import { input } from './input.js';
 import { M, glow } from './models.js';
@@ -77,9 +78,9 @@ export function initTools(camera) {
   for (const k in models) { models[k].scale.setScalar(k === 'build' ? 0.45 : 0.6); models[k].visible = false; vmScene.add(models[k]); }
 
   // 光束（世界空间）
-  const bg = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true); bg.translate(0, 0.5, 0);
+  const bg = new THREE.CylinderGeometry(1, 1, 1, 16, 24, true); bg.translate(0, 0.5, 0);
   beamCore = new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: 0xfff0d0, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
-  beamOuter = new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: 0xff7020, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
+  beamOuter = new THREE.Mesh(bg, beamMaterial(0xff7a30));
   beamCore.visible = beamOuter.visible = false; beamCore.frustumCulled = beamOuter.frustumCulled = false;
   G.scene.add(beamCore, beamOuter);
   beamGlow = glow(0xff9040, 1.6, G.scene); beamGlow.visible = false;
@@ -198,7 +199,8 @@ export function updateTools(dt, player, camera) {
       const q = new THREE.Quaternion().setFromUnitVectors(up, seg);
       const wob = 1 + Math.sin(performance.now() * 0.05) * 0.2;
       beamCore.position.copy(start); beamCore.quaternion.copy(q); beamCore.scale.set(0.012 * wob, len, 0.012 * wob);
-      beamOuter.position.copy(start); beamOuter.quaternion.copy(q); beamOuter.scale.set(0.04 * wob, len, 0.04 * wob);
+      beamOuter.position.copy(start); beamOuter.quaternion.copy(q); beamOuter.scale.set(0.085 * wob, len, 0.085 * wob); beamOuter.material.uniforms.uLen.value = len;
+      if (Math.random() < 0.35) fx.spark(end, [1, 0.75, 0.4], 2, 7, 0.5);
       beamCore.visible = beamOuter.visible = true;
       beamGlow.position.copy(end); beamGlow.visible = true; beamGlow.scale.setScalar(1.2 + Math.random() * 0.8);
       kick = Math.max(kick, 0.15 + Math.random() * 0.1);

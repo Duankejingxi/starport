@@ -4,6 +4,8 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { sunDir } from './sky.js';
 import { initPebbles, updatePebbles } from './pebbles.js';
 import { G, ColliderGrid, RES_INFO } from './state.js';
 import { buildTerrain, makeMapCanvas, getHeight, applyTerraform, floraMat } from './terrain.js';
@@ -38,6 +40,7 @@ import { spawnRover, getRover, roverState, enterRover, exitRover, updateRover, r
 import { updateEvents, podAt, openPod, dropPod } from './events.js';
 import { updateFestival, startFestival } from './festival.js';
 import { updateMega } from './mega.js';
+import { initCineFx, updateCineFx, explode } from './cinefx.js';
 
 const $ = id => document.getElementById(id);
 G.debug = /[?&]debug/.test(location.search);
@@ -68,6 +71,44 @@ let composer = null, bloom = null;
 function setupComposer() {
   composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
+  // 环境光遮蔽：缝隙、接缝、贴地处的柔和阴影
+  gtao = new GTAOPass(scene, camera, window.innerWidth, window.innerHeight);
+  gtao.output = GTAOPass.OUTPUT.Default; gtao.blendIntensity = 1.0;
+  // 法线/深度预渲染只要实体：精灵、粒子、加法发光体都隐藏，否则会在 AO 里留下黑色方块
+  gtao.overrideVisibility = function () {
+    const cache = this._visibilityCache;
+    this.scene.traverse(o => {
+      cache.set(o, o.visible);
+      const m = o.material;
+      if (o.isPoints || o.isLine || o.isSprite || (m && !Array.isArray(m) && m.transparent && (m.depthWrite === false || m.blending === THREE.AdditiveBlending))) o.visible = false;
+    });
+  };
+  gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.4, thickness: 1.5, scale: 1.2, samples: 12 });
+  gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+  composer.addPass(gtao);
+  // 体积光：从太阳屏幕位置向外的径向光束
+  shafts = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, uSun: { value: new THREE.Vector2(0.5, 0.5) }, uK: { value: 0 }, uAsp: { value: 1 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uSun; uniform float uK, uAsp; varying vec2 vUv;
+      void main(){
+        vec4 base = texture2D(tDiffuse, vUv);
+        if (uK < 0.001) { gl_FragColor = base; return; }
+        vec2 d = (uSun - vUv); float dist = length(d * vec2(uAsp, 1.0));
+        d *= 0.92 / 48.0;
+        vec2 uv = vUv; float decay = 1.0; vec3 acc = vec3(0.0);
+        for (int i = 0; i < 48; i++) {
+          uv += d;
+          vec3 s = texture2D(tDiffuse, clamp(uv, 0.001, 0.999)).rgb;
+          float b = max(max(s.r, s.g), s.b);
+          acc += s * smoothstep(1.3, 3.0, b) * decay;
+          decay *= 0.965;
+        }
+        acc *= 0.035 * uK * (1.0 - smoothstep(0.2, 1.1, dist) * 0.6);
+        gl_FragColor = vec4(base.rgb + acc, base.a);
+      }`,
+  });
+  composer.addPass(shafts);
   bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.5, 0.88);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
@@ -92,12 +133,20 @@ function setupComposer() {
   });
   composer.addPass(grade);
 }
-let grade = null;
+let grade = null, gtao = null, shafts = null;
+const _sv = new THREE.Vector3();
 function renderScene() {
   if (quality === 'high' && composer) {
     // 夜里泛光更强，白天收敛，避免天空过曝
     bloom.strength = 0.3 + G.time.night * 0.22;
     bloom.threshold = 0.9;
+    // 体积光：太阳在屏幕内且在地平线以上时才出现
+    _sv.copy(camera.position).addScaledVector(sunDir, 1000).project(camera);
+    const onScr = _sv.z < 1 && Math.abs(_sv.x) < 1.6 && Math.abs(_sv.y) < 1.6;
+    const sk = onScr ? THREE.MathUtils.smoothstep(sunDir.y, -0.02, 0.12) * (1 - G.storm) * (1 - THREE.MathUtils.smoothstep(Math.max(Math.abs(_sv.x), Math.abs(_sv.y)), 1.0, 1.6)) : 0;
+    shafts.uniforms.uK.value += (sk - shafts.uniforms.uK.value) * 0.1;
+    shafts.uniforms.uSun.value.set(_sv.x * 0.5 + 0.5, _sv.y * 0.5 + 0.5);
+    shafts.uniforms.uAsp.value = camera.aspect;
     grade.uniforms.uT.value = (performance.now() * 0.001) % 100; grade.uniforms.uNight.value = G.time.night;
     composer.render();
   } else renderer.render(scene, camera);
@@ -113,9 +162,11 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+  if (gtao) gtao.setSize(window.innerWidth, window.innerHeight);
 });
 
 // —— 世界生成 ——
+initCineFx();
 G.hiShadows = quality === 'high';
 buildSky(scene);
 buildTerrain(scene);
@@ -743,7 +794,7 @@ let introCam = 0;
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.05);
-  if (landing) { updateLanding(dt); renderScene(); input.endFrame(); return; }
+  if (landing) { updateLanding(dt); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (!G.started) {
     // 标题画面：缓慢环绕着陆舱
     introCam += dt * 0.05;
@@ -752,7 +803,7 @@ function frame() {
     camera.lookAt(LANDER_POS.x, getHeight(LANDER_POS.x, LANDER_POS.z) + 4, LANDER_POS.z);
     G.time.t = 0.27 + Math.sin(introCam * 0.5) * 0.01;
     updateSky(0, camera.position);
-    updateFx(dt, camera.position);
+    updateFx(dt, camera.position); updateCineFx(dt);
     renderScene();
     return;
   }
@@ -765,7 +816,7 @@ function frame() {
     updateUI(0, { prompt: '' });
     updateSky(0, camera.position);
   }
-  updateFx(running ? dt : 0, camera.position);
+  updateFx(running ? dt : 0, camera.position); updateCineFx(running ? dt : 0);
   input.endFrame();
   renderScene();
   renderViewmodel(renderer);
@@ -826,6 +877,7 @@ window.__dbg = {
   look(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; },
   begin: () => begin(false),
   fest: () => startFestival(),
+  boom: (x, y, z, s) => explode(new THREE.Vector3(x, y, z), s),
   pod: () => { const p = dropPod(); return { x: p.x, z: p.z }; },
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },

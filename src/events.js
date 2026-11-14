@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G } from './state.js';
+import { explode } from './cinefx.js';
 import { glow, M } from './models.js';
 import { getHeight, HALF } from './terrain.js';
 import { fx } from './fx.js';
@@ -75,7 +76,7 @@ export function updateEvents(dt) {
 
 function impact(p) {
   const up = p.clone(); up.y += 1.5;
-  fx.burst(up, [1, 0.55, 0.2], 120, 22);
+  fx.burst(up, [1, 0.55, 0.2], 120, 22); explode(up, 2.6, 0xff8a40);
   fx.ring(p, 2, 90);
   fx.dustPuff(up, 40, 8);
   audio.play('rumble'); audio.play('kill');
