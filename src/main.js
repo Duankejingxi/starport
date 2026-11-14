@@ -43,6 +43,7 @@ import { updateMega } from './mega.js';
 import { initCineFx, updateCineFx, explode, billow, shockwave, flash as cineFlash, shake as cineShake } from './cinefx.js';
 import { playWarp } from './warp.js';
 import { throwGrenade, updateGrenades } from './grenade.js';
+import { updateDevils, spawnDevil } from './devils.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -936,6 +937,7 @@ function update(dt) {
     if (!G.driving) updateTools(dt, player, camera); else G.lookBuilding = null;
     if (input.hit('KeyG') && !G.menuOpen && !player.dead && !G.driving) throwGrenade(camera, player);
     updateGrenades(dt);
+    updateDevils(dt);
     updateBuildings(dt, { shoot });
     updateLightPool(dt);
     updateColony(dt);
@@ -989,7 +991,7 @@ window.__dbg = {
   fest: () => startFestival(),
   boom: (x, y, z, s) => explode(new THREE.Vector3(x, y, z), s),
   pod: () => dropPod(),
-  audio, spawnCrawler,
+  audio, spawnCrawler, spawnDevil,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
   launch(d = "europa") { const b = G.buildings.find(b => b.type === "launch"); startLaunch(b, d); },

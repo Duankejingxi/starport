@@ -8,6 +8,8 @@ import { relicCount } from './relics.js';
 const KEY = 'starport-achv';
 export const ACHV = [
   { id: 'first', name: '第一步', desc: '在异星采集第一块矿石', icon: 'iron', check: () => G.stats.mined.iron + G.stats.mined.silicon + G.stats.mined.ice > 0 },
+  { id: 'devil', name: '乘风而上', desc: '被尘卷风卷上天空', icon: 'storm', check: () => (G.stats.devils || 0) > 0 },
+  { id: 'boomer', name: '一雷清场', desc: '投掷第一颗震荡雷', icon: 'bomb', check: () => (G.stats.grenades || 0) > 0 },
   { id: 'breathe', name: '呼吸', desc: '建起第一座制氧站', icon: 'o2', check: () => G.stats.built.oxygen > 0 },
   { id: 'home', name: '第一个家', desc: '建造居住穹顶', icon: 'dome', check: () => G.stats.built.habitat > 0 },
   { id: 'welcome', name: '欢迎回家', desc: '迎接第一批移民', icon: 'pop', check: () => G.stats.arrived > 0 },
