@@ -9,6 +9,7 @@ const KEY = 'starport-achv';
 export const ACHV = [
   { id: 'first', name: '第一步', desc: '在异星采集第一块矿石', icon: 'iron', check: () => G.stats.mined.iron + G.stats.mined.silicon + G.stats.mined.ice > 0 },
   { id: 'devil', name: '乘风而上', desc: '被尘卷风卷上天空', icon: 'storm', check: () => (G.stats.devils || 0) > 0 },
+  { id: 'geyser', name: '冰上飞人', desc: '被木卫二的冰火山送上天空', icon: 'ice', check: () => (G.stats.geyser || 0) > 0 },
   { id: 'boomer', name: '一雷清场', desc: '投掷第一颗震荡雷', icon: 'bomb', check: () => (G.stats.grenades || 0) > 0 },
   { id: 'breathe', name: '呼吸', desc: '建起第一座制氧站', icon: 'o2', check: () => G.stats.built.oxygen > 0 },
   { id: 'home', name: '第一个家', desc: '建造居住穹顶', icon: 'dome', check: () => G.stats.built.habitat > 0 },

@@ -46,6 +46,7 @@ import { playWarp } from './warp.js';
 import { throwGrenade, updateGrenades } from './grenade.js';
 import { updateDevils, spawnDevil } from './devils.js';
 import { updateLoot } from './loot.js';
+import { initGeysers, updateGeysers, geyserList, triggerGeyser } from './geysers.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -184,6 +185,7 @@ buildTerrain(scene);
 buildSkyline(scene);
 initFx(scene);
 initLightPool(scene, quality === 'high');
+initGeysers(scene);
 const lander = makeLander();
 lander.group.position.set(LANDER_POS.x, getHeight(LANDER_POS.x, LANDER_POS.z) + 0.1, LANDER_POS.z);
 lander.group.rotation.y = 0.6;
@@ -943,6 +945,7 @@ function update(dt) {
     updateGrenades(dt);
     updateDevils(dt);
     updateLoot(dt);
+    updateGeysers(dt);
     updateBuildings(dt, { shoot });
     updateLightPool(dt);
     updateColony(dt);
@@ -996,7 +999,7 @@ window.__dbg = {
   fest: () => startFestival(),
   boom: (x, y, z, s) => explode(new THREE.Vector3(x, y, z), s),
   pod: () => dropPod(),
-  audio, spawnCrawler, spawnDevil, spawnWasp,
+  audio, spawnCrawler, spawnDevil, spawnWasp, geyserList, triggerGeyser,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
   launch(d = "europa") { const b = G.buildings.find(b => b.type === "launch"); startLaunch(b, d); },
