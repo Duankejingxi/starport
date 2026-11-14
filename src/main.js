@@ -16,7 +16,7 @@ import { audio } from './audio.js';
 import { generateNodes, updateNodes, serializeNodes, loadNodes } from './resources.js';
 import { createBuilding, updateBuildings, serializeBuildings, recalcColony, destroyBuilding, DEFS, setGhost, placement, canUpgrade, upgradeCost, upgradeBuilding, MAX_LV } from './buildings.js';
 import { costText } from './state.js';
-import { updateProjectiles, updateEnemies, shoot, clearEnemies, rayEnemy, spawnCrawler } from './combat.js';
+import { updateProjectiles, updateEnemies, shoot, clearEnemies, rayEnemy, spawnCrawler, spawnWasp } from './combat.js';
 import { Player, LANDER_POS } from './player.js';
 import { initTools, updateTools, renderViewmodel, tool } from './tools.js';
 import { updateColony, lookColonist, serializeColonists, loadColonists } from './colony.js';
@@ -996,7 +996,7 @@ window.__dbg = {
   fest: () => startFestival(),
   boom: (x, y, z, s) => explode(new THREE.Vector3(x, y, z), s),
   pod: () => dropPod(),
-  audio, spawnCrawler, spawnDevil,
+  audio, spawnCrawler, spawnDevil, spawnWasp,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
   launch(d = "europa") { const b = G.buildings.find(b => b.type === "launch"); startLaunch(b, d); },

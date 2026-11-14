@@ -80,7 +80,7 @@ export function damageEnemy(e, dmg, owner) {
 function killEnemy(e, owner) {
   e.dead = true;
   const p = e.pos.clone(); p.y += 1;
-  fx.burst(p, [1, 0.4, 0.1], 40, 9); fx.dustPuff(p, 12, 2); explode(p, e.boss ? 3.5 : e.guardian ? 1.4 : 0.9, 0xff6a2a);
+  fx.burst(p, [1, 0.4, 0.1], 40, 9); fx.dustPuff(p, 12, 2); explode(p, e.boss ? 3.5 : e.guardian ? 1.4 : e.flyer ? 0.55 : 0.9, 0xff6a2a);
   fx.debris(p, e.legs[0].children[0].material, 6, 5, 0.45 * e.scale);
   fx.debris(p, e.inner.children[1].material, 8, 6, 0.5 * e.scale);
   audio.play('kill', e.pos);
@@ -102,7 +102,67 @@ function killEnemy(e, owner) {
   if (drop) { G.res.titanium += drop; G.stats.mined.titanium += drop; G.events.emit('pickup', { type: 'titanium', n: drop, note: '晶体残骸' }); }
 }
 
-let spawnT = 0, nightBudget = 0, wasNight = false, guardT = 5, bossT = -1;
+// —— 晶翼蜂：夜间成群出现的飞行敌人。盘旋 → 蓄势（发亮、尖鸣）→ 俯冲 → 拉升 ——
+const waspWing = new THREE.MeshBasicMaterial({ color: 0xffa070, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+const wingGeo = (() => { const g = new THREE.CircleGeometry(0.5, 20); g.scale(1.15, 0.32, 1); g.rotateZ(-0.18); g.translate(0.56, -0.05, 0); return g; })();
+const waspBody = new THREE.OctahedronGeometry(0.32, 0); waspBody.scale(0.8, 0.8, 2.0);
+export function spawnWasp(x, z, y) {
+  const scale = 0.8;
+  const group = new THREE.Group();
+  const inner = new THREE.Group(); inner.position.y = 1.0 * scale; group.add(inner);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), CRAWLER_MATS.eye); eye.position.z = 0.55; inner.add(eye);
+  const body = new THREE.Mesh(waspBody, CRAWLER_MATS.crystal); body.castShadow = true; inner.add(body);
+  const sting = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.5, 6), CRAWLER_MATS.crystal); sting.rotation.x = -Math.PI / 2; sting.position.z = -0.8; inner.add(sting);
+  const legs = [];
+  for (const sd of [-1, 1]) {
+    const w = new THREE.Group(); w.position.set(sd * 0.15, 0.12, 0.1); w.scale.x = sd; inner.add(w);
+    const m = new THREE.Mesh(wingGeo, waspWing); m.rotation.x = -Math.PI / 2; w.add(m);
+    legs.push(w);
+  }
+  const g = glow(0xff5a20, 1.2, inner, 0, 0, 0);
+  group.position.set(x, y, z); G.scene.add(group);
+  const hp = 22 + G.time.day * 1.5;
+  const e = { group, inner, legs, glowS: g, pos: group.position, hp, maxHp: hp, scale, flyer: true, state: 'orbit', st: 2 + Math.random() * 4,
+    ang: Math.random() * 6.28, rad: 13 + Math.random() * 8, alt: 7 + Math.random() * 5, vel: new THREE.Vector3(), speed: 9, phase: Math.random() * 6, flash: 0, sink: 0, atk: 0, retarget: 0 };
+  G.enemies.push(e);
+  return e;
+}
+const _w = new THREE.Vector3(), _d = new THREE.Vector3();
+function updateWasp(e, dt, P, now, leaving) {
+  const gy = getHeight(e.pos.x, e.pos.z);
+  e.st -= dt;
+  if (leaving) e.state = 'leave';
+  if (e.state === 'orbit') {
+    e.ang += dt * 0.9;
+    _w.set(P.x + Math.cos(e.ang) * e.rad, Math.max(gy, getHeight(P.x, P.z)) + e.alt + Math.sin(now * 2 + e.phase) * 1.2, P.z + Math.sin(e.ang) * e.rad);
+    if (e.st <= 0 && !G.player.dead) { e.state = 'windup'; e.st = 0.7; audio.play('wasp', e.pos); }
+  } else if (e.state === 'windup') {
+    _w.copy(e.pos); e.vel.multiplyScalar(Math.pow(0.02, dt));
+    if (e.st <= 0) { e.state = 'dive'; e.st = 1.6; _d.set(P.x, P.y + 1.3, P.z).sub(e.pos).normalize(); e.vel.copy(_d).multiplyScalar(28); }
+  } else if (e.state === 'dive') {
+    _d.set(P.x, P.y + 1.3, P.z).sub(e.pos); const l = _d.length();
+    e.vel.lerp(_d.multiplyScalar(28 / Math.max(l, 0.01)), Math.min(1, dt * 0.8));
+    if (l < 1.6 && !G.player.dead) { G.player.damage(7 * D().dmg, e.pos); e.state = 'retreat'; e.st = 1.4; e.vel.y = 14; }
+    if (e.st <= 0 || e.pos.y < gy + 0.6) { e.state = 'retreat'; e.st = 1.2; e.vel.y = Math.abs(e.vel.y) + 8; }
+  } else if (e.state === 'retreat') {
+    e.vel.y += dt * 6; if (e.st <= 0) { e.state = 'orbit'; e.st = 3 + Math.random() * 4; e.ang = Math.atan2(e.pos.z - P.z, e.pos.x - P.x); }
+  } else if (e.state === 'leave') {
+    e.vel.y += dt * 10; if (e.pos.y > gy + 120) { G.scene.remove(e.group); e.dead = true; e.gone = true; }
+  }
+  if (e.state === 'orbit') { _d.copy(_w).sub(e.pos); e.vel.lerp(_d.multiplyScalar(2.2), Math.min(1, dt * 2)); if (e.vel.length() > 16) e.vel.setLength(16); }
+  e.pos.addScaledVector(e.vel, dt);
+  if (e.pos.y < gy + 0.8) e.pos.y = gy + 0.8;
+  // 朝向飞行方向，翅膀高频扇动
+  if (e.vel.lengthSq() > 0.5) { e.group.rotation.y = Math.atan2(e.vel.x, e.vel.z); e.inner.rotation.x = -Math.atan2(e.vel.y, Math.hypot(e.vel.x, e.vel.z)) * 0.7; }
+  const flap = Math.sin(now * 55 + e.phase) * 0.7;
+  e.legs[0].rotation.z = flap; e.legs[1].rotation.z = flap;
+  const hot = e.state === 'windup' ? 1 : e.state === 'dive' ? 0.7 : 0.25;
+  e.glowS.material.opacity = hot * (0.7 + Math.random() * 0.3); e.glowS.scale.setScalar(0.8 + hot * 1.6);
+  if (e.state === 'dive' && Math.random() < dt * 40) fx.trail(e.pos.clone().setY(e.pos.y + 0.8), [1, 0.4, 0.15], 0.7);
+  if (e.flash > 0) { e.flash -= dt; e.inner.scale.setScalar(1 + e.flash * 1.5); } else e.inner.scale.setScalar(1);
+}
+
+let spawnT = 0, nightBudget = 0, wasNight = false, guardT = 5, bossT = -1, waspT = 40;
 export function bossAlive() { return G.enemies.find(e => e.boss && !e.dead); }
 function colonyCenter() {
   if (!G.buildings.length) return new THREE.Vector3(0, 0, 0);
@@ -163,10 +223,22 @@ export function updateEnemies(dt) {
     }
   }
 
+  // 晶翼蜂群：第 3 夜起出现
+  if (night && threat && (G.nightsSurvived || 0) >= 2) {
+    waspT -= dt;
+    if (waspT <= 0) {
+      waspT = (55 + Math.random() * 40) / Math.max(0.5, D().foe);
+      const n = Math.min(2 + Math.floor((G.nightsSurvived || 0) / 3), 6), a = Math.random() * 6.28;
+      const x = THREE.MathUtils.clamp(P.x + Math.cos(a) * 70, -HALF + 150, HALF - 150), z = THREE.MathUtils.clamp(P.z + Math.sin(a) * 70, -HALF + 150, HALF - 150);
+      for (let k = 0; k < n; k++) spawnWasp(x + (Math.random() - 0.5) * 8, z + (Math.random() - 0.5) * 8, getHeight(x, z) + 25 + Math.random() * 8);
+      G.events.emit('toast', '晶翼蜂群正在逼近');
+    }
+  }
   const now = performance.now() * 0.001;
   for (let i = G.enemies.length - 1; i >= 0; i--) {
     const e = G.enemies[i];
     if (e.dead) { G.enemies.splice(i, 1); continue; }
+    if (e.flyer) { updateWasp(e, dt, P, now, G.time.night < 0.3 || G.terraform >= 1); continue; }
     // 黎明时钻回地底
     if (!e.guardian && (G.time.night < 0.3 || G.terraform >= 1)) {
       e.sink -= dt * 1.5;

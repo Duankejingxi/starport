@@ -149,6 +149,7 @@ export const audio = {
       case 'rumble': this.noise(4, 150, 0.5, 'lowpass', 0, 1, D); this.noise(3, 400, 0.2, 'lowpass', 0.5, 1, D); this.thump(40, 3, 0.3, D); break;
       case 'jet': this.noise(0.14, 900, 0.09, 'bandpass', 0, 1, D); break;
       case 'night': this.tone(110, 3.5, 'organ', 0.06, 0.8); this.tone(165, 3.5, 'organ', 0.04, 0.8, 0.3); break;
+      case 'wasp': this.tone(1800, 0.5, 'sawtooth', 0.04, 1.8, 0, D); this.tone(1830, 0.5, 'square', 0.025, 1.7, 0, D); break;
       case 'whoosh': this.noise(0.6, 400, 0.12, 'bandpass', 0, 1.5, D, 6); break;
     }
   },
