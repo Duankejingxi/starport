@@ -200,6 +200,10 @@ document.addEventListener('pointerlockchange', () => {
   G.locked = document.pointerLockElement === canvas;
   if (!G.locked && G.started && !G.menuOpen && !player.dead && !G.endingShown && !G.cine) openMenu('pause');
 });
+// 提示「点击画面继续」时，按任意键（Esc 除外）也能继续
+window.addEventListener('keydown', e => {
+  if (e.code !== 'Escape' && G.started && !G.locked && !G.menuOpen && !player.dead && !G.endingShown && !G.cine && !$('clickhint').classList.contains('hidden')) G.requestLock();
+});
 canvas.addEventListener('click', () => {
   audio.init();
   if (G.started && !G.locked && !G.menuOpen && !player.dead) G.requestLock();
@@ -864,6 +868,21 @@ function updateLanding(dt) {
   if (L.shake > 0.01) { camera.position.x += (Math.random() - 0.5) * L.shake * 0.5; camera.position.y += (Math.random() - 0.5) * L.shake * 0.4; }
 }
 
+// —— 性能守护：帧率持续偏低时逐级降低开销，保证操作跟手 ——
+const perf = { n: 0, t0: 0, step: 0, last: 0 };
+function perfGovernor(now) {
+  if (!perf.t0) { perf.t0 = now; perf.n = 0; return; }
+  perf.n++;
+  const span = now - perf.t0;
+  if (span < 4) return;
+  const fps = perf.n / span; perf.t0 = now; perf.n = 0;
+  if (fps >= 32 || perf.step >= 3 || now - perf.last < 6) return;
+  perf.step++; perf.last = now;
+  if (perf.step === 1 && quality === 'high') { if (gtao) gtao.enabled = false; renderer.setPixelRatio(1); composer && composer.setPixelRatio(1); renderer.setSize(innerWidth, innerHeight); composer && composer.setSize(innerWidth, innerHeight); }
+  else if (quality === 'high') { applyQuality('mid', true); toast('已自动调低画质，保持流畅', 'gear'); }
+  else if (quality === 'mid') { applyQuality('low', true); toast('已自动调低画质，保持流畅', 'gear'); }
+}
+
 // —— 主循环 ——
 const clock = new THREE.Clock();
 let introCam = 0;
@@ -887,6 +906,7 @@ function frame() {
   }
   if (G.debug) G.locked = true;
   const running = G.locked && !G.menuOpen && !G.endingShown && !G.cine;
+  if (running && !G.debug) perfGovernor(clock.elapsedTime);
   $('clickhint').classList.toggle('hidden', !(G.started && !G.locked && !G.menuOpen && !player.dead && !G.endingShown && !G.cine));
   if (running) {
     update(dt);
