@@ -18,6 +18,7 @@ import { Player, LANDER_POS } from './player.js';
 import { initTools, updateTools, renderViewmodel, tool } from './tools.js';
 import { updateColony, lookColonist, serializeColonists, loadColonists } from './colony.js';
 import { updateStory, startChapter, radio, CHAPTERS, setStormState, stormState, resetStoryEnding } from './story.js';
+import { visorBoot } from './ui.js';
 import { initUI, updateUI, toast, chapterCard, openMenu, closeMenus, setPausePane, archiveHTML, buildMenuKey } from './ui.js';
 import { updateAchievements, achievementsHTML } from './achievements.js';
 import { updateAmbient } from './ambient.js';
@@ -36,6 +37,7 @@ import { initCity, updateCity, LEVELS } from './city.js';
 import { spawnRover, getRover, roverState, enterRover, exitRover, updateRover, roverSpeed } from './rover.js';
 import { updateEvents, podAt, openPod, dropPod } from './events.js';
 import { updateFestival, startFestival } from './festival.js';
+import { updateMega } from './mega.js';
 
 const $ = id => document.getElementById(id);
 G.debug = /[?&]debug/.test(location.search);
@@ -148,7 +150,7 @@ canvas.addEventListener('click', () => {
 function save(silent) {
   if (!G.started) return;
   const data = {
-    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [], plazaSeen: !!G.plazaSeen, mode: G.mode, diff: G.diffKey, morale: G.morale, waypoint: G.waypoint || null, tech: G.tech || {}, rp: G.rp || 0, requests: G.requests || [],
+    v: 1, res: G.res, upgrades: G.upgrades, stats: G.stats, chapter: G.chapter, goalDone: G.goalDone, terraform: G.terraform, ended: G.ended, nights: G.nightsSurvived || 0, city: G.cityLevel, pop: G.popTotal || 0, launched: !!G.launched, rover: roverState(), relics: G.relicsFound || [], plazaSeen: !!G.plazaSeen, mode: G.mode, diff: G.diffKey, morale: G.morale, waypoint: G.waypoint || null, megaSeen: !!G.megaSeen, tech: G.tech || {}, rp: G.rp || 0, requests: G.requests || [],
     time: { t: G.time.t, day: G.time.day },
     player: { x: player.pos.x, z: player.pos.z, yaw: player.yaw, o2: player.o2, hp: player.health },
     buildings: serializeBuildings(), nodes: serializeNodes(), colonists: serializeColonists(), storm: stormState(),
@@ -172,7 +174,7 @@ function applySave(d) {
   loadColonists(d.colonists || []);
   if (d.rover) spawnRover(d.rover.x, d.rover.z, d.rover.h);
   G.relicsFound = d.relics || []; G.plazaSeen = !!d.plazaSeen;
-  G.morale = d.morale; G.waypoint = d.waypoint || null; G.mode = d.mode || 'story'; G.diffKey = d.diff || 'normal'; G.tech = d.tech || {}; G.rp = d.rp || 0; G.requests = d.requests || [];
+  G.morale = d.morale; G.waypoint = d.waypoint || null; G.megaSeen = !!d.megaSeen; G.mode = d.mode || 'story'; G.diffKey = d.diff || 'normal'; G.tech = d.tech || {}; G.rp = d.rp || 0; G.requests = d.requests || [];
   G.cityLevel = d.city || 0; G.popTotal = d.pop ?? (d.colonists || []).length; G.launched = !!d.launched;
   initCity(scene);
   setStormState(d.storm);
@@ -216,7 +218,7 @@ function playCine(done) {
 }
 function begin(fromSave) {
   audio.init();
-  if (fromSave && existing) applySave(existing);
+  if (fromSave && existing) { applySave(existing); setTimeout(visorBoot, 300); }
   else {
     localStorage.removeItem(SAVE_KEY);
     generateNodes();
@@ -232,11 +234,12 @@ function begin(fromSave) {
     startChapter(0, true);
     if (isFree()) {
       playLanding(() => {
-        chapterCard({ k: 'FREE MODE', title: P.name, sub: `自由开拓 · ${DIFFS[G.diffKey].name}` });
+        visorBoot();
+        setTimeout(() => chapterCard({ k: 'FREE MODE', title: P.name, sub: `自由开拓 · ${DIFFS[G.diffKey].name}` }), 1600);
         radio('方舟 · AI', '自由模式已启动。没有任务清单，这片土地完全属于你。建好第一座设施后，居民和指挥中心会陆续提出委托。');
         radio('方舟 · AI', '提示：B 建造，T 科研，Tab 殖民地档案。祝你好运。');
       });
-    } else playCine(() => playLanding(() => { chapterCard(CHAPTERS[0]); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); }));
+    } else playCine(() => playLanding(() => { visorBoot(); setTimeout(() => chapterCard(CHAPTERS[0]), 1600); CHAPTERS[0].radio.forEach(r => radio(r[0], r[1])); }));
   }
   initRelics();
   initCompanion();
@@ -793,6 +796,7 @@ function update(dt) {
     updateCompanion(dt);
     updateSystems(dt, reqCtx);
     updateFestival(dt);
+    updateMega(dt);
     updatePebbles();
     if (!G.plazaSeen && G.time.night > 0.6 && G.colonists.filter(c => c.atPlaza && !c.target).length >= 4) {
       G.plazaSeen = true;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { G } from './state.js';
+import { G, RES_INFO } from './state.js';
 import { D, has } from './systems.js';
 import { input } from './input.js';
 import { M, glow } from './models.js';
@@ -153,7 +153,13 @@ export function updateTools(dt, player, camera) {
 
   const origin = camera.position, dir = player.fwd;
   G.lookBuilding = G.menuOpen ? null : rayBuilding(origin, dir, 14);
-  G.aimNode = id === 'laser' && !!rayNode(origin, dir, 9);
+  const an = G.menuOpen ? null : rayNode(origin, dir, 30);
+  G.aimNode = id === 'laser' && !!an && an.dist < 9;
+  // 目标锁定：敌人优先，其次矿点
+  const ae = G.menuOpen || id === 'build' ? null : rayEnemy(origin, dir, id === 'rifle' ? 140 : 40);
+  if (ae) { const e = ae.e; G.aimTarget = { id: e, x: e.pos.x, y: e.pos.y + 1.0 * e.scale, z: e.pos.z, r: 1.7 * e.scale, name: e.boss ? '晶母' : e.guardian ? '钛矿守卫' : '锈蚀蛛', tag: e.boss ? 'CRYSTAL MOTHER' : 'HOSTILE', dist: ae.dist, bar: Math.max(0, e.hp / e.maxHp), kind: 'enemy' }; }
+  else if (an && id !== 'build') { const n = an.n; G.aimTarget = { id: n, x: n.x, y: n.y + 0.8 * n.mesh.scale.x, z: n.z, r: 1.7 * n.mesh.scale.x + 0.3, name: RES_INFO[n.type].name, tag: { iron: 'FE ORE', silicon: 'SI CRYSTAL', ice: 'H2O ICE', titanium: 'TI ORE' }[n.type], dist: an.dist, bar: Math.max(0, n.amount / n.max), kind: 'node', color: RES_INFO[n.type].color }; }
+  else G.aimTarget = null;
 
   // 切换工具
   if (!G.menuOpen && !player.dead && !G.photo) {

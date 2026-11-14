@@ -3,6 +3,7 @@ import { G } from './state.js';
 import { glowTexture as glowTex } from './models.js';
 import { smoothstep, lerp, clamp } from './noise.js';
 import { P } from './planets.js';
+import { Lensflare, LensflareElement } from 'three/examples/jsm/objects/Lensflare.js';
 
 const DAY_LEN = 540; // 一个火星日（游戏秒）
 let sky, stars, sun, hemi, amb, phobos, deimos, skyMat;
@@ -17,6 +18,38 @@ const PAL = {
   halo: CC(PS.halo),
 };
 let extra = {};
+// —— 镜头光晕：光斑 + 横向变形光条（星际穿越式） ——
+let flareAnchor, flareEls = [];
+function flareTex(kind) {
+  const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S; const g = cv.getContext('2d');
+  if (kind === 'streak') {
+    const gr = g.createLinearGradient(0, 0, S, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, S / 2 - 2, S, 4);
+    const v = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2); v.addColorStop(0, 'rgba(255,255,255,.35)'); v.addColorStop(1, 'rgba(255,255,255,0)');
+    g.globalCompositeOperation = 'destination-in'; g.fillStyle = v; g.fillRect(0, 0, S, S);
+  } else if (kind === 'ring') {
+    const gr = g.createRadialGradient(S / 2, S / 2, S * 0.36, S / 2, S / 2, S / 2);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.7, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, S, S);
+  } else if (kind === 'hex') {
+    g.fillStyle = 'rgba(255,255,255,.22)'; g.beginPath();
+    for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; g[i ? 'lineTo' : 'moveTo'](S / 2 + Math.cos(a) * S * 0.45, S / 2 + Math.sin(a) * S * 0.45); } g.fill();
+  } else {
+    const gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.15, 'rgba(255,240,220,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, S, S);
+  }
+  return new THREE.CanvasTexture(cv);
+}
+function buildFlare(scene) {
+  flareAnchor = new THREE.Object3D(); scene.add(flareAnchor);
+  const lf = new Lensflare();
+  const add = (kind, size, dist, col) => { const e = new LensflareElement(flareTex(kind), size, dist, new THREE.Color(col)); e.base = new THREE.Color(col); lf.addElement(e); flareEls.push(e); };
+  add('glow', 380, 0, 0xffe8cc); add('streak', 1600, 0, 0x9ad8ff); add('streak', 900, 0, 0xffd0a0);
+  add('hex', 70, 0.35, 0x6fa8ff); add('ring', 140, 0.55, 0xffb070); add('hex', 110, 0.75, 0x86ffc8); add('glow', 60, 0.9, 0xff9a60); add('ring', 260, 1.15, 0x6a8cff);
+  flareAnchor.add(lf);
+}
 let envScene, envSky, pmrem, envRT = null, envT = 0;
 // 极光：按星球设定颜色与强度
 const AURORA = { mars: [0.35, [0.2, 0.9, 0.7], [0.3, 0.5, 1.0]], europa: [0.6, [0.4, 0.6, 1.0], [0.8, 0.4, 1.0]], kepler: [1.0, [0.3, 1.0, 0.5], [0.9, 0.3, 0.9]] }[P.id];
@@ -121,6 +154,23 @@ export function buildSky(scene) {
     const gas = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 24), new THREE.MeshBasicMaterial({ color: 0x8a7ad0, fog: false }));
     gas.add(ring); ring.rotation.x = 1.2;
     scene.add(s2, gas); extra = { s2, gas };
+    // 卡冈图雅：黑洞与吸积盘（含经过引力透镜弯折、从上下方绕过来的那一圈）
+    const dc = document.createElement('canvas'); dc.width = dc.height = 512; const dg = dc.getContext('2d');
+    const gr = dg.createRadialGradient(256, 256, 120, 256, 256, 256);
+    gr.addColorStop(0, 'rgba(255,250,230,0)'); gr.addColorStop(0.08, 'rgba(255,245,220,1)'); gr.addColorStop(0.3, 'rgba(255,190,110,.85)'); gr.addColorStop(0.7, 'rgba(200,90,40,.35)'); gr.addColorStop(1, 'rgba(120,40,20,0)');
+    dg.fillStyle = gr; dg.fillRect(0, 0, 512, 512);
+    dg.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 40; i++) { dg.strokeStyle = `rgba(0,0,0,${0.1 + Math.random() * 0.2})`; dg.lineWidth = 1 + Math.random() * 3; dg.beginPath(); dg.arc(256, 256, 130 + Math.random() * 120, 0, Math.PI * 2); dg.stroke(); }
+    const dt2 = new THREE.CanvasTexture(dc);
+    const bh = new THREE.Group();
+    const dmat = (op) => { const m = new THREE.MeshBasicMaterial({ map: dt2, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }); return m; };
+    const disk = new THREE.Mesh(new THREE.RingGeometry(150, 560, 96, 1), dmat(0.9)); disk.userData.op = 0.9;
+    disk.rotation.x = -1.35; bh.add(disk);
+    const halo = new THREE.Mesh(new THREE.RingGeometry(150, 330, 96, 1), dmat(0.75)); halo.userData.op = 0.75; bh.add(halo);
+    const core = new THREE.Mesh(new THREE.CircleGeometry(150, 64), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false, transparent: true, depthWrite: false })); core.userData.op = 1; core.position.z = 1; bh.add(core);
+    const rim = new THREE.Mesh(new THREE.RingGeometry(150, 158, 96), new THREE.MeshBasicMaterial({ color: 0xffe6c0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, fog: false, depthWrite: false })); rim.userData.op = 0.9; rim.position.z = 2; bh.add(rim);
+    bh.renderOrder = -7; scene.add(bh);
+    extra.bh = bh; extra.disk = disk;
   }
 
   sun = new THREE.DirectionalLight(0xfff0dd, 3);
@@ -129,6 +179,7 @@ export function buildSky(scene) {
   const sc2 = sun.shadow.camera; sc2.left = -70; sc2.right = 70; sc2.top = 70; sc2.bottom = -70; sc2.near = 1; sc2.far = 400;
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.6;
   scene.add(sun, sun.target);
+  buildFlare(scene);
   hemi = new THREE.HemisphereLight(0xffd2b0, 0x5a2c1a, 1);
   amb = new THREE.AmbientLight(0x404a70, 0.3);
   scene.add(hemi, amb);
@@ -181,6 +232,17 @@ export function updateSky(dt, camPos) {
     extra.jup.rotation.y += 0.00004;
     const ia = G.time.t * Math.PI * 8;
     extra.io.position.set(camPos.x - 1800 + Math.cos(ia) * 1400, camPos.y + 650 + Math.sin(ia) * 300, camPos.z - 2600 + Math.sin(ia) * 1400);
+  }
+  if (flareAnchor) {
+    flareAnchor.position.copy(camPos).addScaledVector(sunDir, 3000);
+    const v = smoothstep(-0.03, 0.12, el) * (1 - storm) * (P.id === 'europa' ? 0.6 : 1);
+    for (const e of flareEls) e.color.copy(e.base).multiplyScalar(v);
+  }
+  if (extra.bh) {
+    extra.bh.position.set(camPos.x - 2200, camPos.y + 900, camPos.z + 1900);
+    extra.bh.lookAt(camPos);
+    extra.disk.rotation.z += dt * 0.05;
+    extra.bh.children.forEach(m => { if (m.material && m.material.opacity !== undefined && m.userData.op) m.material.opacity = m.userData.op * (0.45 + T.night * 0.55); });
   }
   if (extra.s2) {
     extra.s2.position.copy(camPos).addScaledVector(new THREE.Vector3(sunDir.x * 0.8 - 0.3, sunDir.y * 0.9 - 0.05, sunDir.z + 0.4).normalize(), 3000);

@@ -570,3 +570,91 @@ body.photo #photo-bar { display: flex; position: fixed; left: 50%; bottom: 3.2vh
 #research .bp-head::after, #trade .bp-head::after { background: linear-gradient(90deg, rgba(var(--holo), .5), transparent 60%); }
 .kv div { box-shadow: inset 0 0 0 1px var(--hair), inset 0 1px 0 rgba(var(--holo-a), .25); }
 #intro-pane { box-shadow: inset 0 0 0 1px rgba(var(--holo-a), .22), 0 0 40px rgba(var(--holo-a), .08), 0 30px 80px rgba(0, 0, 0, .5); }
+
+/* =========================================================
+   过渡动画
+   ========================================================= */
+/* 背景：打开菜单时游戏画面平滑地失焦、变暗 */
+#c { transition: filter .5s var(--ease), transform .6s var(--ease); }
+body.menu-open #c { filter: blur(7px) brightness(.55) saturate(.75); transform: scale(1.03); }
+body.menu-open #hud { opacity: 0; transition: opacity .25s; }
+#hud { transition: opacity .4s .1s; }
+.screen { backdrop-filter: none !important; }
+#intro.screen { backdrop-filter: none; }
+
+/* 打开：遮罩淡入、内容由虚变实、全息扫描线扫过 */
+.screen.opening { animation: scrfade .35s var(--ease) both; }
+.screen.opening > * { animation: holoUp .55s var(--ease) both !important; }
+.screen.opening::after { content: ''; position: absolute; left: 0; right: 0; height: 2px; top: 0; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(var(--holo), .9), transparent); box-shadow: 0 0 18px rgba(var(--holo), .9), 0 0 60px rgba(var(--holo), .4); animation: scanY .6s var(--ease) both; }
+#pause.opening .side { animation: sidein .5s var(--ease) both !important; }
+#pause.opening .pane { animation: holoUp .55s .08s var(--ease) both !important; }
+@keyframes scrfade { from { opacity: 0; } }
+@keyframes holoUp { 0% { opacity: 0; transform: translateY(18px) scale(.985); filter: blur(6px) brightness(1.8); } 60% { filter: blur(0) brightness(1.15); } 100% { opacity: 1; transform: none; filter: none; } }
+@keyframes scanY { from { top: 0; opacity: 1; } 85% { opacity: 1; } to { top: 100%; opacity: 0; } }
+/* 关闭：整体轻微缩小淡出 */
+.screen.closing { animation: scrout .26s var(--ease) both; pointer-events: none; }
+.screen.closing > * { animation: holoDown .26s var(--ease) both !important; }
+@keyframes scrout { to { opacity: 0; } }
+@keyframes holoDown { to { opacity: 0; transform: translateY(8px) scale(.99); filter: blur(3px); } }
+
+/* 卡片依次浮现 */
+.stagger > * { animation: itemIn .5s var(--ease) both; animation-delay: calc(var(--i, 0) * 28ms + 120ms); }
+@keyframes itemIn { from { opacity: 0; transform: translateY(14px) scale(.97); filter: blur(3px); } }
+/* 详情切换：交叉淡入 */
+.swap > * { animation: detIn .4s var(--ease) both; }
+.swap > :nth-child(2) { animation-delay: .03s; } .swap > :nth-child(3) { animation-delay: .06s; } .swap > :nth-child(4) { animation-delay: .09s; } .swap > :nth-child(5) { animation-delay: .12s; } .swap > :nth-child(n+6) { animation-delay: .15s; }
+@keyframes detIn { from { opacity: 0; transform: translateX(10px); } }
+.swap .pv img { animation: pvIn .5s var(--ease) both; }
+@keyframes pvIn { from { opacity: 0; transform: scale(.9) rotate(-3deg); } }
+
+/* 交互的细节手感 */
+.tile, .opt, .rs, nav.menu button, .bp-tabs button, .go, .launch, button.x { will-change: transform; }
+.tile:active, .opt:active, .rs:active { transform: scale(.97); transition-duration: .08s; }
+.go:active, .launch:active { transform: translateY(1px) scale(.99); }
+.bp-tabs button { transition: background .25s var(--ease), color .25s; }
+.slot { transition: background .25s var(--ease), width .3s var(--ease), box-shadow .25s; }
+.slot.on .ic { animation: slotPop .35s var(--ease); }
+@keyframes slotPop { 0% { transform: scale(.7) translateY(4px); } 60% { transform: scale(1.15); } }
+#prompt { transition: opacity .2s, transform .25s var(--ease); }
+#prompt:not(.show) { transform: translateX(-50%) translateY(6px); }
+#buildhint { transition: opacity .25s, transform .3s var(--ease); } #buildhint:not(.show) { transform: translateX(-50%) translateY(10px); }
+#radio .txt, #radio .who { transition: opacity .3s; }
+#crosshair { transition: transform .2s var(--ease); }
+#crosshair.enemy { transform: translate(-50%, -50%) scale(1.15) rotate(45deg); }
+
+/* =========================================================
+   科幻 HUD：目标锁定、面罩启动、受伤故障
+   ========================================================= */
+#lock { position: absolute; left: 0; top: 0; width: 80px; height: 80px; pointer-events: none; opacity: 0; transition: opacity .2s; --lc: var(--amber); }
+#lock.on { opacity: 1; }
+#lock .c { position: absolute; width: 22%; height: 22%; min-width: 10px; min-height: 10px; border: 2px solid var(--lc); filter: drop-shadow(0 0 5px var(--lc)); }
+#lock .tl { left: 0; top: 0; border-right: 0; border-bottom: 0; } #lock .tr { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+#lock .bl { left: 0; bottom: 0; border-right: 0; border-top: 0; } #lock .br { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+@keyframes lockC { 0% { opacity: 0; } 30% { opacity: 1; } 45% { opacity: .3; } 60%, 100% { opacity: 1; } }
+#lock .lk-info { position: absolute; left: calc(100% + 12px); top: -2px; white-space: nowrap; text-shadow: var(--shadow); }
+@keyframes lkInfo { from { opacity: 0; transform: translateX(-8px); clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+#lock .lk-tag { font: 600 10px var(--fn); letter-spacing: 3px; color: var(--lc); }
+#lock .lk-name { font-size: 14px; letter-spacing: 2px; margin-top: 1px; }
+#lock .lk-bar { width: 86px; height: 3px; background: rgba(255, 255, 255, .15); margin: 5px 0 4px; }
+#lock .lk-bar i { display: block; height: 100%; background: var(--lc); box-shadow: 0 0 6px var(--lc); transition: width .2s; }
+#lock .lk-dist { font: 600 12px var(--fn); letter-spacing: 2px; color: var(--txt2); }
+#lock.enemy .c { animation: lockPulse 1s infinite; }
+@keyframes lockPulse { 50% { filter: drop-shadow(0 0 10px var(--lc)); } }
+
+/* 面罩启动序列 */
+#boot { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 9; pointer-events: none; font: 600 13px var(--fn); letter-spacing: 3px; color: var(--cyan); text-shadow: 0 0 10px rgba(var(--holo), .7); opacity: 0; }
+#boot.show { opacity: 1; } #boot.out { opacity: 0; transition: opacity .7s; }
+#boot .bt-l { font-family: var(--fn), var(--fc); padding: 3px 0; opacity: 0; animation: btLine .3s steps(4) both; }
+#boot .bt-l:first-of-type { color: var(--amber); }
+@keyframes btLine { from { opacity: 0; clip-path: inset(0 100% 0 0); } to { opacity: 1; clip-path: inset(0 0 0 0); } }
+#boot .bt-ring { position: absolute; left: 50%; top: 50%; width: 520px; height: 520px; margin: -260px; border-radius: 50%; border: 1px solid rgba(var(--holo), .5); box-shadow: 0 0 40px rgba(var(--holo), .25), inset 0 0 40px rgba(var(--holo), .15); animation: btRing 1.5s var(--ease) both; }
+@keyframes btRing { from { transform: scale(.2); opacity: 0; } 30% { opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+body.booting #hud .panel, body.booting #suit, body.booting #hotbar, body.booting #compass { opacity: 0; }
+#hotbar, #compass { transition: opacity .6s; }
+body:not(.booting) #compass { animation: holoin .8s var(--ease) both; }
+
+/* 受伤：画面撕裂与色彩错位 */
+body.glitch #c { animation: glitch .32s steps(3) both; }
+body.glitch #hud { animation: glitchH .32s steps(3) both; }
+@keyframes glitch { 0% { transform: translate(-6px, 2px); filter: hue-rotate(-25deg) saturate(1.6) contrast(1.2); } 33% { transform: translate(5px, -3px) skewX(-1deg); filter: hue-rotate(20deg); } 66% { transform: translate(-2px, 1px); } 100% { transform: none; filter: none; } }
+@keyframes glitchH { 0% { transform: translateX(4px); text-shadow: -3px 0 rgba(255, 0, 60, .7), 3px 0 rgba(0, 220, 255, .7); } 50% { transform: translateX(-3px); } 100% { transform: none; } }

@@ -8,6 +8,7 @@ import { clockText } from './sky.js';
 import { audio } from './audio.js';
 import { LANDER_POS } from './player.js';
 import { WORLD } from './terrain.js';
+import * as THREE from 'three';
 import { ic, iconSprite } from './icons.js';
 import { buildingThumbs } from './thumbs.js';
 import { nearestRelic, allRelics, relicCount } from './relics.js';
@@ -30,6 +31,7 @@ export function initUI(mapCanvas) {
   $('res').innerHTML = Object.entries(RES_INFO).map(([k, r]) => `<div class="r" id="r-${k}" style="--rc:${r.color}"><span class="ic">${ic(k)}</span><span class="tx"><small>${r.name}</small><b>0</b></span></div>`).join('');
   G.events.on('toast', t => toast(t));
   G.events.on('pickup', p => pickup(p));
+  G.events.on('hurt', n => { document.body.classList.remove('glitch'); void document.body.offsetWidth; document.body.classList.add('glitch'); clearTimeout(G._gl); G._gl = setTimeout(() => document.body.classList.remove('glitch'), 320); });
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { audio.play('ui'); closeMenus(true); }));
   document.querySelectorAll('.menu button, .bp-tabs button').forEach(b => b.addEventListener('mouseenter', () => audio.play('tick')));
 
@@ -100,10 +102,25 @@ export function chapterCard(ch) {
 
 // —— 菜单 ——
 const MENUS = ['build', 'craft', 'pause', 'starmap', 'archive', 'research', 'trade', 'mapscr'];
+// 过渡动画：打开时全息启动 + 卡片依次浮现；关闭时淡出收起
+let closeTimer = null;
+function animateIn(id) {
+  const el = $(id);
+  el.classList.remove('closing'); el.classList.add('opening');
+  setTimeout(() => el.classList.remove('opening'), 700);
+  el.querySelectorAll('.bp-grid, .people, .achv, .kv, #starmap-list, .opts').forEach(g => {
+    g.classList.remove('stagger'); void g.offsetWidth; g.classList.add('stagger');
+    [...g.children].forEach((c, i) => c.style.setProperty('--i', Math.min(i, 18)));
+    setTimeout(() => g.classList.remove('stagger'), 1400);
+  });
+}
+export function swapIn(el) { if (!el) return; el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap'); }
 export function openMenu(id) {
-  closeMenus(false);
+  closeMenus(false, true);
   G.menuOpen = id;
   $(id).classList.remove('hidden');
+  document.body.classList.add('menu-open');
+  for (const k in lastDet) delete lastDet[k];
   if (document.pointerLockElement) document.exitPointerLock();
   audio.play('open');
   if (id === 'build') { if (!thumbs.solar) { try { thumbs = buildingThumbs(ORDER.filter(k => !unlockState(k).hide)); } catch (e) { thumbs = {}; } } renderBuild(); }
@@ -113,15 +130,23 @@ export function openMenu(id) {
   if (id === 'mapscr') renderMap();
   if (id === 'archive') $('archive-body').innerHTML = archiveHTML();
   if (id === 'pause') $('pause-pane').innerHTML = '';
+  animateIn(id);
 }
-export function closeMenus(relock) {
-  MENUS.forEach(id => $(id).classList.add('hidden'));
+export function closeMenus(relock, instant = false) {
+  clearTimeout(closeTimer);
+  const open = MENUS.filter(id => !$(id).classList.contains('hidden'));
+  if (instant || !open.length) open.forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('closing'); });
+  else {
+    open.forEach(id => $(id).classList.add('closing'));
+    closeTimer = setTimeout(() => open.forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('closing'); }), 260);
+  }
+  if (!instant) document.body.classList.remove('menu-open');
   const was = G.menuOpen;
   G.menuOpen = false;
   if (was === 'build' && !placement.type) tool.index = 0;
   if (relock) G.requestLock();
 }
-export function setPausePane(html) { $('pause-pane').innerHTML = html; }
+export function setPausePane(html) { $('pause-pane').innerHTML = html; swapIn($('pause-pane')); const g = $('pause-pane').querySelector('.achv, .kv, .people'); if (g) { g.classList.add('stagger'); [...g.children].forEach((c, i) => c.style.setProperty('--i', Math.min(i, 18))); } }
 
 const CATS = { all: '全部', life: '生存', city: '城市', industry: '工业', defense: '防御', stellar: '星际' };
 let bpCat = 'all', bpSel = null;
@@ -175,6 +200,7 @@ function renderBuildDetail() {
     ${us.ok ? needRows(d.cost) : `<div class="why">${ic('lock')} ${whyLocked(k)}</div>`}
     <button class="go" ${us.ok ? '' : 'disabled'}>${us.ok ? (ok ? '开始建造' : '放置蓝图（资源不足）') : '尚未解锁'}</button>`;
   $('bp-detail').querySelector('.go').addEventListener('click', () => chooseBuilding(k));
+  if (lastDet['bp-detail'] !== bpSel) { lastDet['bp-detail'] = bpSel; swapIn($('bp-detail')); }
 }
 function chooseBuilding(k) {
   const d = DEFS[k];
@@ -211,6 +237,7 @@ function renderCraft() {
     ${has ? '<div class="why okc">已制造并装备</div>' : blocked ? `<div class="why">${ic('lock')} 需要先制造等离子步枪</div>` : needRows(r.cost)}
     <button class="go" ${has || blocked || !canAfford(r.cost) ? 'disabled' : ''}>${has ? '已装备' : canAfford(r.cost) ? '制造' : '资源不足'}</button>`;
   $('craft-detail').querySelector('.go').addEventListener('click', () => craft(crSel));
+  if (lastDet['craft-detail'] !== crSel) { lastDet['craft-detail'] = crSel; swapIn($('craft-detail')); }
 }
 function craft(k) {
   const r = RECIPES[k];
@@ -249,6 +276,37 @@ function renderResearch() {
     <div class="need"><div class="row ${ok || done ? '' : 'lack'}" style="--rc:var(--cyan)">${ic('book')}<span class="nm">科研点数</span>${Math.floor(G.rp || 0)} / ${t.cost}</div></div>
     <button class="go" ${done || !ok ? 'disabled' : ''}>${done ? '已完成' : ok ? '开始研究' : '科研点数不足'}</button>`;
   $('research-detail').querySelector('.go').addEventListener('click', () => { if (research(rsSel)) { rsSel = Object.keys(TECHS).find(k => !has(k)) || rsSel; renderResearch(); } });
+  if (lastDet['research-detail'] !== rsSel) { lastDet['research-detail'] = rsSel; swapIn($('research-detail')); }
+}
+
+// —— 目标锁定框：四角收拢、显示名称与距离 ——
+const lk = { x: 0, y: 0, s: 80, a: 0, id: null, t: 0 };
+const _v = new THREE.Vector3();
+function updateLock(dt) {
+  const el = $('lock'), T = G.aimTarget;
+  if (T) {
+    _v.set(T.x, T.y, T.z).project(G.camera);
+    if (_v.z < 1) {
+      const W = innerWidth, H = innerHeight, sx = (_v.x * 0.5 + 0.5) * W, sy = (-_v.y * 0.5 + 0.5) * H;
+      const px = Math.max(46, Math.min(260, T.r / Math.max(1, T.dist) * H * 0.9));
+      if (lk.id !== T.id) { lk.id = T.id; lk.x = sx; lk.y = sy; lk.s = px * 2.6; lk.t = 0; audio.play('tick');
+        el.querySelector('.lk-info').animate([{ opacity: 0, transform: 'translateX(-10px)', clipPath: 'inset(0 100% 0 0)' }, { opacity: 1, transform: 'none', clipPath: 'inset(0 0 0 0)' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)', delay: 80, fill: 'backwards' });
+        el.querySelectorAll('.c').forEach(c => c.animate([{ opacity: 0 }, { opacity: 1, offset: .3 }, { opacity: .25, offset: .45 }, { opacity: 1 }], { duration: 420 })); }
+      const k = Math.min(1, dt * 14);
+      lk.x += (sx - lk.x) * k; lk.y += (sy - lk.y) * k; lk.s += (px - lk.s) * Math.min(1, dt * 9);
+      lk.t += dt;
+      el.style.transform = `translate(${lk.x - lk.s / 2}px, ${lk.y - lk.s / 2}px)`;
+      el.style.width = el.style.height = lk.s + 'px';
+      const cls = 'on ' + T.kind; if (el.className !== cls) el.className = cls;
+      el.style.setProperty('--lc', T.kind === 'enemy' ? 'var(--red)' : T.color || 'var(--amber)');
+      el.querySelector('.lk-tag').textContent = T.tag;
+      el.querySelector('.lk-name').textContent = T.name;
+      el.querySelector('.lk-dist').textContent = T.dist.toFixed(1) + ' M';
+      el.querySelector('.lk-bar i').style.width = (T.bar * 100) + '%';
+      return;
+    }
+  }
+  lk.id = null; el.classList.remove('on');
 }
 
 // —— 全息地图 ——
@@ -329,13 +387,14 @@ export function archiveHTML() {
 }
 
 // —— 每帧刷新 HUD ——
+const shownRes = {}, resEls = {}, lastDet = {};
 let slowT = 0, radioKey = '', radioChars = 0, lastGoals = '';
 export function updateUI(dt, ctx) {
   const P = G.player, C = G.colony;
   slowT -= dt;
   if (slowT <= 0) {
     slowT = 0.2;
-    for (const k in RES_INFO) $('r-' + k).querySelector('b').textContent = Math.floor(G.res[k]);
+
     const n = nextLevelInfo(), L = LEVELS[G.cityLevel];
     const prog = n ? Math.min(1, Math.min(C.pop / n.pop, G.buildings.length / Math.max(1, n.b))) : 1;
     const cityHTML = `<span class="lv">LV.${ROMAN[G.cityLevel]}</span><span class="nm">${L.name}</span>${n ? `<div class="pg"><i style="width:${prog * 100}%"></i></div><div class="nx">下一级「${n.name}」· 人口 ${Math.min(C.pop, n.pop)}/${n.pop} · 设施 ${Math.min(G.buildings.length, n.b)}/${n.b}</div>` : '<div class="nx">已达到最高等级</div>'}`;
@@ -378,6 +437,13 @@ export function updateUI(dt, ctx) {
       s.classList.toggle('lock', !!(TOOLS[j].need && !G.upgrades[TOOLS[j].need]));
     });
   }
+  for (const k in RES_INFO) {
+    shownRes[k] = shownRes[k] ?? G.res[k];
+    const d = G.res[k] - shownRes[k];
+    shownRes[k] = Math.abs(d) < 0.5 ? G.res[k] : shownRes[k] + d * Math.min(1, dt * 7 + 0.02);
+    const v = Math.floor(shownRes[k] + 0.0001), el = resEls[k] || (resEls[k] = $('r-' + k).querySelector('b'));
+    if (el.textContent != v) el.textContent = v;
+  }
   dial('d-hp', 70, P.health / P.maxHealth); dial('d-o2', 58, P.o2 / P.maxO2); dial('d-en', 47, P.energy / 100);
   $('d-o2n').textContent = Math.ceil(P.o2 / P.maxO2 * 100); $('d-hpn').textContent = Math.ceil(P.health); $('d-enn').textContent = Math.ceil(P.energy);
   $('pl-en').textContent = clockText().split(' · ')[0] === PLANET.name ? EN[PID] : EN[PID];
@@ -415,6 +481,7 @@ export function updateUI(dt, ctx) {
   $('hurt').style.opacity = Math.min(1, P.hurtT * 1.6 + (P.o2 <= 0 ? 0.5 + Math.sin(performance.now() * 0.01) * 0.2 : 0));
   $('lowo2').style.opacity = !P.inLife && P.o2 < P.maxO2 * 0.2 ? (0.4 + Math.sin(performance.now() * 0.006) * 0.3) * (1 - P.o2 / (P.maxO2 * 0.2) * 0.6) : 0;
   $('crosshair').className = ctx.crossClass || '';
+  updateLock(dt);
   const tip = $('tip');
   if (tip.dataset.k !== (ctx.tip || '')) { tip.dataset.k = ctx.tip || ''; tip.innerHTML = ctx.tip ? `<div class="tk">提示</div><div>${ctx.tip}</div>` : ''; }
   tip.classList.toggle('show', !!ctx.tip);
@@ -520,4 +587,16 @@ function drawMinimap() {
   mmx.fillStyle = gr; mmx.beginPath(); mmx.moveTo(0, 0); mmx.arc(0, 0, R * 0.6, -Math.PI / 2 - 0.55, -Math.PI / 2 + 0.55); mmx.closePath(); mmx.fill();
   mmx.fillStyle = '#fff'; mmx.beginPath(); mmx.moveTo(0, -7); mmx.lineTo(5, 5); mmx.lineTo(0, 2.5); mmx.lineTo(-5, 5); mmx.closePath(); mmx.fill();
   mmx.restore();
+}
+
+// —— 面罩启动序列 ——
+export function visorBoot() {
+  const el = $('boot');
+  const lines = ['ARK OS 3.1  ·  VISOR LINK ESTABLISHED', '生命维持 ........... 正常', '宇航服气密 ......... 正常', '导航与罗盘 ......... 校准完成', '殖民地数据链 ....... 已同步', '全息投影 ........... 启动'];
+  el.innerHTML = '<div class="bt-ring"></div>' + lines.map((l, i) => `<div class="bt-l" style="animation-delay:${0.1 + i * 0.16}s">${l}</div>`).join('');
+  el.className = 'show';
+  document.body.classList.add('booting');
+  audio.play('open');
+  setTimeout(() => { el.className = 'out'; document.body.classList.remove('booting'); audio.play('chapter'); }, 1500);
+  setTimeout(() => { el.className = ''; el.innerHTML = ''; }, 2300);
 }

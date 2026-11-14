@@ -38,6 +38,7 @@ export class Player {
     this.hurtT = 0.5;
     if (from) this.lastHitDir = Math.atan2(from.x - this.pos.x, from.z - this.pos.z);
     audio.play('hurt');
+    G.events.emit('hurt', n);
     if (this.health <= 0) this.die('你倒在了火星的尘土里');
   }
 
