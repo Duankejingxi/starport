@@ -58,10 +58,12 @@ export function beamMaterial(color) {
 // ================= 瞬态特效：火球、冲击波、闪光 =================
 const live = [];
 const lights = [];
-for (let i = 0; i < 4; i++) { const l = new THREE.PointLight(0xffa050, 0, 30, 1.6); lights.push({ l, t: 0, dur: 1, peak: 0 }); }
+for (let i = 0; i < 2; i++) { const l = new THREE.PointLight(0xffa050, 0, 30, 1.6); lights.push({ l, t: 0, dur: 1, peak: 0 }); }
 let lightsAdded = false;
-function flash(pos, color, peak, range, dur) {
-  if (!lightsAdded) { lights.forEach(o => G.scene.add(o.l)); lightsAdded = true; }
+// 开局就把闪光灯放进场景，避免第一次爆炸时所有材质重新编译导致卡顿
+export function addFlashLights() { if (lightsAdded || !G.scene) return; lights.forEach(o => G.scene.add(o.l)); lightsAdded = true; }
+export function flash(pos, color, peak, range, dur) {
+  if (!lightsAdded) addFlashLights();
   const o = lights.reduce((a, b) => (a.t / a.dur > b.t / b.dur || a.peak === 0 ? a : b));
   o.l.position.copy(pos); o.l.color.set(color); o.l.distance = range; o.t = 0; o.dur = dur; o.peak = peak;
 }
@@ -180,4 +182,4 @@ export function updateCineFx(dt) {
   G.shake = (G.shake || 0) * Math.pow(0.02, dt);
 }
 
-export function initCineFx() { M.flame = flameMat; }
+export function initCineFx() { M.flame = flameMat; addFlashLights(); }

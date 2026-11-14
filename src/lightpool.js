@@ -4,7 +4,7 @@ import { G } from './state.js';
 // —— 夜间真实光源：固定数量的点光源在玩家附近的建筑间平滑轮换，加上地面的彩色光池 ——
 // 灯的数量固定，不会因为建筑增减而让着色器重新编译
 
-const N = 6;
+let N = 3; // 动态灯越多，每个材质的着色器越重，低端显卡编译会卡住，所以保持很少
 const LIGHT = {
   habitat: [0xffc27a, 3.2, 1], apartment: [0xffc27a, 6, 1.3], greenhouse: [0xff5cc8, 2.6, 1.1], vfarm: [0xff5cc8, 4, 1.2],
   lamp: [0xffd29a, 3.9, 1.15], reactor: [0x4fb2ff, 4, 1.4], plaza: [0x8fd4ff, 3.5, 1.2], lab: [0x9fe8ff, 3, 0.9],
@@ -40,7 +40,8 @@ function coneMat(color) {
 }
 const poolGeo = new THREE.PlaneGeometry(1, 1); poolGeo.rotateX(-Math.PI / 2);
 
-export function initLightPool(scene) {
+export function initLightPool(scene, hi = true) {
+  N = hi ? 3 : 0;
   for (let i = 0; i < N; i++) {
     const l = new THREE.PointLight(0xffffff, 0, 34, 1.7);
     l.userData = { b: null, i: 0 };

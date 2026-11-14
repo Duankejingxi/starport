@@ -40,7 +40,7 @@ import { spawnRover, getRover, roverState, enterRover, exitRover, updateRover, r
 import { updateEvents, podAt, openPod, dropPod } from './events.js';
 import { updateFestival, startFestival } from './festival.js';
 import { updateMega } from './mega.js';
-import { initCineFx, updateCineFx, explode, billow, shockwave, shake as cineShake } from './cinefx.js';
+import { initCineFx, updateCineFx, explode, billow, shockwave, flash as cineFlash, shake as cineShake } from './cinefx.js';
 import { playWarp } from './warp.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
@@ -173,7 +173,7 @@ G.hiShadows = quality === 'high';
 buildSky(scene);
 buildTerrain(scene);
 initFx(scene);
-initLightPool(scene);
+initLightPool(scene, quality === 'high');
 const lander = makeLander();
 lander.group.position.set(LANDER_POS.x, getHeight(LANDER_POS.x, LANDER_POS.z) + 0.1, LANDER_POS.z);
 lander.group.rotation.y = 0.6;
@@ -189,9 +189,14 @@ initCity(scene);
 // —— 指针锁定 ——
 G.requestLock = () => {
   if (G.debug) { G.locked = true; return; }
-  try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* 忽略 */ }
+  // Chrome 在刚退出锁定后约 1 秒内会拒绝再次锁定：失败时稍后自动重试一次
+  const retry = () => setTimeout(() => { if (!G.locked && G.started && !G.menuOpen) { try { const q = canvas.requestPointerLock(); if (q && q.catch) q.catch(() => {}); } catch (e) { /* 忽略 */ } } }, 1100);
+  try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(retry); } catch (e) { retry(); }
 };
+let lockErr = 0;
+document.addEventListener('pointerlockerror', () => { if (++lockErr <= 2) setTimeout(() => { if (!G.locked && G.started && !G.menuOpen) try { canvas.requestPointerLock(); } catch (e) { /* 忽略 */ } }, 1100); });
 document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement === canvas) lockErr = 0;
   G.locked = document.pointerLockElement === canvas;
   if (!G.locked && G.started && !G.menuOpen && !player.dead && !G.endingShown && !G.cine) openMenu('pause');
 });
@@ -582,9 +587,8 @@ function startLaunch(b, dest) {
     if (ok) { dir = d; cam = c; }
   }
   if (!cam) { dir = new THREE.Vector3(Math.cos(sunA), 0, Math.sin(sunA)); cam = pad.clone().addScaledVector(dir, 74); cam.y = getHeight(cam.x, cam.z) + 2.6; }
-  const light = new THREE.PointLight(0xffa860, 0, 260, 1.3); scene.add(light);
   const cap = document.createElement('div'); cap.id = 'launch-cap'; cap.innerHTML = '<div class="lc-k">LAUNCH SEQUENCE · ' + PLANETS[dest].name + '</div><div class="lc-n"></div>'; document.body.appendChild(cap);
-  G.launching = { b, t: 0, dest, pad, dir, cam, light, cap, n: -1, look: pad.clone().setY(b.y + 14), fov: camera.fov, v: 0 };
+  G.launching = { b, t: 0, dest, pad, dir, cam, cap, n: -1, look: pad.clone().setY(b.y + 14), fov: camera.fov, v: 0 };
   G.launched = true; G.cine = true;
   document.body.classList.add('cinema');
   if (document.pointerLockElement) document.exitPointerLock();
@@ -624,8 +628,8 @@ function updateLaunch(dt) {
     const rate = Math.max(0, 1 - alt / 70);
     for (let i = 0; i < Math.round(4 * rate); i++) billow(L.pad.clone().setY(L.pad.y + 0.5), 1.5);
     for (let i = 0; i < 4; i++) fx.flame(base);
-    L.light.position.copy(base).y -= 4;
-    L.light.intensity = (2500 + Math.random() * 900) * burn;
+    const lp = base.clone(); lp.y -= 4;
+    cineFlash(lp, 0xffa860, (2500 + Math.random() * 900) * burn, 260, 0.12);
     G.shake = Math.max(G.shake || 0, 0.35 * rate + 0.08);
     if (L.t > LIFT) { L.v += dt * (1.2 + (L.t - LIFT) * 3.2); ship.position.y += L.v * dt; }
   }
@@ -935,7 +939,12 @@ function update(dt) {
     if (G.terraform > 0 && G.terraform <= 1) { terraT -= dt; if (terraT <= 0) { terraT = 4; applyTerraform(terraCenters(), G.terraform); } }
   }
 }
-$('loading').style.transition = 'opacity .8s'; $('loading').style.opacity = 0; setTimeout(() => $('loading').remove(), 900);
+// 后台并行编译所有着色器，避免进入游戏时主线程长时间卡死
+{
+  const hide = () => { $('loading').style.transition = 'opacity .8s'; $('loading').style.opacity = 0; setTimeout(() => $('loading').remove(), 900); };
+  let p = null; try { p = renderer.compileAsync ? renderer.compileAsync(scene, camera) : null; } catch (e) { p = null; }
+  if (p && p.then) Promise.race([p, new Promise(r => setTimeout(r, 8000))]).then(hide, hide); else hide();
+}
 frame();
 
 window.addEventListener('beforeunload', () => save(true));
