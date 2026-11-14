@@ -100,11 +100,15 @@ export function shockwave(pos, color = 0xffc080, size = 6, dur = 0.7, ground = t
   }
 }
 // 爆炸：闪光 → 火球翻滚上升并转为黑烟 → 冲击波 → 镜头震动
+const recent = [];
 export function explode(pos, scale = 1, color = 0xff8a3a) {
-  audio.play('boom', pos);
-  flash(pos, color, 60 * scale, 24 * scale, 0.6);
+  // 同一时间多次爆炸叠加会过曝：按近期爆炸数量衰减亮度
+  const now = performance.now(); while (recent.length && now - recent[0] > 350) recent.shift(); recent.push(now);
+  const att = 1 / Math.sqrt(recent.length);
+  if (recent.length <= 3) audio.play('boom', pos);
+  flash(pos, color, 60 * scale * att, 24 * scale, 0.6);
   const core = sprite(glowTexture(), 0xfff2d0, THREE.AdditiveBlending, 1); core.position.copy(pos);
-  live.push({ o: core, t: 0, dur: 0.28, upd: (k, o) => { o.scale.setScalar((1.6 + k * 4) * scale); o.material.opacity = (1 - k) * (1 - k); } });
+  live.push({ o: core, t: 0, dur: 0.28, upd: (k, o) => { o.scale.setScalar((1.6 + k * 4) * scale); o.material.opacity = (1 - k) * (1 - k) * att; } });
   for (let i = 0; i < 11; i++) {
     const f = sprite(fireTex, 0xffffff, THREE.AdditiveBlending, 1);
     const off = new THREE.Vector3((Math.random() - 0.5) * 2.4, Math.random() * 1.6, (Math.random() - 0.5) * 2.4).multiplyScalar(scale);
@@ -113,7 +117,7 @@ export function explode(pos, scale = 1, color = 0xff8a3a) {
     live.push({ o: f, t: 0, dur, upd: (k, o, dt) => {
       o.position.y += dt * rise * scale; o.material.rotation += dt * 0.8;
       o.scale.setScalar(sz * (0.5 + k * 1.2));
-      const c = o.material.color, w = Math.max(0, 1 - k * 6), hot = 3.2 * (1 - k) + 0.4; c.setRGB(hot, hot * (0.42 + w * 0.3 - k * 0.2), hot * (0.1 + w * 0.25)); o.material.opacity = k < 0.45 ? 1 : (1 - k) / 0.55;
+      const c = o.material.color, w = Math.max(0, 1 - k * 6), hot = 3.2 * (1 - k) + 0.4; c.setRGB(hot, hot * (0.42 + w * 0.3 - k * 0.2), hot * (0.1 + w * 0.25)); o.material.opacity = (k < 0.45 ? 1 : (1 - k) / 0.55) * att;
     } });
   }
   for (let i = 0; i < 14; i++) {

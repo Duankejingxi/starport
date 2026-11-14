@@ -178,6 +178,7 @@ export const RECIPES = {
   jetpack:   { name: '喷气背包', icon: 'jet', cost: { iron: 20, silicon: 15, titanium: 4 }, desc: '空中按住空格飞行，消耗能量。' },
   overclock: { name: '激光超频', icon: 'bolt2', cost: { silicon: 20, titanium: 3 }, desc: '采矿速度 ×2，激光伤害提升。' },
   armor:     { name: '复合装甲', icon: 'armor', cost: { iron: 30, titanium: 6 }, desc: '生命上限 150，受到伤害 -40%。' },
+  grenade:   { name: '震荡雷', icon: 'bomb', cost: { iron: 16, silicon: 10, titanium: 2 }, desc: '按 G 投掷，冷却 8 秒。落地弹跳后爆炸，冲击波重创并击退范围内的锈蚀蛛。' },
   rifle2:    { name: '聚焦线圈', icon: 'focus', cost: { silicon: 18, titanium: 6 }, need: 'rifle', desc: '等离子步枪伤害 +60%。' },
 };
 

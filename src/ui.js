@@ -1,3 +1,4 @@
+import { grenadeCooldown, GRENADE_CD } from './grenade.js';
 import { G, RES_INFO, canAfford, costText, pay } from './state.js';
 import { DEFS, ORDER, setGhost, placement, unlockState } from './buildings.js';
 import { LEVELS, nextLevelInfo, CENTER } from './city.js';
@@ -27,7 +28,7 @@ export function initUI(mapCanvas) {
   mm = $('minimap'); mmx = mm.getContext('2d');
   $('pl-cn').textContent = PLANET.name;
   $('kick-planet').textContent = EN[PID];
-  $('hotbar').innerHTML = TOOLS.map((t, i) => `<div class="slot" data-i="${i}"><span class="key">${i + 1}</span><span class="ic">${ic(t.icon)}</span><span class="nm">${t.name}</span></div>`).join('');
+  $('hotbar').innerHTML = TOOLS.map((t, i) => `<div class="slot" data-i="${i}"><span class="key">${i + 1}</span><span class="ic">${ic(t.icon)}</span><span class="nm">${t.name}</span></div>`).join('') + `<div class="slot gad hidden" id="gad-g"><span class="key">G</span><span class="ic">${ic('bomb')}</span><span class="nm">震荡雷</span><i class="cdf"></i></div>`;
   $('res').innerHTML = Object.entries(RES_INFO).map(([k, r]) => `<div class="r" id="r-${k}" style="--rc:${r.color}"><span class="ic">${ic(k)}</span><span class="tx"><small>${r.name}</small><b>0</b></span></div>`).join('');
   G.events.on('toast', t => toast(t));
   G.events.on('pickup', p => pickup(p));
@@ -433,7 +434,7 @@ export function updateUI(dt, ctx) {
     } else if (isFree()) gh += '<div class="g"><div class="gx" style="color:var(--dim)">先建一座设施，居民们会开始提出委托</div></div>';
     if (G.rp > 0.5 || G.buildings.some(b => b.type === 'lab')) gh += `<div class="rq-h">科研 <b>${Math.floor(G.rp)}</b> 点 <small>+${rpRate().toFixed(1)}/秒 · T 打开</small></div>`;
     if (gh !== lastGoals) { lastGoals = gh; $('goals').innerHTML = gh; $('goal-ch').textContent = isFree() ? `自由模式 · ${DIFFS[G.diffKey || 'normal'].name}` : ch.title.replace(/ · /, ' '); }
-    document.querySelectorAll('#hotbar .slot').forEach((s, j) => {
+    document.querySelectorAll('#hotbar .slot:not(.gad)').forEach((s, j) => {
       s.classList.toggle('on', j === tool.index);
       s.classList.toggle('lock', !!(TOOLS[j].need && !G.upgrades[TOOLS[j].need]));
     });
@@ -444,6 +445,12 @@ export function updateUI(dt, ctx) {
     shownRes[k] = Math.abs(d) < 0.5 ? G.res[k] : shownRes[k] + d * Math.min(1, dt * 7 + 0.02);
     const v = Math.floor(shownRes[k] + 0.0001), el = resEls[k] || (resEls[k] = $('r-' + k).querySelector('b'));
     if (el.textContent != v) el.textContent = v;
+  }
+  {
+    const gs = $('gad-g'), cdv = grenadeCooldown() / GRENADE_CD;
+    gs.classList.toggle('hidden', !G.upgrades.grenade);
+    gs.style.setProperty('--cd', cdv.toFixed(3));
+    const rd = cdv <= 0; if (rd !== gs._rd) { gs._rd = rd; gs.classList.toggle('ready', rd); if (rd && G.upgrades.grenade) gs.animate([{ boxShadow: '0 0 0 1px rgba(255,180,90,.9), 0 0 22px rgba(255,150,60,.6)' }, { boxShadow: '0 0 0 1px rgba(255,180,90,0)' }], { duration: 700, easing: 'ease-out' }); }
   }
   dial('d-hp', 70, P.health / P.maxHealth); dial('d-o2', 58, P.o2 / P.maxO2); dial('d-en', 47, P.energy / 100);
   $('d-o2n').textContent = Math.ceil(P.o2 / P.maxO2 * 100); $('d-hpn').textContent = Math.ceil(P.health); $('d-enn').textContent = Math.ceil(P.energy);

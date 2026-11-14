@@ -677,3 +677,10 @@ body.glitch #hud { animation: glitchH .32s steps(3) both; }
 @keyframes lcPop { from { opacity: 0; transform: scale(1.35); filter: blur(8px); } 30% { opacity: 1; filter: none; } to { opacity: .85; transform: scale(1); } }
 #launch-cap.out { transition: opacity .8s; opacity: 0; }
 #fade.white { background: #fff8ec; transition: opacity 1.4s cubic-bezier(.6, 0, .9, .5); }
+
+/* —— 道具槽：震荡雷冷却 —— */
+#hotbar .slot.gad { position: relative; overflow: hidden; margin-left: 10px; }
+#hotbar .slot.gad::before { content: ''; position: absolute; left: -7px; top: 18%; bottom: 18%; width: 1px; background: rgba(255, 255, 255, .15); }
+#hotbar .slot.gad .cdf { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--cd, 0) * 100%); background: linear-gradient(180deg, rgba(10, 8, 8, .55), rgba(10, 8, 8, .8)); transition: height .1s linear; pointer-events: none; }
+#hotbar .slot.gad.ready .ic { color: #ffb36a; filter: drop-shadow(0 0 6px rgba(255, 150, 60, .6)); }
+#hotbar .slot.hidden { display: none; }

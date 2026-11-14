@@ -175,6 +175,15 @@ export function updateEnemies(dt) {
       continue;
     }
     if (e.sink < 0) e.sink = Math.min(0, e.sink + dt * 1.5);
+    // 被震荡雷击退 / 眩晕
+    if (e.kb) { e.pos.x += e.kb.x * dt; e.pos.z += e.kb.z * dt; const f = Math.pow(0.04, dt); e.kb.x *= f; e.kb.z *= f; if (Math.abs(e.kb.x) + Math.abs(e.kb.z) < 0.2) e.kb = null; }
+    if (e.stun > 0) {
+      e.stun -= dt; e.pos.y = getHeight(e.pos.x, e.pos.z) + e.sink;
+      e.group.rotation.z = Math.sin(now * 30) * 0.08 * Math.min(1, e.stun);
+      if (Math.random() < dt * 8) fx.spark(new THREE.Vector3(e.pos.x, e.pos.y + 1.4 * e.scale, e.pos.z), [0.6, 0.85, 1], 2, 2, 0.4);
+      continue;
+    }
+    e.group.rotation.z = 0;
     const dP = Math.hypot(P.x - e.pos.x, P.z - e.pos.z);
     // 选目标
     e.retarget -= dt;

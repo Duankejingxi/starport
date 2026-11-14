@@ -15,7 +15,7 @@ import { audio } from './audio.js';
 import { generateNodes, updateNodes, serializeNodes, loadNodes } from './resources.js';
 import { createBuilding, updateBuildings, serializeBuildings, recalcColony, destroyBuilding, DEFS, setGhost, placement, canUpgrade, upgradeCost, upgradeBuilding, MAX_LV } from './buildings.js';
 import { costText } from './state.js';
-import { updateProjectiles, updateEnemies, shoot, clearEnemies, rayEnemy } from './combat.js';
+import { updateProjectiles, updateEnemies, shoot, clearEnemies, rayEnemy, spawnCrawler } from './combat.js';
 import { Player, LANDER_POS } from './player.js';
 import { initTools, updateTools, renderViewmodel, tool } from './tools.js';
 import { updateColony, lookColonist, serializeColonists, loadColonists } from './colony.js';
@@ -42,6 +42,7 @@ import { updateFestival, startFestival } from './festival.js';
 import { updateMega } from './mega.js';
 import { initCineFx, updateCineFx, explode, billow, shockwave, flash as cineFlash, shake as cineShake } from './cinefx.js';
 import { playWarp } from './warp.js';
+import { throwGrenade, updateGrenades } from './grenade.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -933,6 +934,8 @@ function update(dt) {
     if (G.time.dawn) { G.time.dawn = false; toast(`第 ${G.time.day} 日 · 黎明`, 'sun'); }
     updateNodes(dt);
     if (!G.driving) updateTools(dt, player, camera); else G.lookBuilding = null;
+    if (input.hit('KeyG') && !G.menuOpen && !player.dead && !G.driving) throwGrenade(camera, player);
+    updateGrenades(dt);
     updateBuildings(dt, { shoot });
     updateLightPool(dt);
     updateColony(dt);
@@ -986,7 +989,7 @@ window.__dbg = {
   fest: () => startFestival(),
   boom: (x, y, z, s) => explode(new THREE.Vector3(x, y, z), s),
   pod: () => dropPod(),
-  audio,
+  audio, spawnCrawler,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
   launch(d = "europa") { const b = G.buildings.find(b => b.type === "launch"); startLaunch(b, d); },
