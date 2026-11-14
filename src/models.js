@@ -184,7 +184,7 @@ export const BUILD_MODELS = {
     mk(cyl(0.08, 0.1, 4.2, 6), M.metal, 0, 2.1, 0, g);
     mk(box(0.6, 0.2, 0.6), M.dark, 0, 4.3, 0, g);
     const bulb = mk(new THREE.SphereGeometry(0.2, 8, 6), M.lamp, 0, 4.15, 0, g); bulb.castShadow = false;
-    a.glow = glow(0xffd9a0, 3, g, 0, 4.1, 0);
+    a.glow = glow(0xffd9a0, 1.7, g, 0, 4.1, 0);
   },
   terraformer(g, a) {
     foundation(g, 7);

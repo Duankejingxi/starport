@@ -41,6 +41,7 @@ import { updateEvents, podAt, openPod, dropPod } from './events.js';
 import { updateFestival, startFestival } from './festival.js';
 import { updateMega } from './mega.js';
 import { initCineFx, updateCineFx, explode } from './cinefx.js';
+import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
 G.debug = /[?&]debug/.test(location.search);
@@ -171,6 +172,7 @@ G.hiShadows = quality === 'high';
 buildSky(scene);
 buildTerrain(scene);
 initFx(scene);
+initLightPool(scene);
 const lander = makeLander();
 lander.group.position.set(LANDER_POS.x, getHeight(LANDER_POS.x, LANDER_POS.z) + 0.1, LANDER_POS.z);
 lander.group.rotation.y = 0.6;
@@ -832,6 +834,7 @@ function update(dt) {
     updateNodes(dt);
     if (!G.driving) updateTools(dt, player, camera); else G.lookBuilding = null;
     updateBuildings(dt, { shoot });
+    updateLightPool(dt);
     updateColony(dt);
     updateCity(dt, tool.id === 'build' && !!placement.type);
     updateLaunch(dt);
