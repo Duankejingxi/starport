@@ -24,7 +24,7 @@ export const PLANETS = {
     id: 'europa', name: '木卫二·欧罗巴', place: '康纳马拉混沌区', title: '冰下之海', next: 'kepler',
     seed: 1610, gravity: 3.6, solar: 0.55, terraformable: false, craters: 14,
     hills: 16, ridges: 26, detail: 1.1,
-    ground: { a: [0.80, 0.84, 0.88], b: [0.93, 0.95, 0.97], steep: [0.52, 0.36, 0.30], low: [0.62, 0.72, 0.82] },
+    ground: { a: [0.80, 0.84, 0.88], b: [0.93, 0.95, 0.97], steep: [0.50, 0.58, 0.68], low: [0.62, 0.72, 0.82] },
     rockHSL: [0.58, 0.2, 0.62], rock: 0xb8c8d8,
     sky: {
       dayTop: [0.02, 0.025, 0.05], dayHor: [0.16, 0.18, 0.26], setTop: [0.01, 0.012, 0.03], setHor: [0.10, 0.10, 0.16],
