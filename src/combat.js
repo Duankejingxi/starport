@@ -83,7 +83,7 @@ function killEnemy(e, owner) {
   fx.burst(p, [1, 0.4, 0.1], 40, 9); fx.dustPuff(p, 12, 2); explode(p, e.boss ? 3.5 : e.guardian ? 1.4 : 0.9, 0xff6a2a);
   fx.debris(p, e.legs[0].children[0].material, 6, 5, 0.45 * e.scale);
   fx.debris(p, e.inner.children[1].material, 8, 6, 0.5 * e.scale);
-  audio.play('kill');
+  audio.play('kill', e.pos);
   G.scene.remove(e.group);
   G.stats.kills++;
   if (e.guardian) G.stats.guardKills = (G.stats.guardKills || 0) + 1;

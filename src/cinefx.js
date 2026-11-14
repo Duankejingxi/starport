@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { G } from './state.js';
 import { glowTexture, M } from './models.js';
 import { fx } from './fx.js';
+import { audio } from './audio.js';
 
 // ================= 着色器噪声 =================
 const NOISE = `
@@ -100,6 +101,7 @@ export function shockwave(pos, color = 0xffc080, size = 6, dur = 0.7, ground = t
 }
 // 爆炸：闪光 → 火球翻滚上升并转为黑烟 → 冲击波 → 镜头震动
 export function explode(pos, scale = 1, color = 0xff8a3a) {
+  audio.play('boom', pos);
   flash(pos, color, 60 * scale, 24 * scale, 0.6);
   const core = sprite(glowTexture(), 0xfff2d0, THREE.AdditiveBlending, 1); core.position.copy(pos);
   live.push({ o: core, t: 0, dur: 0.28, upd: (k, o) => { o.scale.setScalar((1.6 + k * 4) * scale); o.material.opacity = (1 - k) * (1 - k); } });

@@ -137,6 +137,7 @@ export function closeMenus(relock, instant = false) {
   const open = MENUS.filter(id => !$(id).classList.contains('hidden'));
   if (instant || !open.length) open.forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('closing'); });
   else {
+    audio.play('close');
     open.forEach(id => $(id).classList.add('closing'));
     closeTimer = setTimeout(() => open.forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('closing'); }), 260);
   }

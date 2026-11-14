@@ -80,7 +80,7 @@ function impact(p) {
   fx.burst(up, [1, 0.55, 0.2], 120, 22); explode(up, 2.6, 0xff8a40);
   fx.ring(p, 2, 90);
   fx.dustPuff(up, 40, 8);
-  audio.play('rumble'); audio.play('kill');
+  audio.play('rumble', p);
   const d = p.distanceTo(G.player.pos);
   if (d < 80) G.player.landDip = Math.max(G.player.landDip, 0.4 * (1 - d / 80));
   if (!G.colliders.overlaps(p.x, p.z, 2.5)) {

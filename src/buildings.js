@@ -329,7 +329,7 @@ function updateTurret(b, dt, ctx) {
     from.addScaledVector(dir, 2.2);
     ctx.shoot(from, dir, 15 * MUL[b.level || 1] * (has('plasma') ? 1.5 : 1), 'turret');
     muzzle(from, dir, 0xffc070, 1.1);
-    audio.play('turret');
+    audio.play('turret', from);
   }
 }
 
