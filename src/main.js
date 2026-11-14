@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { sunDir } from './sky.js';
@@ -44,6 +45,7 @@ import { initCineFx, updateCineFx, explode, billow, shockwave, flash as cineFlas
 import { playWarp } from './warp.js';
 import { throwGrenade, updateGrenades } from './grenade.js';
 import { updateDevils, spawnDevil } from './devils.js';
+import { updateLoot } from './loot.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -73,8 +75,7 @@ function applyQuality(q, live) {
 // 泛光后期：仅高画质开启
 let composer = null, bloom = null;
 function setupComposer() {
-  // 多重采样抗锯齿：后期链路默认没有 MSAA，边缘会有锯齿
-  const rt = new THREE.WebGLRenderTarget(window.innerWidth * renderer.getPixelRatio(), window.innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, samples: renderer.capabilities.isWebGL2 ? 4 : 0 });
+  const rt = new THREE.WebGLRenderTarget(window.innerWidth * renderer.getPixelRatio(), window.innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType });
   composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
   // 环境光遮蔽：缝隙、接缝、贴地处的柔和阴影
@@ -138,8 +139,11 @@ function setupComposer() {
       }`,
   });
   composer.addPass(grade);
+  // 后处理抗锯齿（SMAA）：不影响粒子，开销小
+  smaa = new SMAAPass(window.innerWidth * renderer.getPixelRatio(), window.innerHeight * renderer.getPixelRatio());
+  composer.addPass(smaa);
 }
-let grade = null, gtao = null, shafts = null;
+let grade = null, gtao = null, shafts = null, smaa = null;
 const _sv = new THREE.Vector3();
 function renderScene() {
   updateSkyline(camera.position, scene.fog.color);
@@ -938,6 +942,7 @@ function update(dt) {
     if (input.hit('KeyG') && !G.menuOpen && !player.dead && !G.driving) throwGrenade(camera, player);
     updateGrenades(dt);
     updateDevils(dt);
+    updateLoot(dt);
     updateBuildings(dt, { shoot });
     updateLightPool(dt);
     updateColony(dt);

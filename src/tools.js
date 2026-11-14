@@ -6,6 +6,7 @@ import { input } from './input.js';
 import { M, glow } from './models.js';
 import { raycastTerrain } from './terrain.js';
 import { mineNode, NODE_COLOR } from './resources.js';
+import { oreShard } from './loot.js';
 import { rayEnemy, damageEnemy, shoot } from './combat.js';
 import { fx } from './fx.js';
 import { audio } from './audio.js';
@@ -220,6 +221,7 @@ export function updateTools(dt, player, camera) {
           G.res[n.type]++; G.stats.mined[n.type]++;
           if (n.meteor) G.stats.meteorMined = (G.stats.meteorMined || 0) + 1;
           G.events.emit('pickup', { type: n.type, n: 1 });
+          oreShard(end.clone().addScaledVector(dir, -0.3), NODE_COLOR[n.type]);
           if (mineNode(n, 1)) { audio.play('deplete'); mineAcc = 0; break; }
         }
       } else if (kind === 'enemy') {
