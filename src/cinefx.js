@@ -141,6 +141,14 @@ export function billow(pos, scale = 1, tint = [0.78, 0.6, 0.48]) {
     o.material.opacity = Math.min(1, k * 8) * (1 - k) * 0.75;
   } });
 }
+// 炮口焰：极短的强光 + 前向十字星芒
+export function muzzle(pos, dir, color = 0xffc070, size = 1) {
+  flash(pos, color, 30 * size, 14 * size, 0.09);
+  const s = sprite(glowTexture(), color, THREE.AdditiveBlending, 1); s.position.copy(pos);
+  live.push({ o: s, t: 0, dur: 0.09, upd: (k, o) => { o.scale.setScalar((1.8 - k) * size); o.material.opacity = 1 - k; } });
+  const f = sprite(fireTex, 0xffe0b0, THREE.AdditiveBlending, 1); f.position.copy(pos).addScaledVector(dir, 0.6 * size); f.material.rotation = Math.random() * 6;
+  live.push({ o: f, t: 0, dur: 0.07, upd: (k, o) => { o.scale.setScalar((1.2 + k) * size); o.material.opacity = 1 - k; } });
+}
 // 小型命中：闪光 + 小冲击环
 export function impact(pos, color = 0x8ee7ff, size = 1) {
   flash(pos, color, 18 * size, 8 * size, 0.18);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { G, canAfford, pay } from './state.js';
-import { explode } from './cinefx.js';
+import { explode, muzzle } from './cinefx.js';
 import { BUILD_MODELS, M, CITY_MATS, glow } from './models.js';
 import { P, PID, META } from './planets.js';
 import { LEVELS, inTerritory } from './city.js';
@@ -328,6 +328,7 @@ function updateTurret(b, dt, ctx) {
     const dir = to.sub(from).normalize();
     from.addScaledVector(dir, 2.2);
     ctx.shoot(from, dir, 15 * MUL[b.level || 1] * (has('plasma') ? 1.5 : 1), 'turret');
+    muzzle(from, dir, 0xffc070, 1.1);
     audio.play('turret');
   }
 }
