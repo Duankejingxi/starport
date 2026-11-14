@@ -741,3 +741,69 @@ export function makeShuttleHD() {
   const fg = glow(0xffa040, 9, g, 0, -0.5, 0);
   return { group: g, flame, flameGlow: fg };
 }
+
+// ================= 路灯（高精度）：八角基座、渐细灯杆、碟形灯头、顶部小太阳能板 =================
+Object.assign(BUILD_MODELS, {
+  lamp(g, a) {
+    mk(cyl(0.55, 0.62, 0.3, 8), M.found, 0, 0.1, 0, g, 0, Math.PI / 8, 0).castShadow = false;
+    mk(cyl(0.62, 0.62, 2, 8), M.found, 0, -1.1, 0, g, 0, Math.PI / 8, 0).castShadow = false;
+    bolts(g, 0.45, 0.28, 6, 0.035);
+    mk(lathe([[0, 0], [0.2, 0], [0.2, 0.08], [0.13, 0.2], [0.11, 0.6], [0.075, 3.6], [0.06, 4.0], [0, 4.0]], 16), M.metal, 0, 0.25, 0, g);
+    mk(cyl(0.135, 0.135, 0.5, 16), M.hazard, 0, 0.75, 0, g);
+    // 配电盒 + 状态灯
+    mk(rbox(0.22, 0.32, 0.14, 0.03), M.dark, 0, 1.3, 0.14, g);
+    a.led = glow(0x55ff99, 0.18, g, 0.06, 1.42, 0.22);
+    tube([V(0, 1.12, 0.18), V(0, 0.6, 0.2), V(0, 0.3, 0.32), V(0, 0.22, 0.48)], 0.02, M.rubber, g, 12);
+    // 灯头
+    mk(lathe([[0, 0], [0.62, 0.0], [0.66, 0.05], [0.55, 0.16], [0.22, 0.26], [0.08, 0.3], [0, 0.3]], 32), M.white, 0, 4.18, 0, g);
+    mk(new THREE.TorusGeometry(0.5, 0.035, 8, 40), M.lamp, 0, 4.17, 0, g, Math.PI / 2, 0, 0).castShadow = false;
+    const lens = mk(new THREE.CircleGeometry(0.42, 32), M.lamp, 0, 4.15, 0, g, Math.PI / 2, 0, 0); lens.castShadow = false;
+    mk(new THREE.TorusGeometry(0.64, 0.02, 6, 40), M.metal, 0, 4.2, 0, g, Math.PI / 2, 0, 0);
+    // 小太阳能板与天线
+    const sp = new THREE.Group(); sp.position.set(0, 4.55, 0); sp.rotation.x = -0.45; g.add(sp);
+    mk(cyl(0.025, 0.025, 0.25, 6), M.metal, 0, -0.1, 0, sp);
+    mk(rbox(0.7, 0.03, 0.45, 0.01), M.cell, 0, 0.04, 0, sp);
+    rod(V(0.25, 4.45, -0.1), V(0.3, 5.2, -0.12), 0.008, M.metal, g, 4);
+    a.glow = glow(0xffd9a0, 1.7, g, 0, 4.1, 0);
+  },
+});
+
+// ================= 地球补给舱（高精度）：钟形返回舱、烧蚀隔热罩、反推、着陆腿 =================
+export function makePodHD() {
+  const g = new THREE.Group();
+  const body = new THREE.Group(); body.position.y = 0.55; g.add(body);
+  // 钟形舱体
+  mk(lathe([[1.28, 0.3], [1.22, 0.55], [1.05, 1.2], [0.8, 1.9], [0.55, 2.35], [0.42, 2.45], [0, 2.47]], 40), M.white, 0, 0, 0, body);
+  // 烧蚀隔热罩
+  mk(lathe([[0, 0], [0.9, 0.06], [1.24, 0.2], [1.32, 0.3], [1.28, 0.36], [0, 0.36]], 40), M.ablative, 0, 0, 0, body);
+  // 橙色腰带与面板接缝
+  mk(cyl(1.18, 1.23, 0.18, 40), M.orange, 0, 0.72, 0, body);
+  for (const [r, y] of [[0.98, 1.35], [0.66, 2.05]]) mk(new THREE.TorusGeometry(r, 0.015, 4, 48), M.dark, 0, y, 0, body, Math.PI / 2, 0, 0);
+  // 舱门 + 舷窗
+  const hz = 1.0, ha = Math.PI / 2;
+  const hatch = new THREE.Group(); hatch.position.set(0, 1.35, 0); body.add(hatch);
+  const hd = mk(rbox(0.62, 0.72, 0.06, 0.08), M.panel, 0, 0, hz - 0.06, hatch); hd.rotation.x = -0.36;
+  porthole(body, 0.55, 1.75, 0.6, 0.14, Math.PI / 4.2, -0.38);
+  hazard(hatch, 0.62, 0.06, 0, -0.42, hz - 0.03 + 0.12).rotation.x = -0.36;
+  // 反推喷口（四组）
+  for (let i = 0; i < 4; i++) {
+    const an = i * Math.PI / 2 + Math.PI / 4, x = Math.cos(an), z = Math.sin(an);
+    const q = new THREE.Group(); q.position.set(x * 0.98, 1.55, z * 0.98); q.rotation.y = -an; body.add(q);
+    mk(rbox(0.22, 0.26, 0.16, 0.03), M.dark, 0.05, 0, 0, q);
+    for (const [dx, dy] of [[0.15, 0], [0.05, 0.14]]) mk(cyl(0.025, 0.045, 0.08, 8), M.metal, dx, dy, 0, q, 0, 0, -Math.PI / 2);
+  }
+  // 顶部：降落伞舱、天线、信标
+  mk(cyl(0.3, 0.38, 0.2, 24), M.panel, 0, 2.55, 0, body);
+  mk(cyl(0.32, 0.32, 0.04, 24), M.orange, 0, 2.66, 0, body);
+  rod(V(0.18, 2.6, 0.05), V(0.22, 3.4, 0.08), 0.012, M.metal, body, 4);
+  // 着陆腿
+  for (let i = 0; i < 4; i++) {
+    const an = i * Math.PI / 2, x = Math.cos(an), z = Math.sin(an);
+    rod(V(x * 1.05, 1.05, z * 1.05), V(x * 1.7, 0.04, z * 1.7), 0.05, M.metal, g, 8);
+    rod(V(x * 1.2, 0.62, z * 1.2), V(x * 1.48, 0.38, z * 1.48), 0.035, M.chrome, g, 8);
+    mk(cyl(0.2, 0.24, 0.07, 16), M.dark, x * 1.72, 0.035, z * 1.72, g);
+  }
+  const beacon = glow(0x66ff99, 1.1, body, 0.22, 3.42, 0.08);
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.85, 4.5, 20, 1, true), M.flame); flame.rotation.x = Math.PI; flame.position.y = -1.7; g.add(flame);
+  return { g, beacon, flame };
+}

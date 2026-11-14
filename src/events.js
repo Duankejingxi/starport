@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { G } from './state.js';
 import { explode } from './cinefx.js';
 import { glow, M } from './models.js';
+import { makePodHD } from './models_hd.js';
 import { getHeight, HALF } from './terrain.js';
 import { fx } from './fx.js';
 import { audio } from './audio.js';
@@ -92,18 +93,7 @@ function impact(p) {
 // —— 地球补给舱：定期从天而降，落点有信标，按 E 打开 ——
 const pods = [];
 let podT = 150;
-function buildPod() {
-  const g = new THREE.Group();
-  const mk = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = true; g.add(m); return m; };
-  mk(new THREE.CylinderGeometry(0.9, 1.2, 1.8, 20), M.white, 1.2);
-  mk(new THREE.CylinderGeometry(0.92, 0.92, 0.25, 20), M.orange, 1.6);
-  mk(new THREE.ConeGeometry(0.9, 0.9, 20), M.white, 2.55);
-  mk(new THREE.CylinderGeometry(1.25, 1.1, 0.3, 20), M.dark, 0.2);
-  for (let i = 0; i < 4; i++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.1, 6), M.metal); const a = i * Math.PI / 2; l.position.set(Math.cos(a) * 1.1, 0.25, Math.sin(a) * 1.1); l.rotation.set(Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6); g.add(l); }
-  const beacon = glow(0x66ff99, 2.4, g, 0, 3.4, 0);
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.8, 4, 12, 1, true), M.flame); flame.rotation.x = Math.PI; flame.position.y = -1.8; g.add(flame);
-  return { g, beacon, flame };
-}
+function buildPod() { return makePodHD(); }
 export function dropPod(nearPlayer = true) {
   const P = G.player.pos;
   let x = 0, z = 0;
