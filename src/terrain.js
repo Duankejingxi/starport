@@ -43,7 +43,13 @@ function heightAt(x, z) {
   h = lerp(SPAWN_H + noise3(x * 0.02, z * 0.02) * 0.6, h, smoothstep(45, 150, ds));
   const de = Math.max(Math.abs(x), Math.abs(z));
   const edge = HALF - 200;
-  if (de > edge) { const k = (de - edge) / 200; h += k * k * 160 * (0.65 + 0.35 * noise(x * 0.01, z * 0.01)); }
+  if (de > edge) {
+    // 世界边缘的山脉：脊状噪声叠加，山脊锋利、山谷舒缓
+    const k = (de - edge) / 200;
+    let r = 0, a = 1, f = 0.0035;
+    for (let o = 0; o < 3; o++) { const n = 1 - Math.abs(noise2(x * f, z * f)); r += n * n * a; a *= 0.45; f *= 2; }
+    h += k * k * (110 + r * 70) * (0.75 + 0.25 * noise(x * 0.008, z * 0.008));
+  }
   return h;
 }
 
@@ -263,4 +269,40 @@ function buildFlora(scene, r) {
     n++;
   }
   scene.add(stems, caps);
+}
+
+// —— 远景山脉剪影：两层环形山脊，颜色随雾色变化，制造空气透视 ——
+const skyline = [];
+export function buildSkyline(scene) {
+  const mk = (R, hMin, hMax, seed, tint, depth) => {
+    const n2 = makeNoise2D(P.seed * 13 + seed), seg = 720;
+    const pos = [], fk = [], idx = [];
+    for (let i = 0; i <= seg; i++) {
+      const a = i / seg * Math.PI * 2, cx = Math.cos(a), cz = Math.sin(a);
+      let r = 0, amp = 1, f = 1.6;
+      for (let o = 0; o < 5; o++) { const v = 1 - Math.abs(n2(cx * f + 9, cz * f - 4)); r += v * v * amp; amp *= 0.5; f *= 2.2; }
+      const top = hMin + (hMax - hMin) * Math.min(1, r / 1.4);
+      pos.push(cx * R, -60, cz * R, cx * R, top * 0.45, cz * R, cx * R, top, cz * R);
+      fk.push(0, 0.55, 1);
+      if (i < seg) { const b = i * 3; for (let j = 0; j < 2; j++) idx.push(b + j, b + j + 3, b + j + 1, b + j + 1, b + j + 3, b + j + 4); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('k', new THREE.Float32BufferAttribute(fk, 1));
+    g.setIndex(idx);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uFog: { value: new THREE.Color() }, uTint: { value: new THREE.Color(tint) }, uD: { value: depth }, uSky: { value: new THREE.Color() } },
+      vertexShader: 'attribute float k; varying float vK; void main(){ vK = k; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform vec3 uFog, uTint; uniform float uD; varying float vK; void main(){ float m = uD * smoothstep(0.0, 1.0, vK); gl_FragColor = vec4(mix(uFog, uTint * (0.55 + 0.45 * uFog), m), 1.0); }',
+      fog: false, depthWrite: true,
+    });
+    const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.renderOrder = -1; m.userData.noAO = true;
+    scene.add(m); skyline.push(m);
+  };
+  const rock = new THREE.Color(P.id === 'europa' ? 0x8a9aab : P.id === 'kepler' ? 0x5a6a4a : 0x8a4a30);
+  mk(2600, 220, 700, 2, rock.clone().multiplyScalar(0.9), 0.32);
+  mk(1800, 120, 430, 5, rock, 0.5);
+}
+export function updateSkyline(cam, fogColor) {
+  for (const m of skyline) { m.position.set(cam.x, 0, cam.z); m.material.uniforms.uFog.value.copy(fogColor); }
 }

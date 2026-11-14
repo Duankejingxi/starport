@@ -8,7 +8,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { sunDir } from './sky.js';
 import { initPebbles, updatePebbles } from './pebbles.js';
 import { G, ColliderGrid, RES_INFO } from './state.js';
-import { buildTerrain, makeMapCanvas, getHeight, applyTerraform, floraMat } from './terrain.js';
+import { buildTerrain, makeMapCanvas, getHeight, applyTerraform, floraMat, buildSkyline, updateSkyline } from './terrain.js';
 import { buildSky, updateSky } from './sky.js';
 import { initFx, updateFx, fx } from './fx.js';
 import { audio } from './audio.js';
@@ -71,7 +71,9 @@ function applyQuality(q, live) {
 // 泛光后期：仅高画质开启
 let composer = null, bloom = null;
 function setupComposer() {
-  composer = new EffectComposer(renderer);
+  // 多重采样抗锯齿：后期链路默认没有 MSAA，边缘会有锯齿
+  const rt = new THREE.WebGLRenderTarget(window.innerWidth * renderer.getPixelRatio(), window.innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, samples: renderer.capabilities.isWebGL2 ? 4 : 0 });
+  composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
   // 环境光遮蔽：缝隙、接缝、贴地处的柔和阴影
   gtao = new GTAOPass(scene, camera, window.innerWidth, window.innerHeight);
@@ -82,7 +84,7 @@ function setupComposer() {
     this.scene.traverse(o => {
       cache.set(o, o.visible);
       const m = o.material;
-      if (o.isPoints || o.isLine || o.isSprite || (m && !Array.isArray(m) && m.transparent && (m.depthWrite === false || m.blending === THREE.AdditiveBlending))) o.visible = false;
+      if (o.isPoints || o.isLine || o.isSprite || o.userData.noAO || (m && !Array.isArray(m) && m.transparent && (m.depthWrite === false || m.blending === THREE.AdditiveBlending))) o.visible = false;
     });
   };
   gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.4, thickness: 1.5, scale: 1.2, samples: 12 });
@@ -138,6 +140,7 @@ function setupComposer() {
 let grade = null, gtao = null, shafts = null;
 const _sv = new THREE.Vector3();
 function renderScene() {
+  updateSkyline(camera.position, scene.fog.color);
   if (quality === 'high' && composer) {
     // 夜里泛光更强，白天收敛，避免天空过曝
     bloom.strength = 0.3 + G.time.night * 0.22;
@@ -172,6 +175,7 @@ initCineFx();
 G.hiShadows = quality === 'high';
 buildSky(scene);
 buildTerrain(scene);
+buildSkyline(scene);
 initFx(scene);
 initLightPool(scene, quality === 'high');
 const lander = makeLander();
