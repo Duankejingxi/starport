@@ -697,3 +697,18 @@ body.glitch #hud { animation: glitchH .32s steps(3) both; }
 #dmgdir .dd { position: absolute; left: -160px; top: -160px; width: 320px; height: 320px; opacity: 0; }
 #dmgdir .dd::before { content: ''; position: absolute; left: 50%; top: 0; width: 150px; height: 46px; transform: translateX(-50%); border-radius: 50% 50% 0 0 / 100% 100% 0 0; border-top: 4px solid rgba(255, 60, 40, .9); filter: drop-shadow(0 0 10px rgba(255, 40, 20, .8)); -webkit-mask: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent); mask: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent); }
 body.cinema #hitmark, body.cinema #dmgdir { display: none; }
+
+/* —— 影片 —— */
+body.film #intro, body.film #hud, body.film #visor, body.film #clickhint, body.film #achv-pop, body.film #chapter, body.film #radio { display: none !important; }
+.film-cap { position: fixed; left: 0; right: 0; bottom: 14vh; z-index: 40; text-align: center; pointer-events: none; color: #f2ece4; font-family: 'Rajdhani', 'PingFang SC', 'Microsoft YaHei', sans-serif; text-shadow: 0 2px 18px rgba(0, 0, 0, .7); }
+.film-cap p { margin: .5em 0; font-size: 22px; letter-spacing: .4em; opacity: 0; animation: capIn 1.6s cubic-bezier(.2, .7, .2, 1) both; }
+.film-cap p:first-child { font-size: 13px; letter-spacing: .7em; color: rgba(255, 210, 170, .85); }
+.film-cap p b { font-size: 38px; font-weight: 600; letter-spacing: .3em; color: #fff; }
+.film-cap.small p { font-size: 18px; }
+.film-flash { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+.film-skip { position: fixed; right: 4vw; bottom: 4vh; z-index: 41; font-size: 12px; letter-spacing: .3em; color: rgba(255, 255, 255, .35); pointer-events: none; animation: capIn 1s 2s both; }
+.film-title { position: fixed; inset: 0; z-index: 72; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(40, 30, 25, .25), #000 70%); pointer-events: none; animation: ftIn 1.6s ease-out both; }
+.film-title h1 { margin: 0; font-size: 120px; font-weight: 300; letter-spacing: .35em; color: #fff; text-indent: .35em; animation: capIn 2.2s .3s cubic-bezier(.2, .7, .2, 1) both; }
+.film-title p { margin: 10px 0 0; font-size: 26px; letter-spacing: .5em; color: #ffb37a; animation: capIn 2s 1s both; }
+.film-title small { margin-top: 18px; font-size: 12px; letter-spacing: 1.2em; color: rgba(255, 255, 255, .4); animation: capIn 2s 1.6s both; }
+@keyframes ftIn { from { opacity: 0; } to { opacity: 1; } }

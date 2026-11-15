@@ -49,6 +49,7 @@ import { updateLoot } from './loot.js';
 import { initGeysers, updateGeysers, geyserList, triggerGeyser } from './geysers.js';
 import { initSkyWhales, updateSkyWhales, whaleList } from './skywhales.js';
 import { updateHaboob } from './haboob.js';
+import { playFilm, updateFilm, filmSeek } from './film.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -392,6 +393,11 @@ if (META.autoResume && existing) {
 }
 $('btn-save').addEventListener('click', () => save(false));
 $('btn-archive').addEventListener('click', () => setPausePane(archiveHTML()));
+$('btn-film').addEventListener('click', () => {
+  audio.play('ui');
+  playFilm({ renderer, camera, lander, LANDER: LANDER_POS, getHeight, createBuilding, renderScene, updateSky, updateFx, updateCineFx,
+    updateBuildings: dt => { updateBuildings(dt, { shoot }); updateLightPool(dt); } });
+});
 $('btn-achv').addEventListener('click', () => setPausePane(achievementsHTML()));
 $('btn-restart').addEventListener('click', () => { if (confirm('将删除所有星球的进度，从火星重新开始。确定吗？')) { clearAll(); G.started = false; location.href = location.pathname + (G.debug ? '?debug' : ''); } });
 $('vol').addEventListener('input', e => audio.setVolume(+e.target.value));
@@ -946,6 +952,7 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.05);
   if (G.warping) return; // 虫洞画面接管屏幕时不再渲染场景
+  if (G.film) { updateFilm(dt); input.endFrame(); return; }
   if (landing) { updateLanding(dt); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (G.flyover) { updateFlyover(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (G.launching && !G.endingShown) { updateLaunch(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
@@ -1049,6 +1056,7 @@ window.__dbg = {
   ending: () => showEnding(), flyStep(sec) { for (let t = 0; t < sec && G.flyover; t += 0.05) updateFlyover(0.05); return !!G.flyover; },
   stormWarn: () => setStormState({ phase: 'warn', t: 25 }),
   drive() { G.upgrades.rover = true; if (!getRover()) spawnRover(player.pos.x + 4, player.pos.z, 0); enterRover(); },
+  film: () => $('btn-film').click(), filmSeek, filmStep(sec) { for (let t = 0; t < sec && G.film && !G.warping; t += 0.05) updateFilm(0.05); },
   audio, spawnCrawler, spawnDevil, spawnWasp, geyserList, triggerGeyser, whales: whaleList,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
