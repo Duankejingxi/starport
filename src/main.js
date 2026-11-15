@@ -424,6 +424,9 @@ G.events.on('crafted', k => {
   radio('方舟 · AI', '漫游车已出厂。车舱加压，可以在车里补氧。小心别开下悬崖。');
 });
 G.events.on('cityLevel', lv => {
+  // 安全时来一段简短的航拍，看看扩张后的领地
+  const calm = !G.enemies.some(e => !e.dead && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < 80) && !G.driving && !player.dead && !G.cine;
+  if (calm && G.buildings.length >= 4) cityFlyover([`COLONY LEVEL ${['I', 'II', 'III', 'IV', 'V', 'VI'][G.cityLevel]}`, `<b>${lv.name}</b>`], () => G.requestLock(), 7);
   chapterCard({ k: `COLONY LEVEL ${['I', 'II', 'III', 'IV', 'V', 'VI'][G.cityLevel]}`, title: lv.name, sub: `城市升级 · 领地扩展至 ${lv.r} 米` });
   const lines = {
     1: ['方舟 · AI', '殖民地升级为定居点。领地扩大了，更远的土地可以建造了。'],
@@ -492,17 +495,20 @@ G.events.on('ending', () => {
   setTimeout(showEnding, 14000);
 });
 // —— 结局航拍：镜头环绕上升，俯瞰你建起的城市，字幕依次浮现，然后进入结局画面 ——
-function cityFlyover(caps, done) {
+function cityFlyover(caps, done, dur) {
   if (!G.buildings.length) { done(); return; }
   let cx = 0, cz = 0; for (const b of G.buildings) { cx += b.x; cz += b.z; } cx /= G.buildings.length; cz /= G.buildings.length;
   let R = 40; for (const b of G.buildings) R = Math.max(R, Math.hypot(b.x - cx, b.z - cz));
   if (document.pointerLockElement) document.exitPointerLock();
   G.cine = true; document.body.classList.add('cinema');
   const cap = document.createElement('div'); cap.id = 'warp-cap'; cap.style.zIndex = 30;
-  cap.innerHTML = caps.map((l, i) => `<p style="animation-delay:${1.5 + i * 3.2}s">${l}</p>`).join('');
+  const gap = dur ? 1.2 : 3.2;
+  cap.innerHTML = caps.map((l, i) => `<p style="animation-delay:${(dur ? 0.6 : 1.5) + i * gap}s">${l}</p>`).join('');
   document.body.appendChild(cap);
   const a0 = Math.atan2(player.pos.z - cz, player.pos.x - cx);
-  G.flyover = { t: 0, cx, cz, R, a0, cap, done, dur: 6 + caps.length * 3.2, fov: camera.fov };
+  G.flyover = { t: 0, cx, cz, R, a0, cap, done, dur: dur || 6 + caps.length * 3.2, fov: camera.fov };
+  const skip = e => { if (e.type === 'mousedown' || e.code === 'Space' || e.code === 'Escape') { if (G.flyover) G.flyover.t = Math.max(G.flyover.t, G.flyover.dur); } };
+  G.flyover.skip = skip; setTimeout(() => { window.addEventListener('keydown', skip); window.addEventListener('mousedown', skip); }, 400);
   audio.play('chapter');
 }
 function updateFlyover(dt) {
@@ -514,6 +520,7 @@ function updateFlyover(dt) {
   camera.lookAt(F.cx, gy + 6 + e * 4, F.cz);
   if (F.t > F.dur && !F.faded) { F.faded = true; $('fade').classList.add('on'); }
   if (F.t > F.dur + 2.1) {
+    window.removeEventListener('keydown', F.skip); window.removeEventListener('mousedown', F.skip);
     F.cap.remove(); G.flyover = null; G.cine = false; document.body.classList.remove('cinema');
     player.update(0); $('fade').classList.remove('on');
     F.done();
