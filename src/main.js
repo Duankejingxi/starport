@@ -490,7 +490,39 @@ G.events.on('ending', () => {
   radio('赵小雨', '下雨了！这是火星上的第一场雨！');
   setTimeout(showEnding, 14000);
 });
+// —— 结局航拍：镜头环绕上升，俯瞰你建起的城市，字幕依次浮现，然后进入结局画面 ——
+function cityFlyover(caps, done) {
+  if (!G.buildings.length) { done(); return; }
+  let cx = 0, cz = 0; for (const b of G.buildings) { cx += b.x; cz += b.z; } cx /= G.buildings.length; cz /= G.buildings.length;
+  let R = 40; for (const b of G.buildings) R = Math.max(R, Math.hypot(b.x - cx, b.z - cz));
+  if (document.pointerLockElement) document.exitPointerLock();
+  G.cine = true; document.body.classList.add('cinema');
+  const cap = document.createElement('div'); cap.id = 'warp-cap'; cap.style.zIndex = 30;
+  cap.innerHTML = caps.map((l, i) => `<p style="animation-delay:${1.5 + i * 3.2}s">${l}</p>`).join('');
+  document.body.appendChild(cap);
+  const a0 = Math.atan2(player.pos.z - cz, player.pos.x - cx);
+  G.flyover = { t: 0, cx, cz, R, a0, cap, done, dur: 6 + caps.length * 3.2, fov: camera.fov };
+  audio.play('chapter');
+}
+function updateFlyover(dt) {
+  const F = G.flyover; F.t += dt;
+  const k = Math.min(1, F.t / F.dur), e = k * k * (3 - 2 * k);
+  const a = F.a0 + e * 1.6, r = F.R * (0.9 + e * 0.9) + 30, h = 6 + e * (F.R * 0.55 + 30);
+  const gy = getHeight(F.cx, F.cz);
+  camera.position.set(F.cx + Math.cos(a) * r, Math.max(gy + h, getHeight(F.cx + Math.cos(a) * r, F.cz + Math.sin(a) * r) + 4), F.cz + Math.sin(a) * r);
+  camera.lookAt(F.cx, gy + 6 + e * 4, F.cz);
+  if (F.t > F.dur && !F.faded) { F.faded = true; $('fade').classList.add('on'); }
+  if (F.t > F.dur + 2.1) {
+    F.cap.remove(); G.flyover = null; G.cine = false; document.body.classList.remove('cinema');
+    player.update(0); $('fade').classList.remove('on');
+    F.done();
+  }
+}
 function showEnding() {
+  if (!G._flown) { G._flown = true; G.ended = true; G.endingShown = true; cityFlyover(['NEW HOME · 新家园', `<b>${P.name}</b>`, `${G.colony.pop} 个人，在这里有了家`], () => { G._flown = false; showEnding2(); }); return; }
+  showEnding2();
+}
+function showEnding2() {
   G.ended = true; G.endingShown = true;
   if (player.dead) player.respawn();
   $('death').classList.add('hidden');
@@ -693,6 +725,8 @@ function travel(dest) {
   setTimeout(() => $('fade').classList.remove('on', 'white'), 400);
 }
 function finalEnding() {
+  if (!G._flown2) { G._flown2 = true; G.endingShown = true; cityFlyover(['CIVILIZATION · 星际文明', '三颗星球，一个人类', '这一切，都从你迈出的第一步开始'], finalEnding); return; }
+  G._flown2 = false;
   G.endingShown = true;
   if (document.pointerLockElement) document.exitPointerLock();
   const meta = loadMeta();
@@ -905,6 +939,7 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.05);
   if (G.warping) return; // 虫洞画面接管屏幕时不再渲染场景
   if (landing) { updateLanding(dt); updateCineFx(dt); renderScene(); input.endFrame(); return; }
+  if (G.flyover) { updateFlyover(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (G.launching && !G.endingShown) { updateLaunch(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (!G.started) {
     // 标题画面：缓慢环绕着陆舱
@@ -1002,6 +1037,7 @@ window.__dbg = {
   fest: () => startFestival(),
   boom: (x, y, z, s) => explode(new THREE.Vector3(x, y, z), s),
   pod: () => dropPod(),
+  ending: () => showEnding(), flyStep(sec) { for (let t = 0; t < sec && G.flyover; t += 0.05) updateFlyover(0.05); return !!G.flyover; },
   audio, spawnCrawler, spawnDevil, spawnWasp, geyserList, triggerGeyser, whales: whaleList,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
