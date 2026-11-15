@@ -438,31 +438,48 @@ Object.assign(BUILD_MODELS, {
 // ================= 后期建筑 =================
 Object.assign(BUILD_MODELS, {
   apartment(g, a) {
+    // 火星生态公寓：裙楼大堂 + 八角收分主塔（竖向白色肋板、每三层一圈挑台）+ 圆柱副塔 + 玻璃连廊 + 发光冠顶
     foundation(g, 4.4, true);
     const R = rng(91), [w1, w2] = CITY_MATS;
+    if (!M.strip) { M.strip = new THREE.MeshStandardMaterial({ color: 0x0a1a20, emissive: 0x7fe8ff, emissiveIntensity: 1.2 }); CITY_MATS.push(M.strip); }
+    // 裙楼
     mk(rbox(8.6, 0.6, 8.6, 0.15), M.panel, 0, 0.3, 0, g);
-    // 主塔：分段收分 + 楼层线
-    const tower = (x, z, w, h, mat) => {
-      mk(rbox(w, h, w, 0.25), mat, x, 0.6 + h / 2, z, g);
-      for (let y = 2.2; y < h; y += 2.2) mk(new THREE.BoxGeometry(w + 0.08, 0.12, w + 0.08), M.white, x, 0.6 + y, z, g);
-      for (const s of [-1, 1]) { mk(new THREE.BoxGeometry(0.16, h, 0.16), M.metal, x + s * w / 2, 0.6 + h / 2, z + w / 2, g); mk(new THREE.BoxGeometry(0.16, h, 0.16), M.metal, x + s * w / 2, 0.6 + h / 2, z - w / 2, g); }
-    };
-    tower(-1.3, -1.2, 4.6, 17, w1);
-    tower(2.1, 2.0, 3.6, 11, w2);
-    mk(rbox(4.0, 1.2, 4.0, 0.3), M.white, -1.3, 18.2, -1.2, g);
-    mk(rbox(3.0, 0.9, 3.0, 0.3), M.white, 2.1, 12.1, 2.0, g);
-    // 空中连廊
-    mk(rbox(2.6, 1.1, 1.4, 0.4), M.glass, 0.6, 7.4, 0.6, g, 0, Math.PI / 4, 0).castShadow = false;
-    for (const y of [6.9, 7.9]) mk(rbox(2.7, 0.1, 1.5, 0.04), M.metal, 0.6, y, 0.6, g, 0, Math.PI / 4, 0);
-    // 屋顶花园与设备
-    for (let i = 0; i < 6; i++) mk(new THREE.IcosahedronGeometry(0.35 + R() * 0.2, 0), M.leaf2, 1.4 + R() * 1.4, 12.75, 1.3 + R() * 1.4, g);
-    greebles(g, R, 8, -2.8, 0.2, 18.6, 18.9, 0.6);
-    mk(cyl(0.08, 0.1, 4, 8), M.metal, -1.3, 20.8, -1.2, g);
-    a.tip = glow(0xff4040, 1.4, g, -1.3, 22.9, -1.2);
-    // 入口雨棚
-    mk(rbox(2.4, 0.15, 1.6, 0.05), M.orange, -1.3, 3.2, 1.9, g);
-    for (const x of [-2.3, -0.3]) mk(cyl(0.05, 0.05, 2.6, 8), M.metal, x, 1.9, 2.6, g);
-    glow(0xffd9a0, 1.2, g, -1.3, 3.0, 2.2);
+    mk(rbox(8.0, 2.6, 7.6, 0.35), M.white, 0, 1.9, -0.2, g);
+    mk(rbox(8.08, 1.3, 7.68, 0.3), M.glass, 0, 1.7, -0.2, g).castShadow = false;
+    mk(rbox(8.2, 0.18, 7.8, 0.06), M.orange, 0, 3.25, -0.2, g);
+    // 主塔：八角、上窄下宽
+    const H = 19, base = 3.3;
+    const t1 = mk(new THREE.CylinderGeometry(2.25, 2.7, H, 8, 1), w1, -1.2, base + H / 2, -1.2, g); t1.rotation.y = Math.PI / 8;
+    for (let i = 0; i < 8; i++) {
+      const an = i * Math.PI / 4;
+      const f = mk(new THREE.BoxGeometry(0.14, H, 0.42), M.white, -1.2 + Math.cos(an) * 2.55, base + H / 2, -1.2 + Math.sin(an) * 2.55, g, 0, -an, 0);
+      f.rotation.z = Math.cos(an) * 0.0; f.scale.z = 1;
+    }
+    for (let y = 3; y < H; y += 3) { const k = y / H, r = 2.7 - (2.7 - 2.25) * k; mk(new THREE.CylinderGeometry(r + 0.32, r + 0.32, 0.14, 8, 1), M.white, -1.2, base + y, -1.2, g, 0, Math.PI / 8, 0); }
+    // 竖向灯带（夜间发光）
+    for (const an of [Math.PI / 4, Math.PI * 1.25]) mk(new THREE.BoxGeometry(0.08, H - 1, 0.08), M.strip, -1.2 + Math.cos(an) * 2.62, base + H / 2, -1.2 + Math.sin(an) * 2.62, g).castShadow = false;
+    // 冠顶：收口 + 光环 + 天线
+    mk(new THREE.CylinderGeometry(1.2, 2.3, 2.2, 8, 1), M.white, -1.2, base + H + 1.1, -1.2, g, 0, Math.PI / 8, 0);
+    mk(new THREE.TorusGeometry(1.75, 0.07, 6, 32), M.strip, -1.2, base + H + 0.5, -1.2, g, Math.PI / 2, 0, 0).castShadow = false;
+    mk(cyl(0.9, 1.2, 0.5, 16), M.panel, -1.2, base + H + 2.45, -1.2, g);
+    greebles(g, R, 6, -2.2, -0.2, base + H + 2.7, base + H + 2.9, -1.2);
+    mk(cyl(0.06, 0.1, 4.5, 8), M.metal, -1.2, base + H + 4.9, -1.2, g);
+    a.tip = glow(0xff4040, 1.4, g, -1.2, base + H + 7.2, -1.2);
+    // 副塔：圆柱，顶部屋顶花园
+    const H2 = 11.5;
+    mk(new THREE.CylinderGeometry(1.75, 1.85, H2, 20, 1), w2, 2.3, base + H2 / 2, 2.1, g);
+    for (let y = 2.6; y < H2; y += 2.6) mk(new THREE.CylinderGeometry(2.05, 2.05, 0.12, 20, 1), M.white, 2.3, base + y, 2.1, g);
+    mk(cyl(2.0, 1.9, 0.5, 20), M.white, 2.3, base + H2 + 0.25, 2.1, g);
+    mk(cyl(1.75, 1.75, 0.3, 20), M.soil, 2.3, base + H2 + 0.55, 2.1, g);
+    for (let i = 0; i < 7; i++) { const an = R() * 6.28, r = R() * 1.3; mk(new THREE.IcosahedronGeometry(0.3 + R() * 0.25, 0), R() < 0.5 ? M.leaf : M.leaf2, 2.3 + Math.cos(an) * r, base + H2 + 0.9, 2.1 + Math.sin(an) * r, g); }
+    const dome = mk(new THREE.SphereGeometry(1.85, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), M.glass, 2.3, base + H2 + 0.7, 2.1, g); dome.castShadow = false;
+    // 玻璃连廊（圆管）
+    const br = mk(new THREE.CylinderGeometry(0.6, 0.6, 2.4, 14, 1, true), M.glass, 0.65, base + 7.6, 0.5, g, 0, Math.PI / 4 + Math.PI / 2, Math.PI / 2); br.castShadow = false;
+    for (const d of [-1, 1]) mk(new THREE.TorusGeometry(0.62, 0.06, 6, 16), M.metal, 0.65 + d * 0.7 * Math.cos(Math.PI / 4), base + 7.6, 0.5 + d * 0.7 * Math.sin(Math.PI / 4), g, 0, -Math.PI / 4, 0);
+    // 入口雨棚与门灯
+    mk(rbox(2.6, 0.15, 1.6, 0.05), M.orange, -1.2, 3.0, 3.7, g);
+    for (const x of [-2.3, -0.1]) mk(cyl(0.05, 0.05, 2.4, 8), M.metal, x, 1.8, 4.3, g);
+    glow(0xffd9a0, 1.2, g, -1.2, 2.8, 4.0);
   },
   vfarm(g, a) {
     foundation(g, 4);
