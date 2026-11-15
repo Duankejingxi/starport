@@ -1048,6 +1048,7 @@ window.__dbg = {
   pod: () => dropPod(),
   ending: () => showEnding(), flyStep(sec) { for (let t = 0; t < sec && G.flyover; t += 0.05) updateFlyover(0.05); return !!G.flyover; },
   stormWarn: () => setStormState({ phase: 'warn', t: 25 }),
+  drive() { G.upgrades.rover = true; if (!getRover()) spawnRover(player.pos.x + 4, player.pos.z, 0); enterRover(); },
   audio, spawnCrawler, spawnDevil, spawnWasp, geyserList, triggerGeyser, whales: whaleList,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },

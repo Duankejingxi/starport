@@ -24,12 +24,12 @@ export function initCity(scene) {
     fragmentShader: `uniform float opacity, uT; uniform vec3 uCam, uC; varying vec2 vU; varying vec3 vW;
       void main(){
         float v = vU.y;
-        float base = exp(-v * 9.0) * 0.9 + exp(-v * 2.2) * 0.25;
-        float dash = step(0.55, fract(vU.x * 0.25 - uT * 0.6)) * smoothstep(0.35, 0.0, abs(v - 0.06)) * 0.9;
-        float tick = smoothstep(0.92, 1.0, fract(vU.x * 0.05)) * (1.0 - v) * 0.8;
+        // 底部一条细亮线 + 向上很淡的光幕 + 缓慢流过的扫描带
+        float base = smoothstep(0.06, 0.0, v) * 0.9 + exp(-v * 3.0) * 0.12;
+        float band = exp(-pow((fract(vU.x * 0.004 - uT * 0.05) - 0.5) * 12.0, 2.0)) * exp(-v * 2.0) * 0.35;
         float d = distance(vW.xz, uCam.xz);
         float near = 1.0 - smoothstep(25.0, 70.0, d);
-        float a = (base + dash + tick) * opacity * (0.15 + 0.85 * near) * smoothstep(1.0, 0.7, v);
+        float a = (base + band) * opacity * (0.15 + 0.85 * near);
         gl_FragColor = vec4(uC * a * 2.0, a);
       }`,
     transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,

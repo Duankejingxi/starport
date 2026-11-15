@@ -172,10 +172,19 @@ export function updateRover(dt, player, camera) {
     else { const nv = (ground - r.y) / Math.max(dt, 0.001); r.vy = r.vy * 0.6 + nv * 0.4; r.y = ground; }
   }
   placeModel(dt);
-  if (Math.abs(r.speed) > 4 && !r.air && Math.random() < 0.6) {
-    const back = new THREE.Vector3(r.x - fwd.x * 2.5 + (Math.random() - 0.5) * 2, r.y + 0.3, r.z - fwd.z * 2.5);
-    fx.dustPuff(back, 1, 0.5);
+  // 两个后轮各扬起一道尘土，速度越快越浓
+  const spd = Math.abs(r.speed);
+  if (spd > 3 && !r.air) {
+    const side = new THREE.Vector3(-fwd.z, 0, fwd.x), n = spd > 15 ? 3 : spd > 8 ? 2 : 1;
+    for (const sd of [-1, 1]) for (let i = 0; i < n; i++) {
+      if (Math.random() > 0.35 + spd / 40) continue;
+      const back = new THREE.Vector3(r.x - fwd.x * 2.3 + side.x * sd * 1.2, r.y + 0.25, r.z - fwd.z * 2.3 + side.z * sd * 1.2);
+      fx.dustPuff(back, 1, 0.3 + spd * 0.03);
+    }
   }
+  // 镜头：速度带来视野拉宽，颠簸带来轻微震动，落地时一沉
+  const bump = Math.min(1, Math.abs(r.vy - (r._pvy || 0)) * 0.15); r._pvy = r.vy;
+  r.shake = Math.max((r.shake || 0) * Math.pow(0.02, dt), bump * Math.min(1, spd / 10));
   r.lamp.intensity = G.time.night > 0.3 ? 80 : 0;
   for (const h of r.heads) h.visible = G.time.night > 0.3;
 
@@ -184,6 +193,9 @@ export function updateRover(dt, player, camera) {
   camera.quaternion.copy(r.body.getWorldQuaternion(new THREE.Quaternion())).multiply(tmpQ);
   const eye = new THREE.Vector3(0, 2.15, -0.7).applyQuaternion(r.g.quaternion).add(r.g.position);
   camera.position.copy(eye);
+  if (r.shake > 0.01) { camera.position.y += (Math.random() - 0.5) * r.shake * 0.12; camera.position.x += (Math.random() - 0.5) * r.shake * 0.06; }
+  const fovT = (G.baseFov || 72) + Math.min(14, spd * 0.45);
+  if (Math.abs(camera.fov - fovT) > 0.05) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); }
   camera.getWorldDirection(player.fwd);
   player.pos.set(r.x, r.y, r.z);
   player.vel.set(0, 0, 0);
