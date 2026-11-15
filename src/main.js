@@ -48,6 +48,7 @@ import { updateDevils, spawnDevil } from './devils.js';
 import { updateLoot } from './loot.js';
 import { initGeysers, updateGeysers, geyserList, triggerGeyser } from './geysers.js';
 import { initSkyWhales, updateSkyWhales, whaleList } from './skywhales.js';
+import { updateHaboob } from './haboob.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -984,6 +985,7 @@ function update(dt) {
     updateLoot(dt);
     updateGeysers(dt);
     updateSkyWhales(dt);
+    updateHaboob(dt);
     updateBuildings(dt, { shoot });
     updateLightPool(dt);
     updateColony(dt);
@@ -1038,6 +1040,7 @@ window.__dbg = {
   boom: (x, y, z, s) => explode(new THREE.Vector3(x, y, z), s),
   pod: () => dropPod(),
   ending: () => showEnding(), flyStep(sec) { for (let t = 0; t < sec && G.flyover; t += 0.05) updateFlyover(0.05); return !!G.flyover; },
+  stormWarn: () => setStormState({ phase: 'warn', t: 25 }),
   audio, spawnCrawler, spawnDevil, spawnWasp, geyserList, triggerGeyser, whales: whaleList,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },

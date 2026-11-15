@@ -238,6 +238,7 @@ export function startChapter(i, silent = false) {
   }
 }
 
+export function stormWarn() { return stormPhase === 'warn' ? Math.min(1, Math.max(0, 1 - stormT / 25)) : 0; }
 export function stormState() { return { phase: stormPhase, t: stormT, left: stormLeft }; }
 export function setStormState(s) { if (s) { stormPhase = s.phase === 'storm' ? 'calm' : s.phase; stormT = s.t ?? 200; } }
 export function resetStoryEnding(v) { endingQueued = v; }
