@@ -104,6 +104,7 @@ export function selectTool(i) {
   else setGhost(null);
 }
 
+const sway = { x: 0, y: 0 };
 let mineAcc = 0, fireCool = 0, kick = 0, mineSoundT = 0, swap = 0, lastTool = -1;
 const tmp = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), oc = new THREE.Vector3();
 
@@ -141,8 +142,13 @@ export function updateTools(dt, player, camera) {
   const hs = Math.hypot(player.vel.x, player.vel.z);
   const bx = Math.sin(player.bob) * 0.012 * Math.min(1, hs / 6), by = Math.abs(Math.cos(player.bob)) * 0.012 * Math.min(1, hs / 6);
   kick *= Math.pow(0.0001, dt);
+  // 武器惯性：转动视角时武器稍稍滞后，落地时一沉
+  const dyaw = player.yaw - (sway.py ?? player.yaw), dpitch = player.pitch - (sway.pp ?? player.pitch); sway.py = player.yaw; sway.pp = player.pitch;
+  sway.x += (THREE.MathUtils.clamp(dyaw * 1.6, -0.05, 0.05) - sway.x) * Math.min(1, dt * 10);
+  sway.y += (THREE.MathUtils.clamp(-dpitch * 1.6, -0.04, 0.04) - sway.y) * Math.min(1, dt * 10);
   const base = id === 'build' ? [0.2, -0.24, -0.6] : [0.24, -0.22, -0.58];
-  m.position.set(base[0] + bx, base[1] + by - swap * 0.3 - (player.sprinting ? 0.04 : 0), base[2] + kick * 0.08);
+  m.position.set(base[0] + bx + sway.x, base[1] + by + sway.y - swap * 0.3 - (player.sprinting ? 0.04 : 0) - player.landDip * 0.15, base[2] + kick * 0.08);
+  m.rotation.z = sway.x * 2.5;
   m.rotation.x = (id === 'build' ? -0.5 : 0) + kick * 0.15 + (player.sprinting ? -0.25 : 0);
   if (id === 'build') m.userData.scr.material.opacity = 0.6 + Math.sin(performance.now() * 0.005) * 0.2;
   vmCam.aspect = camera.aspect; vmCam.fov = camera.fov; vmCam.updateProjectionMatrix();
@@ -237,7 +243,7 @@ export function updateTools(dt, player, camera) {
 
   if (id === 'rifle' && firing && fireCool <= 0) {
     if (player.energy >= 5) {
-      fireCool = 0.16; player.energy -= 5; kick = 1;
+      fireCool = 0.16; player.energy -= 5; kick = 1; player.recoil = Math.min(0.06, player.recoil + 0.018); player.yaw += (Math.random() - 0.5) * 0.004;
       const start = camera.localToWorld(MUZZLE.clone());
       // 瞄准点：屏幕中心射线的远处
       const eh = rayEnemy(origin, dir, 200), th = raycastTerrain(origin, dir, 200);

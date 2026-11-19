@@ -378,7 +378,7 @@ const HELP = `<h3>操作</h3><div class="keys">
   <div><kbd>左键</kbd><span>采矿 · 射击 · 放置建筑</span></div><div><kbd>右键</kbd><span>取消建造</span></div>
   <div><kbd>1</kbd><kbd>2</kbd><span>切换工具</span></div><div><kbd>B</kbd><span>建造蓝图</span></div>
   <div><kbd>E</kbd><span>互动 · 交谈 · 上车</span></div><div><kbd>U</kbd><span>升级注视的建筑</span></div><div><kbd>T</kbd><span>科研</span></div>
-  <div><kbd>Q</kbd><span>小星扫描矿藏</span></div><div><kbd>M</kbd><span>星球地图 / 导航</span></div><div><kbd>F</kbd><span>手电筒</span></div><div><kbd>Tab</kbd><span>殖民地档案</span></div>
+  <div><kbd>C</kbd><span>冲刺闪避（消耗能量）</span></div><div><kbd>G</kbd><span>投掷震荡雷</span></div><div><kbd>Q</kbd><span>小星扫描矿藏</span></div><div><kbd>M</kbd><span>星球地图 / 导航</span></div><div><kbd>F</kbd><span>手电筒</span></div><div><kbd>Tab</kbd><span>殖民地档案</span></div>
   <div><kbd>P</kbd><span>拍照模式</span></div><div><kbd>Esc</kbd><span>暂停</span></div></div>
   <h3>生存</h3><p>氧气会持续消耗。着陆舱、制氧站和居住穹顶附近会自动补氧。建好住房、氧气、食物、水和着陆场，移民飞船就会到来。夜里要提防锈蚀蛛。</p>`;
 const togglePane = html => { const el = $('intro-pane'); if (!el.classList.contains('hidden') && el.dataset.k === html.slice(0, 20)) { el.classList.add('hidden'); return; } el.dataset.k = html.slice(0, 20); el.innerHTML = html; el.classList.remove('hidden'); audio.play('tick'); };
@@ -593,6 +593,7 @@ const HINTS = [
   { id: 'mine', text: '对准发光的矿石，<kbd>按住左键</kbd> 用采矿激光采集', when: () => playT > 6 && G.stats.mined.iron + G.stats.mined.silicon === 0 },
   { id: 'build', text: '资源够了！按 <kbd>B</kbd> 打开建造菜单', when: () => G.buildings.length === 0 && G.res.iron >= 8 && G.res.silicon >= 6 },
   { id: 'o2', text: '氧气在持续消耗。回到着陆舱或制氧站附近会自动补氧', when: () => !player.inLife && player.o2 < player.maxO2 * 0.5 },
+  { id: 'dash', text: '被围攻时按 <kbd>C</kbd> 冲刺闪避', when: () => G.enemies.some(e => !e.dead && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < 15) && !(G.stats.dashes > 0) },
   { id: 'night', text: '天黑了，按 <kbd>F</kbd> 打开手电筒', when: () => G.time.night > 0.6 && !player.flashlight },
   { id: 'craft', text: '靠近制造工坊按 <kbd>E</kbd> 制造武器和装备——试试加压漫游车', when: () => G.buildings.some(b => b.type === 'fabricator') && !G.upgrades.rifle },
   { id: 'drive', text: '漫游车就在附近，走过去按 <kbd>E</kbd> 上车', when: () => getRover() && !G.driving && !hintSeen.drove },

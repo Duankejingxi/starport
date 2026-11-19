@@ -25,6 +25,7 @@ export class Player {
     this.bob = 0; this.stepT = 0; this.landDip = 0;
     this.dead = false; this.hurtT = 0; this.flashlight = false;
     this.inLife = false; this.alarmT = 0; this.lastHitDir = 0;
+    this.coyote = 0; this.jumpBuf = 0; this.dashT = 0; this.dashCd = 0; this.recoil = 0; this.dashDir = new THREE.Vector3();
     this.moving = false; this.sprinting = false; this.jetting = false; this.roll = 0;
     this.fwd = new THREE.Vector3();
   }
@@ -85,13 +86,28 @@ export class Player {
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     let wx = 0, wz = 0;
     if (len) { const a = fx_ / len, b = fz / len; wx = a * cos + b * sin; wz = -a * sin + b * cos; }
-    const accel = this.onGround ? 12 : 2.5;
+    const accel = this.onGround ? 14 : 4;
     this.vel.x += (wx * speed - this.vel.x) * Math.min(1, accel * dt);
     this.vel.z += (wz * speed - this.vel.z) * Math.min(1, accel * dt);
 
     // 跳跃与喷气背包
     this.jetting = false;
-    if (!G.menuOpen && input.hit('Space') && this.onGround) { this.vel.y = 5.4; this.onGround = false; audio.play('jump'); }
+    // 跳跃更宽容：离开地面后 0.12 秒内仍可起跳（土狼时间），落地前 0.15 秒按下的跳跃会在落地时执行
+    this.coyote = this.onGround ? 0.12 : Math.max(0, this.coyote - dt);
+    if (!G.menuOpen && input.hit('Space')) this.jumpBuf = 0.15; else this.jumpBuf = Math.max(0, this.jumpBuf - dt);
+    // 冲刺闪避（C）：朝移动方向（没有输入时朝前方）短距离爆发
+    this.dashCd = Math.max(0, this.dashCd - dt);
+    if (!G.menuOpen && input.hit('KeyC') && this.dashCd <= 0 && this.energy >= 15) {
+      this.dashCd = 1.6; this.dashT = 0.2; this.energy -= 15;
+      if (len) this.dashDir.set(wx, 0, wz).normalize(); else this.dashDir.set(-sin, 0, -cos);
+      audio.play('dash'); fx.dustPuff(this.pos, 5, 0.8); G.stats.dashes = (G.stats.dashes || 0) + 1;
+    }
+    if (this.dashT > 0) {
+      this.dashT -= dt;
+      this.vel.x = this.dashDir.x * 21; this.vel.z = this.dashDir.z * 21;
+      if (Math.random() < 0.6) fx.dustPuff(this.pos, 1, 0.4);
+    }
+    if (this.jumpBuf > 0 && (this.onGround || this.coyote > 0) && this.vel.y <= 0.5) { this.vel.y = 5.4; this.onGround = false; this.coyote = 0; this.jumpBuf = 0; audio.play('jump'); }
     else if (!G.menuOpen && input.down('Space') && !this.onGround && G.upgrades.jetpack && this.energy > 1 && this.vel.y < 6) {
       this.vel.y += 15 * dt; this.energy -= 22 * dt; this.jetting = true;
       if (Math.random() < 0.5) audio.play('jet');
@@ -135,9 +151,11 @@ export class Player {
     this.cam.position.set(this.pos.x + Math.sin(tt * 1.7) * sh * 0.25, this.pos.y + EYE + this.bobY + Math.sin(tt * 2.3) * sh * 0.2, this.pos.z + Math.cos(tt * 1.3) * sh * 0.25);
     // 冲刺时视野变宽，左右平移时镜头微倾
     this.roll += ((-fx_ * 0.025) - this.roll) * Math.min(1, dt * 6);
-    const fovT = (G.baseFov || 72) + (this.sprinting ? 8 : 0) + (this.jetting ? 4 : 0);
+    const fovT = (G.baseFov || 72) + (this.sprinting ? 8 : 0) + (this.jetting ? 4 : 0) + (this.dashT > 0 ? 12 : 0);
     if (Math.abs(this.cam.fov - fovT) > 0.05) { this.cam.fov += (fovT - this.cam.fov) * Math.min(1, dt * 5); this.cam.updateProjectionMatrix(); }
-    this.cam.rotation.set(this.pitch, this.yaw, this.roll + Math.sin(this.bob) * 0.006 * Math.min(1, hs / 6), 'YXZ');
+    // 后坐力：只抬高镜头的显示角度，随后自动回落
+    this.recoil *= Math.pow(0.0005, dt);
+    this.cam.rotation.set(this.pitch + this.recoil, this.yaw, this.roll + Math.sin(this.bob) * 0.006 * Math.min(1, hs / 6), 'YXZ');
     this.cam.getWorldDirection(this.fwd);
 
     // 生存：氧气、生命、能量
