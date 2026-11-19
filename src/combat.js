@@ -80,8 +80,10 @@ export function damageEnemy(e, dmg, owner) {
   if (e.hp <= 0) killEnemy(e, owner);
 }
 
+let lastStop = 0;
 function killEnemy(e, owner) {
   e.dead = true;
+  if ((owner === 'player' || owner === 'laser') && !G.driving) { const now = performance.now(); if (now - lastStop > 400) { lastStop = now; G.hitStop = e.boss ? 0.35 : 0.07; } }
   const p = e.pos.clone(); p.y += 1;
   fx.burst(p, [1, 0.4, 0.1], 40, 9); fx.dustPuff(p, 12, 2); explode(p, e.boss ? 3.5 : e.guardian ? 1.4 : e.flyer ? 0.55 : 0.9, 0xff6a2a);
   fx.debris(p, e.legs[0].children[0].material, 6, 5, 0.45 * e.scale);

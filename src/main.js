@@ -970,7 +970,9 @@ const clock = new THREE.Clock();
 let introCam = 0;
 function frame() {
   requestAnimationFrame(frame);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const rdt = Math.min(clock.getDelta(), 0.05);
+  // 顿帧：亲手击杀时时间短暂放慢，让命中更有分量
+  let dt = rdt; if (G.hitStop > 0) { G.hitStop -= rdt; dt = rdt * 0.12; }
   if (G.warping) return; // 虫洞画面接管屏幕时不再渲染场景
   if (G.film) { updateFilm(dt); input.endFrame(); return; }
   if (landing) { updateLanding(dt); updateCineFx(dt); renderScene(); input.endFrame(); return; }
