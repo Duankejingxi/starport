@@ -180,8 +180,24 @@ export function lifeSupportAt(p) {
 
 // —— 建造预览 ——
 let ghost = null, ghostType = null;
-const ghostOk = new THREE.MeshBasicMaterial({ color: 0x55ffaa, transparent: true, opacity: 0.35, depthWrite: false });
-const ghostBad = new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.35, depthWrite: false });
+// 全息预览材质：边缘发光（菲涅尔）+ 向上滚动的扫描线 + 底部更亮
+const ghostT = { value: 0 };
+function holoMat(color) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uC: { value: new THREE.Color(color) }, uT: ghostT, uY0: { value: 0 } },
+    vertexShader: 'varying vec3 vN, vV; varying float vY; uniform float uY0; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vY = w.y - uY0; vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: `uniform vec3 uC; uniform float uT; varying vec3 vN, vV; varying float vY;
+      void main(){
+        float f = pow(1.0 - abs(dot(normalize(vN), vV)), 2.2);
+        float scan = smoothstep(0.85, 1.0, fract(vY * 2.2 - uT * 1.4)) * 0.35;
+        float sweep = exp(-pow((fract(uT * 0.35) * 14.0 - vY) * 1.6, 2.0)) * 0.6;
+        float a = 0.05 + f * 0.6 + scan * 0.7 + sweep * 0.6;
+        gl_FragColor = vec4(uC * (0.3 + f * 1.1 + sweep * 0.6), a);
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+  });
+}
+const ghostOk = holoMat(0x5fe8ff), ghostBad = holoMat(0xff4a3a);
 let rangeRing;
 export const placement = { type: null, rot: 0, valid: false, reason: '', x: 0, z: 0 };
 
@@ -203,6 +219,7 @@ export function setGhost(type) {
 export function updateGhost(hit, playerPos) {
   if (!ghost) return;
   if (!hit) { ghost.visible = false; rangeRing.visible = false; placement.valid = false; placement.reason = '对准地面'; return; }
+  const wasHidden = !ghost.visible;
   ghost.visible = true;
   const def = DEFS[placement.type];
   let x = hit.x, z = hit.z;
@@ -214,7 +231,12 @@ export function updateGhost(hit, playerPos) {
     x = playerPos.x + ax * minD; z = playerPos.z + az * minD; d = minD;
   }
   const y = getHeight(x, z);
-  ghost.position.set(x, y, z); ghost.rotation.y = placement.rot;
+  // 预览平滑跟随准星（实际落点仍是精确位置）
+  ghostT.value = performance.now() * 0.001;
+  if (wasHidden || ghost.position.distanceTo(new THREE.Vector3(x, y, z)) > 30) ghost.position.set(x, y, z);
+  else ghost.position.lerp(new THREE.Vector3(x, y, z), 0.35);
+  let dr = placement.rot - ghost.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); ghost.rotation.y += dr * 0.3;
+  ghostOk.uniforms.uY0.value = ghostBad.uniforms.uY0.value = ghost.position.y;
   placement.x = x; placement.z = z;
   if (rangeRing.scale.x > 1) { rangeRing.visible = true; rangeRing.position.set(x, y + 0.3, z); }
   let reason = '';
@@ -226,7 +248,7 @@ export function updateGhost(hit, playerPos) {
   else if (!inTerritory(x, z, def.r)) reason = '超出殖民地领地（提升城市等级来扩张）';
   placement.valid = !reason; placement.reason = reason;
   const mat = reason ? ghostBad : ghostOk;
-  ghost.traverse(o => { if (o.isMesh) o.material = mat; });
+  if (ghost.userData.mat !== mat) { ghost.userData.mat = mat; ghost.traverse(o => { if (o.isMesh) o.material = mat; }); }
 }
 
 export function tryPlace() {
