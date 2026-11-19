@@ -429,6 +429,25 @@ G.events.on('crafted', k => {
   }
   radio('方舟 · AI', '漫游车已出厂。车舱加压，可以在车里补氧。小心别开下悬崖。');
 });
+// —— 夜战报告：守过一夜后，在黎明时结算战果并发放奖励 ——
+G.events.on('nightfall', () => { G._night = { k: G.stats.kills, hp: player.health, broken: G.buildings.filter(b => b.broken).length, tide: false }; });
+G.events.on('tide', () => { G._night = { k: G.stats.kills, hp: player.health, broken: G.buildings.filter(b => b.broken).length, tide: true }; });
+function dawnReport() {
+  const N = G._night; G._night = null; if (!N) return;
+  const kills = G.stats.kills - N.k, lost = Math.max(0, G.buildings.filter(b => b.broken).length - N.broken);
+  const ti = Math.floor(kills / 2) + (N.tide ? 10 : 0) + (lost === 0 && kills > 0 ? 3 : 0), rp = kills * 3 + (N.tide ? 20 : 0);
+  G.res.titanium += ti; G.rp = (G.rp || 0) + rp;
+  const grade = kills === 0 ? '平安夜' : lost === 0 ? '完美防守' : lost < 3 ? '守住了' : '惨胜';
+  const el = document.createElement('div'); el.id = 'night-report';
+  el.innerHTML = `<div class="nr-k">NIGHT ${G.nightsSurvived || 1} · ${N.tide ? '晶潮之夜' : '夜战报告'}</div><div class="nr-t">${grade}</div>
+    <div class="nr-row"><span>击退</span><b>${kills}</b></div><div class="nr-row"><span>受损设施</span><b class="${lost ? 'bad' : ''}">${lost}</b></div>
+    <div class="nr-row rw"><span>战利品</span><b>钛矿 +${ti} · 科研 +${rp}</b></div>`;
+  document.body.appendChild(el);
+  [...el.children].forEach((c, i) => c.animate([{ opacity: 0, transform: 'translateX(-16px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 200 + i * 120, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both' }));
+  el.animate([{ opacity: 0, transform: 'translateX(-30px)' }, { opacity: 1, transform: 'none' }], { duration: 600, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  audio.play('objective');
+  setTimeout(() => el.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateX(-20px)' }], { duration: 600, fill: 'forwards' }).onfinish = () => el.remove(), 7000);
+}
 G.events.on('cityLevel', lv => {
   // 安全时来一段简短的航拍，看看扩张后的领地
   const calm = !G.enemies.some(e => !e.dead && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < 80) && !G.driving && !player.dead && !G.cine;
@@ -991,7 +1010,7 @@ function update(dt) {
     if (!G.driving) player.update(dt);
     updateRover(dt, player, camera);
     updateSky(dt, camera.position);
-    if (G.time.dawn) { G.time.dawn = false; toast(`第 ${G.time.day} 日 · 黎明`, 'sun'); }
+    if (G.time.dawn) { G.time.dawn = false; toast(`第 ${G.time.day} 日 · 黎明`, 'sun'); dawnReport(); }
     updateNodes(dt);
     if (!G.driving) updateTools(dt, player, camera); else G.lookBuilding = null;
     if (input.hit('KeyG') && !G.menuOpen && !player.dead && !G.driving) throwGrenade(camera, player);
@@ -1058,6 +1077,7 @@ window.__dbg = {
   stormWarn: () => setStormState({ phase: 'warn', t: 25 }),
   drive() { G.upgrades.rover = true; if (!getRover()) spawnRover(player.pos.x + 4, player.pos.z, 0); enterRover(); },
   film: () => $('btn-film').click(), filmSeek, filmStep(sec) { for (let t = 0; t < sec && G.film && !G.warping; t += 0.05) updateFilm(0.05); },
+  dawnReport,
   audio, spawnCrawler, spawnDevil, spawnWasp, geyserList, triggerGeyser, whales: whaleList,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },

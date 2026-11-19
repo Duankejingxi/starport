@@ -283,7 +283,7 @@ export function updateBuildings(dt, ctx) {
       a._scan.position.y = b.y + t * h; a._scan.material.opacity = 0.8 * (1 - t);
       a._scan.scale.setScalar(1 - t * 0.25);
       if (Math.random() < 0.5) fx.spark(new THREE.Vector3(b.x + (Math.random() - 0.5) * b.def.r * 2, b.y + t * h, b.z + (Math.random() - 0.5) * b.def.r * 2), [0.5, 0.9, 1], 1, 2, 0.6);
-      if (t >= 1) { G.scene.remove(a._scan); a._scan.geometry.dispose(); delete a._scan; }
+      if (t >= 1) { G.scene.remove(a._scan); a._scan.geometry.dispose(); delete a._scan; fx.ring(new THREE.Vector3(b.x, b.y + 0.2, b.z), b.def.r * 0.9, 40); audio.play('land', new THREE.Vector3(b.x, b.y, b.z)); }
     }
     if (b.hp < b.maxHp && G.time.night < 0.5) {
       b.hp = Math.min(b.maxHp, b.hp + dt * (b.broken ? 5 : 2));
