@@ -57,15 +57,17 @@ export function updateProjectiles(dt) {
 }
 
 // —— 锈蚀蛛 ——
-export function spawnCrawler(x, z, guardian = false, boss = false) {
-  const scale = boss ? 3.4 : guardian ? 1.35 : 0.85 + Math.random() * 0.35;
-  const m = makeCrawlerHD(scale, CRAWLER_MATS.crystal, CRAWLER_MATS.eye);
+// 晶刺炮手：黄绿色晶体，保持距离抛射酸液
+const spitMats = { crystal: new THREE.MeshStandardMaterial({ color: 0x9adf3a, emissive: 0x4a8a10, emissiveIntensity: 0.9, roughness: 0.25, metalness: 0.1, flatShading: true }), eye: new THREE.MeshBasicMaterial({ color: 0xd8ff60 }) };
+export function spawnCrawler(x, z, guardian = false, boss = false, spitter = false) {
+  const scale = boss ? 3.4 : guardian ? 1.35 : spitter ? 1.0 : 0.85 + Math.random() * 0.35;
+  const m = makeCrawlerHD(scale, spitter ? spitMats.crystal : CRAWLER_MATS.crystal, spitter ? spitMats.eye : CRAWLER_MATS.eye);
   const y = getHeight(x, z);
   m.group.position.set(x, y, z);
   G.scene.add(m.group);
-  const hp = boss ? 1300 + G.time.day * 40 : guardian ? 90 : 36 + G.time.day * 3;
+  const hp = boss ? 1300 + G.time.day * 40 : guardian ? 90 : spitter ? 28 + G.time.day * 2 : 36 + G.time.day * 3;
   const e = { ...m, pos: m.group.position, hp, maxHp: hp, scale, guardian, home: guardian ? new THREE.Vector3(x, y, z) : null,
-    boss, stomp: 4, awake: !guardian, speed: boss ? 3.4 : (guardian ? 5.2 : 4.4) + Math.random() * 1.2, phase: Math.random() * 6, atk: 0, flash: 0, sink: 0, target: null, retarget: 0 };
+    boss, spitter, spitT: 2 + Math.random() * 2, stomp: 4, awake: !guardian, speed: boss ? 3.4 : (guardian ? 5.2 : 4.4) + Math.random() * 1.2, phase: Math.random() * 6, atk: 0, flash: 0, sink: 0, target: null, retarget: 0 };
   G.enemies.push(e);
   return e;
 }
@@ -206,7 +208,8 @@ export function updateEnemies(dt) {
       for (let i = 0; i < n; i++) {
         const x = THREE.MathUtils.clamp(c.x + Math.cos(a) * d + (Math.random() - 0.5) * 10, -HALF + 180, HALF - 180);
         const z = THREE.MathUtils.clamp(c.z + Math.sin(a) * d + (Math.random() - 0.5) * 10, -HALF + 180, HALF - 180);
-        const e = spawnCrawler(x, z); e.sink = -2; // 从地底钻出
+        const sp = (G.nightsSurvived || 0) >= 2 && Math.random() < 0.25;
+        const e = spawnCrawler(x, z, false, false, sp); e.sink = -2; // 从地底钻出
         fx.dustPuff(new THREE.Vector3(x, getHeight(x, z), z), 14, 3);
       }
       nightBudget -= n;
@@ -282,6 +285,18 @@ export function updateEnemies(dt) {
     }
     let tx = P.x, tz = P.z, reach = 1.8 * e.scale;
     const t = e.target;
+    if (e.spitter && t?.kind === 'player') {
+      reach = 20;
+      const dP2 = Math.hypot(P.x - e.pos.x, P.z - e.pos.z);
+      if (dP2 < 26 && !G.player.dead) {
+        e.spitT -= dt;
+        // 出手前 0.6 秒：身体发亮、鼓起
+        const wind = e.spitT < 0.6 ? 1 - e.spitT / 0.6 : 0;
+        e.inner.scale.setScalar(1 + wind * 0.25);
+        if (wind > 0 && Math.random() < dt * 20) fx.spark(new THREE.Vector3(e.pos.x, e.pos.y + 1.4 * e.scale, e.pos.z), [0.7, 1, 0.3], 1, 1.5, 0.3);
+        if (e.spitT <= 0) { e.spitT = 2.6 + Math.random() * 1.2; spit(e); }
+      }
+    }
     if (t?.kind === 'building') { if (!G.buildings.includes(t.b) || t.b.broken) { e.retarget = 0; continue; } tx = t.b.x; tz = t.b.z; reach = t.b.def.r * 0.9 + 1.4; }
     else if (t?.kind === 'home') { tx = e.home.x; tz = e.home.z; reach = 2; }
     let dx = tx - e.pos.x, dz = tz - e.pos.z;
@@ -306,7 +321,7 @@ export function updateEnemies(dt) {
       }
       e.group.rotation.y = Math.atan2(dx, dz);
       moving = true;
-    } else if (t && t.kind !== 'home') {
+    } else if (t && t.kind !== 'home' && !(e.spitter && t.kind === 'player')) {
       e.group.rotation.y = Math.atan2(dx, dz);
       e.atk -= dt;
       if (e.atk <= 0) {
@@ -336,8 +351,39 @@ export function updateEnemies(dt) {
       l.rotation.z = Math.max(0, Math.cos(ph + l.userData.phase)) * 0.25 * l.userData.side * (moving ? 1 : 0);
     }
     e.inner.position.y = Math.abs(Math.sin(ph)) * 0.08;
-    if (e.flash > 0) { e.flash -= dt; e.inner.scale.setScalar(1 + e.flash * 1.2); } else e.inner.scale.setScalar(1);
+    if (e.flash > 0) { e.flash -= dt; e.inner.scale.setScalar(1 + e.flash * 1.2); } else if (!(e.spitter && e.spitT < 0.6)) e.inner.scale.setScalar(1);
     if (Math.random() < dt * 4) fx.trail(new THREE.Vector3(e.pos.x, e.pos.y + 1.6 * e.scale, e.pos.z), [1, 0.35, 0.1], 0.8);
+  }
+}
+
+// —— 酸液弹：抛物线飞行，命中玩家造成伤害，落地溅开 ——
+const globs = [];
+const globGeo = new THREE.SphereGeometry(0.28, 12, 8);
+const globMat = new THREE.MeshBasicMaterial({ color: 0xc8ff50 });
+function spit(e) {
+  const P = G.player.pos;
+  const from = new THREE.Vector3(e.pos.x, e.pos.y + 1.5 * e.scale, e.pos.z);
+  // 瞄准玩家当前位置（不预判，横移即可躲开），按距离给出抛物线初速度
+  const to = new THREE.Vector3(P.x, P.y + 1.0, P.z), d = Math.hypot(to.x - from.x, to.z - from.z), T = 0.5 + d / 22;
+  const v = new THREE.Vector3((to.x - from.x) / T, (to.y - from.y) / T + 0.5 * 12 * T, (to.z - from.z) / T);
+  const m = new THREE.Mesh(globGeo, globMat); m.position.copy(from); G.scene.add(m);
+  const g = glow(0xb0ff40, 1.6, m);
+  globs.push({ m, v, life: T + 1.5 });
+  audio.play('spit', from);
+}
+export function updateGlobs(dt) {
+  const P = G.player;
+  for (let i = globs.length - 1; i >= 0; i--) {
+    const o = globs[i], p = o.m.position;
+    o.life -= dt; o.v.y -= 12 * dt; p.addScaledVector(o.v, dt);
+    if (Math.random() < dt * 30) fx.trail(p.clone(), [0.6, 1, 0.2], 0.6);
+    const hitP = !P.dead && !G.driving && Math.hypot(p.x - P.pos.x, p.z - P.pos.z) < 1.1 && p.y > P.pos.y - 0.2 && p.y < P.pos.y + 2.1;
+    const gy = getHeight(p.x, p.z);
+    if (hitP || p.y < gy + 0.1 || o.life <= 0) {
+      if (hitP) P.damage(10 * D().dmg, p);
+      fx.burst(p.clone().setY(Math.max(p.y, gy + 0.2)), [0.6, 1, 0.25], 18, 4); fx.dustPuff(p.clone().setY(gy + 0.3), 3, 1, [0.5, 0.7, 0.2]);
+      G.scene.remove(o.m); globs.splice(i, 1);
+    }
   }
 }
 
