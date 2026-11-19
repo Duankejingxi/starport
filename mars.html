@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>火星 · 实时光线步进</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; image-rendering: auto; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  #ui { position: fixed; left: 24px; bottom: 22px; color: rgba(255, 236, 220, .78); font: 13px/1.7 "PingFang SC", "Microsoft YaHei", sans-serif; letter-spacing: .08em; text-shadow: 0 1px 6px #000; pointer-events: none; }
+  #ui b { color: #fff; font-weight: 500; letter-spacing: .3em; font-size: 15px; }
+  #ui small { color: rgba(255, 220, 190, .55); }
+  #q { position: fixed; right: 20px; top: 16px; display: flex; gap: 6px; }
+  #q button { background: rgba(20, 14, 10, .55); color: #f3e3d4; border: 1px solid rgba(255, 200, 160, .25); padding: 6px 12px; font: 12px sans-serif; letter-spacing: .1em; cursor: pointer; border-radius: 3px; }
+  #q button.on { background: rgba(255, 170, 100, .3); border-color: rgba(255, 190, 140, .7); }
+  #fps { position: fixed; right: 22px; bottom: 20px; color: rgba(255, 255, 255, .35); font: 11px monospace; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui"><b>火星 · 乌托邦平原</b><br>整个画面由一段着色器在你的显卡上逐像素计算，没有任何模型和图片<br><small>拖动鼠标环视 · 滚轮调整高度 · 空格暂停飞行 · 1/2/3 切换时段</small></div>
+<div id="q"><button data-s="0.5">流畅</button><button data-s="0.75" class="on">均衡</button><button data-s="1">精细</button></div>
+<div id="fps"></div>
+<script>
+const VS = `#version 300 es
+in vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
+const FS = `#version 300 es
+precision highp float;
+out vec4 O;
+uniform vec2 R; uniform float T, uSun, uYaw, uPitch, uAlt, uFly;
+
+// ---------- 噪声（带解析导数，用于侵蚀感的地形） ----------
+float hash(vec2 p){ p = 50.0 * fract(p * 0.3183099 + vec2(0.71, 0.113)); return -1.0 + 2.0 * fract(p.x * p.y * (p.x + p.y)); }
+vec3 noised(vec2 x){
+  vec2 i = floor(x), f = fract(x);
+  vec2 u = f*f*f*(f*(f*6.0-15.0)+10.0), du = 30.0*f*f*(f*(f-2.0)+1.0);
+  float a = hash(i), b = hash(i+vec2(1,0)), c = hash(i+vec2(0,1)), d = hash(i+vec2(1,1));
+  float k1 = b-a, k2 = c-a, k4 = a-b-c+d;
+  return vec3(a + k1*u.x + k2*u.y + k4*u.x*u.y, du * vec2(k1 + k4*u.y, k2 + k4*u.x));
+}
+const mat2 m2 = mat2(0.8, -0.6, 0.6, 0.8);
+// 地形：导数抑制的分形噪声，山脊锐利、坡面有冲刷沟壑
+float terrain(vec2 x, int oct){
+  vec2 p = x * 0.0019; float a = 0.0, b = 1.0; vec2 d = vec2(0.0);
+  for (int i = 0; i < 16; i++){ if (i >= oct) break; vec3 n = noised(p); d += n.yz; a += b * n.x / (1.0 + dot(d, d)); b *= 0.5; p = m2 * p * 2.0; }
+  // 平原 + 远处台地
+  float h = 120.0 * a;
+  float mesa = smoothstep(0.15, 0.45, noised(x * 0.00045).x);
+  h += mesa * 90.0;
+  return h;
+}
+float H(vec2 x){ return terrain(x, 9); }
+float Hd(vec2 x){ return terrain(x, 15); }
+vec3 normalAt(vec3 p, float t){
+  vec2 e = vec2(0.003 * t + 0.02, 0.0);
+  return normalize(vec3(Hd(p.xz - e.xy) - Hd(p.xz + e.xy), 2.0 * e.x, Hd(p.xz - e.yx) - Hd(p.xz + e.yx)));
+}
+float march(vec3 ro, vec3 rd, float tmax){
+  float t = 1.0;
+  for (int i = 0; i < 300; i++){
+    vec3 p = ro + rd * t; float h = p.y - H(p.xz);
+    if (abs(h) < 0.0015 * t || t > tmax) break;
+    t += 0.42 * h;
+  }
+  return t;
+}
+float softShadow(vec3 ro, vec3 rd){
+  float res = 1.0, t = 2.0;
+  for (int i = 0; i < 64; i++){ vec3 p = ro + rd * t; float h = p.y - H(p.xz); res = min(res, 16.0 * h / t); t += clamp(h, 2.0, 60.0); if (res < 0.001 || p.y > 400.0) break; }
+  return clamp(res, 0.0, 1.0);
+}
+
+// ---------- 小型殖民地：居住穹顶（带发光窗户）与着陆舱 ----------
+vec3 BASE = vec3(0.0);
+float sdDomes(vec3 p, out float win){
+  vec3 q = p - BASE; win = 0.0;
+  float d = 1e9;
+  for (int i = 0; i < 4; i++){
+    float fi = float(i);
+    vec3 c = vec3(cos(fi * 1.7) * (14.0 + fi * 7.0), 0.0, sin(fi * 1.7) * (14.0 + fi * 7.0));
+    float r = 6.0 + fi * 1.4;
+    vec3 l = q - c;
+    float dd = max(length(l) - r, -l.y);
+    if (dd < d){ d = dd; win = step(abs(l.y - r * 0.35), 0.35) * step(0.5, fract(atan(l.z, l.x) * 3.0)); }
+  }
+  return d;
+}
+float march2(vec3 ro, vec3 rd, float tmax, out float win){
+  float t = 0.0; win = 0.0;
+  for (int i = 0; i < 90; i++){ float w; float d = sdDomes(ro + rd * t, w); if (d < 0.01 * t + 0.01){ win = w; return t; } t += d; if (t > tmax) break; }
+  return 1e9;
+}
+
+// ---------- 天空：火星的奶油糖色白天、日落时太阳周围是蓝色 ----------
+vec3 sunDir(){ float a = uSun; return normalize(vec3(0.6, sin(a), cos(a) * 0.8)); }
+vec3 sky(vec3 rd){
+  vec3 s = sunDir();
+  float sd = max(dot(rd, s), 0.0), el = s.y;
+  float day = smoothstep(-0.22, 0.16, el);
+  vec3 base = mix(vec3(0.02, 0.018, 0.03), mix(vec3(0.72, 0.52, 0.36), vec3(0.62, 0.40, 0.26), smoothstep(0.0, 0.7, rd.y)), day);
+  // 低太阳时，太阳周围的蓝色光晕（火星日落的特征）
+  float lowSun = 1.0 - smoothstep(0.05, 0.45, el);
+  base = mix(base, vec3(0.36, 0.55, 0.85), pow(sd, 6.0) * lowSun * day * 0.85);
+  base += vec3(1.0, 0.9, 0.75) * pow(sd, 900.0) * 6.0 * day;   // 日面
+  base += vec3(1.0, 0.75, 0.5) * pow(sd, 18.0) * 0.25 * day;
+  // 地平线附近的尘雾
+  base = mix(base, vec3(0.8, 0.6, 0.45) * (0.15 + day * 0.85), exp(-max(rd.y, 0.0) * 10.0) * 0.55);
+  // 夜里的星星与银河
+  if (day < 0.5 && rd.y > 0.0){
+    vec2 sp = rd.xz / (rd.y + 0.2) * 220.0; vec2 ci = floor(sp); float h = fract(sin(dot(ci, vec2(12.9898, 78.233))) * 43758.5453);
+    float star = step(0.985, h) * smoothstep(0.35, 0.0, length(fract(sp) - 0.5)) * (1.0 - day * 2.0);
+    base += vec3(star);
+  }
+  return base;
+}
+float clouds(vec3 rd, float t){
+  if (rd.y < 0.02) return 0.0;
+  vec2 uv = rd.xz / rd.y * 900.0 + vec2(t * 6.0, t * 2.0);
+  float c = 0.0, a = 0.5; vec2 p = uv * 0.0016;
+  for (int i = 0; i < 6; i++){ c += a * (noised(p).x * 0.5 + 0.5); p = m2 * p * 2.1; a *= 0.5; }
+  return smoothstep(0.55, 0.85, c) * smoothstep(0.02, 0.2, rd.y);
+}
+
+vec3 shade(vec3 ro, vec3 rd, out float dist){
+  vec3 s = sunDir();
+  float day = smoothstep(-0.22, 0.16, s.y);
+  float tmax = 9000.0;
+  float t = march(ro, rd, tmax);
+  float w; float t2 = march2(ro, rd, min(t, 400.0), w);
+  vec3 col;
+  if (t2 < t){
+    vec3 p = ro + rd * t2;
+    vec3 n; { float e = 0.02, ww; n = normalize(vec3(sdDomes(p + vec3(e,0,0), ww) - sdDomes(p - vec3(e,0,0), ww), sdDomes(p + vec3(0,e,0), ww) - sdDomes(p - vec3(0,e,0), ww), sdDomes(p + vec3(0,0,e), ww) - sdDomes(p - vec3(0,0,e), ww))); }
+    float dif = max(dot(n, s), 0.0) * softShadow(p + n * 0.5, s);
+    vec3 alb = vec3(0.85, 0.82, 0.78);
+    col = alb * (dif * vec3(1.6, 1.35, 1.1) * day + vec3(0.62, 0.48, 0.4) * (0.4 + 0.6 * n.y) * (0.15 + day * 0.85));
+    float spec = pow(max(dot(reflect(rd, n), s), 0.0), 40.0) * dif;
+    col += spec * 0.6;
+    col += w * vec3(1.0, 0.75, 0.4) * (0.4 + (1.0 - day) * 3.0);
+    dist = t2;
+  } else if (t < tmax){
+    vec3 p = ro + rd * t;
+    vec3 n = normalAt(p, t);
+    // 材质：平地是浅色尘土，陡坡露出深色玄武岩，沟谷里更暗
+    float slope = 1.0 - n.y;
+    float dn = noised(p.xz * 0.05).x * 0.5 + 0.5, fn = noised(p.xz * 0.6).x * 0.5 + 0.5;
+    vec3 dust = mix(vec3(0.62, 0.32, 0.17), vec3(0.78, 0.47, 0.28), dn);
+    vec3 rock = mix(vec3(0.24, 0.12, 0.08), vec3(0.42, 0.22, 0.13), fn);
+    vec3 alb = mix(dust, rock, smoothstep(0.18, 0.45, slope + (fn - 0.5) * 0.15));
+    // 地层条纹：台地侧壁的水平沉积层
+    alb *= 0.85 + 0.15 * sin(p.y * 0.9 + dn * 3.0);
+    float sh = softShadow(p + n * 0.3, s);
+    float dif = clamp(dot(n, s), 0.0, 1.0) * sh;
+    float amb = 0.5 + 0.5 * n.y;
+    float bounce = clamp(-dot(n, normalize(vec3(s.x, 0.0, s.z))), 0.0, 1.0);
+    float warm = 1.0 - smoothstep(0.05, 0.5, s.y);
+    vec3 lin = dif * mix(vec3(1.9, 1.45, 1.1), vec3(2.2, 1.2, 0.7), warm) * day
+             + amb * vec3(0.42, 0.3, 0.24) * (0.12 + day * 0.88)
+             + bounce * vec3(0.25, 0.12, 0.07) * day;
+    lin += amb * vec3(0.03, 0.04, 0.07) * (1.0 - day); // 夜间天光
+    col = alb * lin;
+    dist = t;
+  } else { dist = 1e9; col = sky(rd); }
+  // 云层
+  if (dist > 8000.0){ float c = clouds(rd, T); vec3 cc = mix(vec3(0.95, 0.82, 0.7) * (0.25 + day), vec3(0.04, 0.04, 0.06), 1.0 - day); col = mix(col, cc, c * 0.75); }
+  // 大气：随距离加深的尘雾，顺光方向偏暖
+  if (dist < 1e8){
+    float fog = 1.0 - exp(-dist * 0.00038);
+    float sd = max(dot(rd, s), 0.0);
+    vec3 fc = mix(vec3(0.68, 0.5, 0.37), vec3(0.95, 0.72, 0.5), pow(sd, 8.0)) * (0.1 + day * 0.9);
+    col = mix(col, fc, fog);
+  }
+  return col;
+}
+
+void main(){
+  vec2 uv = (2.0 * gl_FragCoord.xy - R) / R.y;
+  // 镜头：沿着一条蜿蜒的路线低空飞行
+  float ft = uFly * 22.0;
+  vec3 ro = vec3(ft * 0.8 + 400.0 * sin(uFly * 0.07), 0.0, ft + 300.0 * cos(uFly * 0.05));
+  float gh = max(H(ro.xz), max(H(ro.xz + vec2(0, 60)), H(ro.xz + vec2(40, 120))));
+  ro.y = gh + uAlt;
+  vec3 fwd = normalize(vec3(0.8 + 0.4 * cos(uFly * 0.07), 0.0, 1.0 - 0.3 * sin(uFly * 0.05)));
+  // 殖民地固定在世界里一处平地上；镜头会从它旁边飞过
+  BASE = vec3(0.0); BASE.xz = ro.xz + fwd.xz * 150.0 + vec2(fwd.z, -fwd.x) * 45.0; BASE.y = H(BASE.xz) - 0.5;
+  float yaw = atan(fwd.x, fwd.z) + uYaw;
+  vec3 ww = normalize(vec3(sin(yaw) * cos(uPitch), sin(uPitch), cos(yaw) * cos(uPitch)));
+  vec3 uu = normalize(cross(ww, vec3(0, 1, 0))), vv = cross(uu, ww);
+  vec3 rd = normalize(uv.x * uu + uv.y * vv + 1.7 * ww);
+  float d; vec3 col = shade(ro, rd, d);
+  // 色调映射、暗角、颗粒
+  col = col / (1.0 + col * 0.55);
+  col = pow(col, vec3(0.86));
+  col = mix(col, col * col * (3.0 - 2.0 * col), 0.25);
+  vec2 q = gl_FragCoord.xy / R; col *= 0.55 + 0.45 * pow(16.0 * q.x * q.y * (1.0 - q.x) * (1.0 - q.y), 0.18);
+  col += (fract(sin(dot(gl_FragCoord.xy + T, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.015;
+  O = vec4(col, 1.0);
+}`;
+
+const cv = document.getElementById('c');
+const gl = cv.getContext('webgl2', { antialias: false, powerPreference: 'high-performance' });
+if (!gl) { document.body.innerHTML = '<p style="color:#fff;font:16px sans-serif;padding:40px">你的浏览器不支持 WebGL2。</p>'; throw 0; }
+function sh(t, s) { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(o)); } return o; }
+const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr); gl.useProgram(pr);
+const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+const U = n => gl.getUniformLocation(pr, n);
+const uR = U('R'), uT = U('T'), uSun = U('uSun'), uYaw = U('uYaw'), uPitch = U('uPitch'), uAlt = U('uAlt'), uFly = U('uFly');
+
+// 低分辨率渲染再放大（光线步进很吃显卡）；按帧率自动微调
+let scale = 0.75, dyn = 1;
+document.querySelectorAll('#q button').forEach(b => b.onclick = () => { scale = +b.dataset.s; dyn = 1; document.querySelectorAll('#q button').forEach(x => x.classList.toggle('on', x === b)); });
+let yaw = 0, pitch = -0.08, alt = 28, sun = 0.32, sunT = 0.32, fly = 0, paused = false;
+let drag = null;
+cv.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY, yaw, pitch]; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => { if (!drag) return; yaw = drag[2] - (e.clientX - drag[0]) * 0.004; pitch = Math.max(-0.7, Math.min(0.6, drag[3] - (e.clientY - drag[1]) * 0.004)); });
+cv.addEventListener('pointerup', () => drag = null);
+addEventListener('wheel', e => { alt = Math.max(6, Math.min(400, alt * (e.deltaY > 0 ? 1.12 : 0.89))); });
+addEventListener('keydown', e => {
+  if (e.code === 'Space') paused = !paused;
+  if (e.code === 'Digit1') sunT = 0.32;   // 上午
+  if (e.code === 'Digit2') sunT = 0.06;   // 日落：太阳周围变蓝
+  if (e.code === 'Digit3') sunT = -0.35;  // 夜晚
+});
+const qs = new URLSearchParams(location.search);
+if (qs.has('sun')) sun = sunT = +qs.get('sun');
+if (qs.has('t')) fly = +qs.get('t');
+if (qs.has('alt')) alt = +qs.get('alt');
+if (qs.has('pitch')) pitch = +qs.get('pitch');
+if (qs.has('scale')) scale = +qs.get('scale');
+let last = performance.now(), acc = 0, frames = 0, t0 = last;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (!paused && !qs.has('still')) fly += dt;
+  if (qs.has('still')) dyn = 1;
+  sun += (sunT - sun) * Math.min(1, dt * 0.8);
+  const s = scale * dyn;
+  const w = Math.max(160, Math.round(innerWidth * s)), h = Math.max(90, Math.round(innerHeight * s));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  gl.viewport(0, 0, w, h);
+  gl.uniform2f(uR, w, h); gl.uniform1f(uT, now / 1000); gl.uniform1f(uSun, sun);
+  gl.uniform1f(uYaw, yaw); gl.uniform1f(uPitch, pitch); gl.uniform1f(uAlt, alt); gl.uniform1f(uFly, fly);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  frames++; acc += dt;
+  if (acc > 1) {
+    const fps = frames / acc; document.getElementById('fps').textContent = `${fps.toFixed(0)} FPS · ${w}×${h}`;
+    if (fps < 24 && dyn > 0.5) dyn *= 0.88; else if (fps > 50 && dyn < 1) dyn = Math.min(1, dyn * 1.06);
+    frames = 0; acc = 0;
+  }
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
