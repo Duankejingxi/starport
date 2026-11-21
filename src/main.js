@@ -419,7 +419,14 @@ document.body.classList.toggle('calm', G.motion < 1);
 $('fov').addEventListener('input', e => { G.baseFov = +e.target.value; camera.fov = +e.target.value; camera.updateProjectionMatrix(); try { localStorage.setItem('starport-fov', e.target.value); } catch (err) { /* 忽略 */ } });
 $('quality').addEventListener('change', e => { applyQuality(e.target.value, true); try { localStorage.setItem('starport-quality', e.target.value); } catch (err) { /* 忽略 */ } });
 $('sens').addEventListener('input', e => { input.sens = +e.target.value; });
-$('btn-respawn').addEventListener('click', () => { if (G.driving) exitRover(player); player.respawn(); $('death').classList.add('hidden'); G.requestLock(); });
+$('btn-respawn').addEventListener('click', () => {
+  if (G.driving) exitRover(player); player.respawn(); $('death').classList.add('hidden'); G.requestLock();
+  // 从黑暗中醒来：画面淡入，视线从地面缓缓抬起
+  player.standT = 1.2;
+  const d = document.createElement('div'); d.className = 'film-flash'; d.style.background = '#000'; document.body.appendChild(d);
+  d.animate([{ opacity: 1 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }], { duration: 1500, easing: 'ease-out' }).onfinish = () => d.remove();
+  audio.play('scan');
+});
 $('btn-endcont').addEventListener('click', () => { $('ending').classList.add('hidden'); G.endingShown = false; G.requestLock(); });
 
 // —— 事件 ——
