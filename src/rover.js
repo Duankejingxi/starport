@@ -95,12 +95,14 @@ function placeModel(dt) {
 export function enterRover() {
   if (!rover) return;
   G.driving = true; rover.lookYaw = 0; rover.pitch = -0.08;
+  if (G.camera) G.camBlend = { p: G.camera.position.clone(), q: G.camera.quaternion.clone(), t: 0, dur: 0.55 };
   G.colliders.remove(rover.collider);
   audio.play('place');
 }
 export function exitRover(player) {
   const r = rover; if (!r) return;
   G.driving = false; audio.engine(0);
+  if (G.camera) G.camBlend = { p: G.camera.position.clone(), q: G.camera.quaternion.clone(), t: 0, dur: 0.45 };
   const c = Math.cos(r.h), s = Math.sin(r.h);
   let px = r.x + c * 3, pz = r.z - s * 3;
   if (G.colliders.overlaps(px, pz, 0.5)) { px = r.x - c * 3; pz = r.z + s * 3; }

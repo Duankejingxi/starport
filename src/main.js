@@ -1064,6 +1064,13 @@ function update(dt) {
       G.plazaSeen = true;
       radio('苏念 · 教师', '今晚大家都来了。我们就这样站着，看着那颗蓝色的星球转啊转……孩子问我，那是哪里。我说，那是我们出发的地方。');
     }
+    // 镜头平滑过渡（上下车等）：从记录的旧机位缓动到这一帧的新机位
+    if (G.camBlend) {
+      const B = G.camBlend; B.t += dt; const k = Math.min(1, B.t / B.dur), e = 1 - Math.pow(1 - k, 3);
+      camera.position.lerpVectors(B.p, camera.position.clone(), e);
+      camera.quaternion.slerpQuaternions(B.q, camera.quaternion.clone(), e);
+      if (k >= 1) G.camBlend = null;
+    }
     const ctx = handleInteraction(dt);
     ctx.tip = hintPrompt(dt);
     updateUI(dt, ctx);
