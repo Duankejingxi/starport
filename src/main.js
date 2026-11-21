@@ -50,6 +50,7 @@ import { initGeysers, updateGeysers, geyserList, triggerGeyser } from './geysers
 import { initSkyWhales, updateSkyWhales, whaleList } from './skywhales.js';
 import { updateHaboob } from './haboob.js';
 import { playFilm, updateFilm, filmSeek } from './film.js';
+import { initJuice, launchTransition } from './juice.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -200,6 +201,7 @@ G.player = player;
 initTools(camera);
 initInput(canvas);
 initUI(makeMapCanvas(350));
+initJuice();
 initCity(scene);
 
 // —— 指针锁定 ——
@@ -345,6 +347,7 @@ function renderSetup() {
   $('btn-launch').addEventListener('click', launchNew);
 }
 function launchNew() {
+  launchTransition();
   const target = setup.mode === 'story' ? 'mars' : setup.planet;
   if (setup.mode === 'story') {
     if (META.visited?.length || existing) { if (!confirm('剧情模式会从火星重新开始，并清除所有星球的进度。确定吗？')) return; }

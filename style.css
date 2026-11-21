@@ -723,3 +723,15 @@ body.film #intro, body.film #hud, body.film #visor, body.film #clickhint, body.f
 #night-report .nr-row b.bad { color: #ff7a5a; }
 #night-report .nr-row.rw b { color: #9fffd0; }
 body.cinema #night-report { display: none; }
+
+/* —— 全局交互动效 —— */
+.jc-ripple { position: absolute; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, rgba(255, 220, 180, .35) 0, rgba(255, 200, 150, .12) 40%, transparent 70%); mix-blend-mode: screen; z-index: 0; }
+.jc-launch { position: fixed; inset: 0; z-index: 90; pointer-events: none; background: radial-gradient(ellipse at center, rgba(255, 236, 210, .95), rgba(255, 180, 120, .6) 45%, rgba(20, 10, 6, .9) 100%); }
+button, .tile, .opt, .slot, .dest, .rs { -webkit-tap-highlight-color: transparent; }
+/* 悬停：平滑的光泽扫过 */
+.tile, .opt, .dest, .rs { transition: transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s, border-color .3s, background .3s; }
+.tile:hover, .opt:hover, .dest:hover, .rs:hover { transform: translateY(-3px); }
+.tile::after, .opt::after, .rs::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: linear-gradient(115deg, transparent 30%, rgba(255, 235, 210, .09) 45%, transparent 60%); background-size: 250% 100%; background-position: 120% 0; transition: background-position .8s cubic-bezier(.2, .8, .2, 1); }
+.tile:hover::after, .opt:hover::after, .rs:hover::after { background-position: -20% 0; }
+nav.menu button { transition: color .25s, transform .45s cubic-bezier(.34, 1.56, .64, 1), letter-spacing .45s cubic-bezier(.2, .8, .2, 1); }
+.title-wrap nav.menu button:hover { letter-spacing: 7px; }
