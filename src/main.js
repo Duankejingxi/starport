@@ -411,6 +411,11 @@ $('vol').addEventListener('input', e => audio.setVolume(+e.target.value));
 $('quality').value = quality;
 G.baseFov = 72;
 try { const f = +localStorage.getItem('starport-fov'); if (f >= 60 && f <= 100) { G.baseFov = f; camera.fov = f; camera.updateProjectionMatrix(); $('fov').value = f; } } catch (e) { /* 忽略 */ }
+// 镜头效果强度：震动、顿帧、受伤故障、速度视野
+G.motion = 1;
+try { const m = localStorage.getItem('starport-motion'); if (m !== null) { G.motion = +m; $('motion').value = m; } } catch (e) { /* 忽略 */ }
+$('motion').addEventListener('change', e => { G.motion = +e.target.value; document.body.classList.toggle('calm', G.motion < 1); try { localStorage.setItem('starport-motion', e.target.value); } catch (err) { /* 忽略 */ } });
+document.body.classList.toggle('calm', G.motion < 1);
 $('fov').addEventListener('input', e => { G.baseFov = +e.target.value; camera.fov = +e.target.value; camera.updateProjectionMatrix(); try { localStorage.setItem('starport-fov', e.target.value); } catch (err) { /* 忽略 */ } });
 $('quality').addEventListener('change', e => { applyQuality(e.target.value, true); try { localStorage.setItem('starport-quality', e.target.value); } catch (err) { /* 忽略 */ } });
 $('sens').addEventListener('input', e => { input.sens = +e.target.value; });
@@ -979,7 +984,7 @@ function frame() {
   requestAnimationFrame(frame);
   const rdt = Math.min(clock.getDelta(), 0.05);
   // 顿帧：亲手击杀时时间短暂放慢，让命中更有分量
-  let dt = rdt; if (G.hitStop > 0) { G.hitStop -= rdt; dt = rdt * 0.12; }
+  let dt = rdt; if (G.hitStop > 0) { G.hitStop -= rdt; if (G.motion >= 1) dt = rdt * 0.12; }
   if (G.warping) return; // 虫洞画面接管屏幕时不再渲染场景
   if (G.film) { updateFilm(dt); input.endFrame(); return; }
   if (landing) { updateLanding(dt); updateCineFx(dt); renderScene(); input.endFrame(); return; }
