@@ -749,3 +749,4 @@ nav.menu button { transition: color .25s, transform .45s cubic-bezier(.34, 1.56,
 body.photo #guide, body.cinema #guide { display: none; }
 body.menu-open #guide, body:not(.playing) #guide { display: none; }
 body.calm.glitch #c, body.calm.glitch #hud { animation: none !important; }
+#death:not(.hidden) ~ #guide, #pause:not(.hidden) ~ #guide, #ending:not(.hidden) ~ #guide, #intro:not(.hidden) ~ #guide { display: none; }
