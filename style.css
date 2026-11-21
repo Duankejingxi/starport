@@ -735,3 +735,16 @@ button, .tile, .opt, .slot, .dest, .rs { -webkit-tap-highlight-color: transparen
 .tile:hover::after, .opt:hover::after, .rs:hover::after { background-position: -20% 0; }
 nav.menu button { transition: color .25s, transform .45s cubic-bezier(.34, 1.56, .64, 1), letter-spacing .45s cubic-bezier(.2, .8, .2, 1); }
 .title-wrap nav.menu button:hover { letter-spacing: 7px; }
+
+/* —— 任务指引标记 —— */
+#guide { position: fixed; left: 0; top: 0; z-index: 8; pointer-events: none; opacity: 0; will-change: transform; --gc: #ffb36a; }
+#guide .gd-dia { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; transform: rotate(45deg); border: 2px solid var(--gc); box-shadow: 0 0 12px var(--gc), inset 0 0 6px var(--gc); animation: gdPulse 1.6s ease-in-out infinite; }
+#guide .gd-dia::after { content: ''; position: absolute; inset: 3px; background: var(--gc); opacity: .7; }
+#guide .gd-t { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); white-space: nowrap; font: 500 12px 'Rajdhani', 'PingFang SC', 'Microsoft YaHei', sans-serif; letter-spacing: .18em; color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, .85); }
+#guide .gd-arrow { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; display: none; }
+#guide .gd-arrow::before { content: ''; position: absolute; left: 22px; top: 1px; border: 5px solid transparent; border-left: 8px solid var(--gc); filter: drop-shadow(0 0 4px var(--gc)); }
+#guide.edge .gd-arrow { display: block; }
+#guide.edge .gd-t { top: 16px; }
+@keyframes gdPulse { 0%, 100% { transform: rotate(45deg) scale(1); } 50% { transform: rotate(45deg) scale(1.25); } }
+body.photo #guide, body.cinema #guide { display: none; }
+body.menu-open #guide, body:not(.playing) #guide { display: none; }

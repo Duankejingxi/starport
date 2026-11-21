@@ -51,6 +51,7 @@ import { initSkyWhales, updateSkyWhales, whaleList } from './skywhales.js';
 import { updateHaboob } from './haboob.js';
 import { playFilm, updateFilm, filmSeek } from './film.js';
 import { initJuice, launchTransition } from './juice.js';
+import { initGuide, updateGuide } from './guide.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -204,6 +205,7 @@ initTools(camera);
 initInput(canvas);
 initUI(makeMapCanvas(350));
 initJuice();
+initGuide();
 initCity(scene);
 
 // —— 指针锁定 ——
@@ -1024,6 +1026,7 @@ function update(dt) {
     updateGrenades(dt);
     updateDevils(dt);
     updateLoot(dt);
+    updateGuide(dt, camera);
     updateGeysers(dt);
     updateSkyWhales(dt);
     updateHaboob(dt);
