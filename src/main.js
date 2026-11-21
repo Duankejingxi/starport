@@ -132,13 +132,15 @@ function setupComposer() {
       float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uT) * 43758.5453); }
       void main(){
         vec2 d = vUv - 0.5; float r2 = dot(d, d);
-        vec2 off = d * r2 * 0.012;
+        vec2 off = d * r2 * 0.006;
         vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
         float l = dot(c, vec3(0.299, 0.587, 0.114));
-        c = mix(vec3(l), c, 1.08);
-        c = (c - 0.5) * 1.06 + 0.5;
-        c += mix(vec3(-0.012, 0.0, 0.025), vec3(0.03, 0.012, -0.02), smoothstep(0.2, 0.8, l));
-        c *= 1.0 - r2 * mix(0.55, 0.8, uNight);
+        // 电影感调色：略降饱和、柔和 S 曲线、暗部偏冷、高光偏暖、黑位微微抬起
+        c = mix(vec3(l), c, 0.9);
+        c = c * c * (3.0 - 2.0 * c) * 0.35 + c * 0.65;
+        c += mix(vec3(-0.01, 0.004, 0.022), vec3(0.022, 0.01, -0.016), smoothstep(0.15, 0.75, l));
+        c = c * 0.97 + 0.018;
+        c *= 1.0 - r2 * mix(0.4, 0.7, uNight);
         c += (h(vUv * 917.0) - 0.5) * mix(0.022, 0.04, uNight);
         gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
       }`,
