@@ -407,6 +407,7 @@ export function archiveHTML() {
 // —— 每帧刷新 HUD ——
 const shownRes = {}, resEls = {}, lastDet = {};
 let slowT = 0, radioKey = '', radioChars = 0, lastGoals = '';
+const lastRes = {}, popT = {};
 export function updateUI(dt, ctx) {
   const P = G.player, C = G.colony;
   slowT -= dt;
@@ -457,6 +458,9 @@ export function updateUI(dt, ctx) {
   }
   for (const k in RES_INFO) {
     shownRes[k] = shownRes[k] ?? G.res[k];
+    // 资源增加时，图标与数字弹一下
+    if (lastRes[k] !== undefined && G.res[k] > lastRes[k] + 0.5 && performance.now() - (popT[k] || 0) > 220) { popT[k] = performance.now(); const row = $('r-' + k); row.animate([{ transform: 'scale(1)', filter: 'brightness(1)' }, { transform: 'scale(1.12)', filter: 'brightness(1.7)', offset: 0.3 }, { transform: 'scale(1)', filter: 'brightness(1)' }], { duration: 420, easing: 'cubic-bezier(.34,1.56,.64,1)' }); }
+    lastRes[k] = G.res[k];
     const d = G.res[k] - shownRes[k];
     shownRes[k] = Math.abs(d) < 0.5 ? G.res[k] : shownRes[k] + d * Math.min(1, dt * 7 + 0.02);
     const v = Math.floor(shownRes[k] + 0.0001), el = resEls[k] || (resEls[k] = $('r-' + k).querySelector('b'));
@@ -490,7 +494,11 @@ export function updateUI(dt, ctx) {
   } else re.classList.remove('show');
 
   const pr = $('prompt');
-  if (pr.dataset.k !== (ctx.prompt || '')) { pr.dataset.k = ctx.prompt || ''; pr.innerHTML = ctx.prompt || ''; }
+  if (pr.dataset.k !== (ctx.prompt || '')) {
+    const had = !!pr.dataset.k; pr.dataset.k = ctx.prompt || ''; pr.innerHTML = ctx.prompt || '';
+    // 提示内容切换时轻轻淡入上浮（驾驶时速度每帧变化，不做动画）
+    if (ctx.prompt && !G.driving) pr.animate([{ opacity: had ? 0.4 : 0, transform: 'translate(-50%, 6px)' }, { opacity: 1, transform: 'translate(-50%, 0)' }], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  }
   pr.classList.toggle('show', !!ctx.prompt);
   pr.classList.toggle('drive', !!G.driving);
   const bh = $('buildhint');
