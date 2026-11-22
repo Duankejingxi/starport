@@ -196,7 +196,12 @@
 <div id="photo-bar"></div>
 <div id="shutter"></div>
 <div id="clickhint" class="hidden">点击画面继续</div>
-<div id="loading"><div class="ld-t">ARK OS</div><div class="ld-s">正在生成星球地表</div><div class="ld-bar"><i></i></div></div>
+<div id="loading"><div class="ld-orbit"><div class="ld-planet"><i></i></div><b></b></div><div class="ld-t">星 港</div><div class="ld-s" id="ld-s">正在生成星球地表</div><div class="ld-bar"><i></i></div></div>
+<script>
+// 游戏脚本下载与初始化期间，循环显示加载状态
+(function () { var L = ['正在生成星球地表', '计算大气散射', '编译着色器', '校准生命维持系统', '唤醒方舟一号'], i = 0, el = document.getElementById('ld-s');
+  var t = setInterval(function () { if (!document.getElementById('loading')) return clearInterval(t); i = (i + 1) % L.length; el.style.opacity = 0; setTimeout(function () { el.textContent = L[i]; el.style.opacity = 1; }, 250); }, 1400); })();
+</script>
 
 <script src="dist/game.js"></script>
 </body>
