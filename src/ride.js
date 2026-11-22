@@ -78,7 +78,7 @@ export function updateRide(dt) {
     R.phase = 'orbit'; audio.engine(0); audio.play('chapter');
     if (R.haze) { const h = R.haze; h.getAnimations().forEach(a => a.cancel()); h.style.opacity = 1; h.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 2200, fill: 'forwards', easing: 'ease-out' }).onfinish = () => h.remove(); }
     cap(['轨道站 · 海拔 400 公里', '从这里看，我们的城市只是一粒光']);
-    S.ark.visible = true;
+    S.ark.visible = false;
   }
   const k = Math.min(1, (t - 9.5) / 15), n = S.cityN;
   cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix();
