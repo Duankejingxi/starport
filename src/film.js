@@ -20,7 +20,7 @@ function noiseGLSL() {
                mix(mix(h3(i+vec3(0,0,1)), h3(i+vec3(1,0,1)), f.x), mix(h3(i+vec3(0,1,1)), h3(i+vec3(1,1,1)), f.x), f.y), f.z); }
   float fbm3(vec3 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 6; i++){ v += a * n3(p); p *= 2.02; a *= 0.5; } return v; }`;
 }
-function buildSpace() {
+export function buildSpace() {
   const s = new THREE.Scene(); s.background = new THREE.Color(0x000000);
   const sunDir = new THREE.Vector3(-0.8, 0.25, 0.55).normalize();
   // 星空：三层亮度

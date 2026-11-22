@@ -226,7 +226,34 @@ function buildClouds(scene) {
   scene.add(clouds);
 }
 
+// —— 暗淡蓝点：火星夜空里那颗淡蓝色的星就是地球。注视它一会儿，会浮现一行字 ——
+const EARTH_DIR = new THREE.Vector3(-0.62, 0.36, -0.7).normalize(); // 西北方，仰角约 21 度
+let earthDot = null, gazeT = 0, gazeShown = false;
+function updateEarthDot(dt, camPos) {
+  if (P.id !== 'mars') return;
+  if (!earthDot) {
+    earthDot = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: 0x8fc4ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: false }));
+    earthDot.scale.setScalar(0.016); G.scene.add(earthDot);
+    const moon = new THREE.Sprite(earthDot.material.clone()); moon.material.color.set(0xd8d8d8); moon.scale.setScalar(0.006); moon.position.set(0.9, 0.35, 0); earthDot.add(moon);
+  }
+  const n = G.time.night;
+  earthDot.visible = n > 0.25;
+  earthDot.position.copy(camPos).addScaledVector(EARTH_DIR, 2800);
+  earthDot.material.opacity = Math.min(1, (n - 0.25) * 2) * (0.85 + Math.sin(performance.now() * 0.002) * 0.15) * (1 - G.storm);
+  if (n > 0.7 && G.time.day >= 2 && !G.stats.paleHint && !gazeShown) { G.stats.paleHint = 1; G.events.emit('toast', '抬头看看西北方的夜空，那颗淡蓝色的星'); }
+  if (!earthDot.visible || gazeShown || !G.camera || G.cine || G.menuOpen) return;
+  const f = new THREE.Vector3(); G.camera.getWorldDirection(f);
+  if (f.dot(EARTH_DIR) > 0.9975) gazeT += dt; else gazeT = Math.max(0, gazeT - dt * 2);
+  if (gazeT > 2) {
+    gazeShown = true; G.stats.paleDot = 1;
+    const el = document.createElement('div'); el.className = 'film-cap small'; el.style.zIndex = 9;
+    el.innerHTML = '<p>那颗淡蓝色的光点，是地球</p><p>所有你爱的人、你听说过的每一个人，都在那上面</p>';
+    document.body.appendChild(el);
+    setTimeout(() => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1500, fill: 'forwards' }).onfinish = () => el.remove(), 9000);
+  }
+}
 export function updateSky(dt, camPos) {
+  updateEarthDot(dt, camPos);
   const T = G.time;
   const prevT = T.t;
   T.t += (dt / DAY_LEN) * (T.elevation < 0 ? 1.5 : 1);

@@ -50,6 +50,8 @@ function build() {
   G.scene.add(root);
 }
 
+// 基座位置（供乘坐天梯使用）；尚未建成时返回 null
+export function megaBase() { if (!root || rise < 1) return null; return { x: root.position.x, y: root.position.y + 2, z: root.position.z }; }
 export function updateMega(dt) {
   if (!root) {
     if ((G.cityLevel || 0) < 3) return;
@@ -64,6 +66,7 @@ export function updateMega(dt) {
   if (rise < 1) { rise = Math.min(1, rise + dt / 12); root.scale.y = Math.max(0.001, 1 - Math.pow(1 - rise, 3)); }
   const now = performance.now() * 0.001;
   for (const c of climbers) {
+    c.g.visible = !G.riding; // 乘坐时你就在爬升舱里
     c.t += dt * 0.012 * c.dir;
     if (c.t > 1) { c.t = 1; c.dir = -1; } if (c.t < 0) { c.t = 0; c.dir = 1; }
     c.g.position.y = 210 + c.t * (H - 20);

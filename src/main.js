@@ -52,6 +52,8 @@ import { updateHaboob } from './haboob.js';
 import { playFilm, updateFilm, filmSeek } from './film.js';
 import { initJuice, launchTransition } from './juice.js';
 import { initGuide, updateGuide } from './guide.js';
+import { startRide, updateRide } from './ride.js';
+import { megaBase } from './mega.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -800,10 +802,17 @@ function finalEnding() {
   save(true);
 }
 
+function rideApi() { return { renderer, camera, scene, player, renderScene, updateSky, updateFx }; }
 function handleInteraction(dt) {
   const ctx = { prompt: '', crossClass: '' };
   if (player.dead || G.menuOpen) return ctx;
   if (G.driving) { ctx.prompt = `<span class="big">${roverSpeed()}</span> KM/H<br><kbd>W S</kbd> 油门 · <kbd>A D</kbd> 转向 · <kbd>Shift</kbd> 加速 · <kbd>空格</kbd> 刹车 · <kbd>E</kbd> 下车`; return ctx; }
+  const mb = megaBase();
+  if (mb && Math.hypot(mb.x - player.pos.x, mb.z - player.pos.z) < 58) {
+    ctx.prompt = '<b>轨道天梯</b><br><kbd>E</kbd>乘坐爬升舱前往轨道站';
+    if (input.hit('KeyE')) startRide(rideApi());
+    return ctx;
+  }
   const pod = podAt(player.pos);
   if (pod) { ctx.prompt = '<b>地球补给舱</b><br><kbd>E</kbd>打开'; if (input.hit('KeyE')) openPod(pod); return ctx; }
   const relic = relicAt(player.pos);
@@ -995,6 +1004,7 @@ function frame() {
   if (G.warping) return; // 虫洞画面接管屏幕时不再渲染场景
   if (G.film) { updateFilm(dt); input.endFrame(); return; }
   if (landing) { updateLanding(dt); updateCineFx(dt); renderScene(); input.endFrame(); return; }
+  if (G.riding) { updateRide(dt); input.endFrame(); return; }
   if (G.flyover) { updateFlyover(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (G.launching && !G.endingShown) { updateLaunch(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (!G.started) {
@@ -1107,6 +1117,7 @@ window.__dbg = {
   drive() { G.upgrades.rover = true; if (!getRover()) spawnRover(player.pos.x + 4, player.pos.z, 0); enterRover(); },
   film: () => $('btn-film').click(), filmSeek, filmStep(sec) { for (let t = 0; t < sec && G.film && !G.warping; t += 0.05) updateFilm(0.05); },
   dawnReport,
+  ride() { startRide(rideApi()); }, rideStep(sec) { for (let t = 0; t < sec && G.riding; t += 0.05) updateRide(0.05); },
   audio, spawnCrawler, spawnDevil, spawnWasp, geyserList, triggerGeyser, whales: whaleList,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
