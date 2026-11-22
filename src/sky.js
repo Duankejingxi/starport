@@ -233,7 +233,7 @@ function updateEarthDot(dt, camPos) {
   if (P.id !== 'mars') return;
   if (!earthDot) {
     earthDot = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: 0x8fc4ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: false }));
-    earthDot.scale.setScalar(0.016); G.scene.add(earthDot);
+    earthDot.scale.setScalar(0.021); G.scene.add(earthDot);
     const moon = new THREE.Sprite(earthDot.material.clone()); moon.material.color.set(0xd8d8d8); moon.scale.setScalar(0.006); moon.position.set(0.9, 0.35, 0); earthDot.add(moon);
   }
   const n = G.time.night;
@@ -246,7 +246,7 @@ function updateEarthDot(dt, camPos) {
   if (f.dot(EARTH_DIR) > 0.9975) gazeT += dt; else gazeT = Math.max(0, gazeT - dt * 2);
   if (gazeT > 2) {
     gazeShown = true; G.stats.paleDot = 1;
-    const el = document.createElement('div'); el.className = 'film-cap small'; el.style.zIndex = 9;
+    const el = document.createElement('div'); el.className = 'film-cap small'; el.style.zIndex = 9; el.style.bottom = 'auto'; el.style.top = '22vh';
     el.innerHTML = '<p>那颗淡蓝色的光点，是地球</p><p>所有你爱的人、你听说过的每一个人，都在那上面</p>';
     document.body.appendChild(el);
     setTimeout(() => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1500, fill: 'forwards' }).onfinish = () => el.remove(), 9000);
