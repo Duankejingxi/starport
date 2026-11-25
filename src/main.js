@@ -54,6 +54,7 @@ import { initJuice, launchTransition } from './juice.js';
 import { initGuide, updateGuide } from './guide.js';
 import { startRide, updateRide } from './ride.js';
 import { megaBase } from './mega.js';
+import { updateTraffic } from './traffic.js';
 import { initLightPool, updateLightPool } from './lightpool.js';
 
 const $ = id => document.getElementById(id);
@@ -1005,7 +1006,7 @@ function frame() {
   if (G.film) { updateFilm(dt); input.endFrame(); return; }
   if (landing) { updateLanding(dt); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (G.riding) { updateRide(dt); input.endFrame(); return; }
-  if (G.flyover) { updateFlyover(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
+  if (G.flyover) { updateFlyover(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateTraffic(dt); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (G.launching && !G.endingShown) { updateLaunch(dt); updateSky(dt, camera.position); updateBuildings(dt, { shoot }); updateLightPool(dt); updateFx(dt, camera.position); updateCineFx(dt); renderScene(); input.endFrame(); return; }
   if (!G.started) {
     // 标题画面：缓慢环绕着陆舱
@@ -1069,6 +1070,7 @@ function update(dt) {
     updateSystems(dt, reqCtx);
     updateFestival(dt);
     updateMega(dt);
+    updateTraffic(dt);
     updatePebbles();
     if (!G.plazaSeen && G.time.night > 0.6 && G.colonists.filter(c => c.atPlaza && !c.target).length >= 4) {
       G.plazaSeen = true;
