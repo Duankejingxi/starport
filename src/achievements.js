@@ -9,6 +9,7 @@ const KEY = 'starport-achv';
 export const ACHV = [
   { id: 'first', name: '第一步', desc: '在异星采集第一块矿石', icon: 'iron', check: () => G.stats.mined.iron + G.stats.mined.silicon + G.stats.mined.ice > 0 },
   { id: 'devil', name: '乘风而上', desc: '被尘卷风卷上天空', icon: 'storm', check: () => (G.stats.devils || 0) > 0 },
+  { id: 'native', name: '火星原住民', desc: '殖民地迎来第一个在异星出生的孩子', icon: 'pop', check: () => (G.stats.children || []).length > 0 },
   { id: 'paledot', name: '暗淡蓝点', desc: '在火星的夜空里找到地球', icon: 'planet', check: () => (G.stats.paleDot || 0) > 0 },
   { id: 'ride', name: '登高望远', desc: '乘坐轨道天梯前往轨道站', icon: 'tower', check: () => (G.stats.rides || 0) > 0 },
   { id: 'whale', name: '鲸歌', desc: '扫描记录开普勒的天鲸', icon: 'planet', check: () => (G.stats.whales || 0) > 0 },

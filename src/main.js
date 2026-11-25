@@ -470,6 +470,13 @@ function dawnReport() {
   audio.play('objective');
   setTimeout(() => el.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateX(-20px)' }], { duration: 600, fill: 'forwards' }).onfinish = () => el.remove(), 7000);
 }
+G.events.on('birth', c => {
+  const first = (G.stats.children || []).length === 1;
+  chapterCard({ k: first ? 'FIRST NATIVE' : 'NEW LIFE', title: first ? '新生' : '又一个孩子', sub: first ? `${P.name}上的第一个孩子出生了 · ${c.name}` : `${c.name} 出生了` });
+  if (first) { radio('医疗站 · Amara', `……是个女孩，六斤二两，哭声很响。她是第一个在${P.name}上出生的人类。`); radio('苏念 · 教师', '她不会记得地球。对她来说，这片土地就是家。我们真的做到了。'); }
+  else radio('医疗站 · Amara', `${c.name}出生了，母子平安。殖民地又多了一个${P.name}原住民。`);
+  audio.play('chapter');
+});
 G.events.on('cityLevel', lv => {
   // 安全时来一段简短的航拍，看看扩张后的领地
   const calm = !G.enemies.some(e => !e.dead && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < 80) && !G.driving && !player.dead && !G.cine;

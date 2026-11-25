@@ -109,6 +109,7 @@ export function updateColony(dt) {
   }
   if (shuttle) updateShuttle(dt);
 
+  checkBirth();
   // 移民行为
   const now = performance.now() * 0.001;
   for (const c of G.colonists) {
@@ -198,8 +199,27 @@ export function lookColonist(origin, dir) {
 
 export function serializeColonists() { return G.colonists.map(c => [c.idx, +c.pos.x.toFixed(1), +c.pos.z.toFixed(1)]); }
 export function loadColonists(list) {
-  for (const [idx, x, z] of list) spawnColonist(x, z, { idx });
+  for (const [idx, x, z] of list) { const c = spawnColonist(x, z, { idx }); if ((G.stats.children || []).includes(idx)) makeChild(c); }
   nextPerson = Math.max(nextPerson, ...list.map(l => l[0] + 1), 0);
+}
+// —— 火星上出生的孩子 ——
+const KIDS = [['小火', '火星出生的第一个孩子', '我出生的时候，天空是黄油色的。妈妈说地球的天是蓝的，我不信。'], ['Aurora', '火星出生的孩子', '我长大要去开普勒！那里有会飞的鲸鱼。'], ['星星', '火星出生的孩子', '我的生日是第一百天。你记住了吗？']];
+function makeChild(c) {
+  const n = (G.stats.children || []).indexOf(c.idx), k = KIDS[Math.max(0, n) % KIDS.length];
+  c.group.scale.setScalar(0.62); c.child = true;
+  c.name = k[0]; c.job = k[1]; c.line = k[2];
+}
+function checkBirth() {
+  const kids = G.stats.children || [];
+  const homes = G.buildings.filter(b => (b.type === 'habitat' || b.type === 'apartment') && !b.broken).length;
+  const need = 10 + kids.length * 12;
+  if (kids.length >= KIDS.length || G.colony.pop < need || homes < 2 + kids.length || G.time.day < 5 + kids.length * 4) return;
+  if (G.time.night > 0.3 || Math.random() > 0.002) return; // 白天随机时刻
+  const h = G.buildings.find(b => b.type === 'habitat' || b.type === 'apartment');
+  const c = spawnColonist(h.x + 3, h.z + h.def.r + 2);
+  G.stats.children = kids.concat([c.idx]);
+  makeChild(c);
+  G.events.emit('birth', c);
 }
 export function shuttleBusy() { return !!shuttle; }
 export function personCount() { return PEOPLE.length; }
