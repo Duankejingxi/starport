@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { G } from './state.js';
 import { has, moraleMul } from './systems.js';
-import { makeColonist } from './models.js';
+import { makeColonist, glow } from './models.js';
 import { makeShuttleHD as makeShuttle } from './models_hd.js';
 import { getHeight } from './terrain.js';
 import { fx } from './fx.js';
@@ -114,7 +114,7 @@ export function updateColony(dt) {
   for (const c of G.colonists) {
     if (!c.target) { c.wait -= dt; if (c.wait <= 0) c.target = pickTarget(c); }
     let moving = false;
-    if (c.target) {
+    if (c.target && !(c.pause > 0)) {
       const dx = c.target.x - c.pos.x, dz = c.target.z - c.pos.z, d = Math.hypot(dx, dz);
       if (d < 0.6) { c.target = null; c.wait = 3 + Math.random() * 8; }
       else {
@@ -125,14 +125,23 @@ export function updateColony(dt) {
           const ox = c.pos.x - k.x, oz = c.pos.z - k.z, od = Math.hypot(ox, oz), rr = k.r + 0.4;
           if (od < rr && od > 0.01) { c.pos.x = k.x + ox / od * rr; c.pos.z = k.z + oz / od * rr; }
         }
-        c.group.rotation.y = Math.atan2(dx, dz);
+        c.yawT = Math.atan2(dx, dz);
         moving = true;
       }
     }
     // 看向玩家
     const pd = Math.hypot(G.player.pos.x - c.pos.x, G.player.pos.z - c.pos.z);
-    if (pd < 4 && !moving) c.group.rotation.y = Math.atan2(G.player.pos.x - c.pos.x, G.player.pos.z - c.pos.z);
-    else if (!moving && c.atPlaza) { c.group.rotation.y = Math.atan2(c.atPlaza.x - c.pos.x, c.atPlaza.z - c.pos.z); c.wait = Math.max(c.wait, 2); if (G.time.night < 0.3) c.wait = 0; }
+    // 你走近时，路过的居民会停下来打个招呼（同一个人一段时间内只停一次）
+    if (moving && pd < 3.2 && !(c.greetCd > 0) && !G.driving) { c.greetCd = 25; c.pause = 2.2; }
+    c.greetCd = Math.max(0, (c.greetCd || 0) - dt);
+    if (c.pause > 0) c.pause -= dt;
+    if (pd < 4 && !moving) c.yawT = Math.atan2(G.player.pos.x - c.pos.x, G.player.pos.z - c.pos.z);
+    else if (!moving && c.atPlaza) { c.yawT = Math.atan2(c.atPlaza.x - c.pos.x, c.atPlaza.z - c.pos.z); c.wait = Math.max(c.wait, 2); if (G.time.night < 0.3) c.wait = 0; }
+    // 平滑转身
+    if (c.yawT !== undefined) { let dy = c.yawT - c.group.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.group.rotation.y += dy * Math.min(1, dt * 7); }
+    // 夜里提着一盏小灯
+    if (!c.lamp) { c.lamp = glow(0xffd6a0, 0.32, c.group, 0.32, 0.55, 0.12); c.lamp.material.depthTest = true; }
+    c.lamp.visible = G.time.night > 0.45; c.lamp.material.opacity = 0.75 + Math.sin(now * 3 + c.phase) * 0.15;
     c.pos.y = getHeight(c.pos.x, c.pos.z);
     const ph = now * 7 + c.phase;
     const sw = moving ? Math.sin(ph) * 0.6 : 0;

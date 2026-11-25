@@ -19,7 +19,7 @@ import { costText } from './state.js';
 import { updateProjectiles, updateEnemies, shoot, clearEnemies, rayEnemy, spawnCrawler, spawnWasp, updateGlobs } from './combat.js';
 import { Player, LANDER_POS } from './player.js';
 import { initTools, updateTools, renderViewmodel, tool } from './tools.js';
-import { updateColony, lookColonist, serializeColonists, loadColonists } from './colony.js';
+import { updateColony, lookColonist, serializeColonists, loadColonists, spawnColonist } from './colony.js';
 import { updateStory, startChapter, radio, CHAPTERS, setStormState, stormState, resetStoryEnding } from './story.js';
 import { visorBoot } from './ui.js';
 import { initUI, updateUI, toast, chapterCard, openMenu, closeMenus, setPausePane, archiveHTML, buildMenuKey } from './ui.js';
@@ -1120,6 +1120,7 @@ window.__dbg = {
   film: () => $('btn-film').click(), filmSeek, filmStep(sec) { for (let t = 0; t < sec && G.film && !G.warping; t += 0.05) updateFilm(0.05); },
   dawnReport,
   ride() { startRide(rideApi()); }, rideStep(sec) { for (let t = 0; t < sec && G.riding; t += 0.05) updateRide(0.05); },
+  spawnColonist,
   audio, spawnCrawler, spawnDevil, spawnWasp, geyserList, triggerGeyser, whales: whaleList,
   slope: (x, z) => getHeight(x + 3, z) - getHeight(x, z),
   landStep(sec) { for (let t = 0; t < sec && landing; t += 0.05) updateLanding(0.05); return !!landing; },
