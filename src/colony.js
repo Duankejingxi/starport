@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { G } from './state.js';
 import { has, moraleMul } from './systems.js';
-import { makeColonist, glow } from './models.js';
+import { glow } from './models.js';
+import { makeColonistHD, animateColonist } from './character.js';
 import { makeShuttleHD as makeShuttle } from './models_hd.js';
 import { getHeight } from './terrain.js';
 import { fx } from './fx.js';
@@ -47,7 +48,7 @@ let nextPerson = 0;
 export function spawnColonist(x, z, saved) {
   const idx = saved?.idx ?? nextPerson++;
   const p = PEOPLE[idx % PEOPLE.length];
-  const m = makeColonist(idx);
+  const m = makeColonistHD(idx);
   m.group.position.set(x, getHeight(x, z), z);
   G.scene.add(m.group);
   const c = { ...m, idx, name: p[0] + (idx >= PEOPLE.length ? ` ${Math.floor(idx / PEOPLE.length) + 1}世` : ''), job: p[1], line: p[2],
@@ -141,14 +142,12 @@ export function updateColony(dt) {
     // 平滑转身
     if (c.yawT !== undefined) { let dy = c.yawT - c.group.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.group.rotation.y += dy * Math.min(1, dt * 7); }
     // 夜里提着一盏小灯
-    if (!c.lamp) { c.lamp = glow(0xffd6a0, 0.32, c.group, 0.32, 0.55, 0.12); c.lamp.material.depthTest = true; }
+    // 左手提灯，随手臂摆动
+    if (!c.lamp) { c.lamp = glow(0xffd6a0, 0.3, c.rig ? c.rig.aL.hand : c.group, 0, -0.1, 0.05); c.lamp.material.depthTest = true; }
     c.lamp.visible = G.time.night > 0.45; c.lamp.material.opacity = 0.75 + Math.sin(now * 3 + c.phase) * 0.15;
     c.pos.y = getHeight(c.pos.x, c.pos.z);
-    const ph = now * 7 + c.phase;
-    const sw = moving ? Math.sin(ph) * 0.6 : 0;
-    c.legL.rotation.x = sw; c.legR.rotation.x = -sw; c.armL.rotation.x = -sw * 0.8; c.armR.rotation.x = sw * 0.8;
-    if (!moving && pd < 4) c.armR.rotation.x = -2.6 + Math.sin(now * 6) * 0.3; // 挥手
-    c.body.position.y = 0.72 + (moving ? Math.abs(Math.sin(ph)) * 0.04 : 0);
+    const eye = new THREE.Vector3(G.player.pos.x, G.player.pos.y + 1.6, G.player.pos.z);
+    animateColonist(c, dt, moving, 1.7, !moving && pd < 4, pd < 7 ? eye : null, now);
     c.talked = Math.max(0, c.talked - dt);
   }
 }
