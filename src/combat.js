@@ -81,6 +81,25 @@ export function damageEnemy(e, dmg, owner) {
 }
 
 let lastStop = 0;
+const corpses = [];
+function updateCorpses(dt) {
+  for (let i = corpses.length - 1; i >= 0; i--) {
+    const c = corpses[i], e = c.e; c.t += dt;
+    const k = Math.min(1, c.t / 0.6);
+    if (e.flyer) {
+      // 晶翼蜂：翅膀停下，打着旋坠地
+      c.vy -= 14 * dt; e.pos.y = Math.max(getHeight(e.pos.x, e.pos.z) + 0.2, e.pos.y + c.vy * dt);
+      e.group.rotation.z += dt * 6; e.legs.forEach(w => { w.rotation.z *= 0.9; });
+    } else {
+      // 腿向身体蜷起，身体翻倒、塌下
+      for (const l of e.legs) { const u = l.userData; l.rotation.z += (u.side * 0.9 - l.rotation.z) * Math.min(1, dt * 6); l.rotation.y *= 0.9; if (u.knee) u.knee.rotation.z += (u.side * 1.4 - u.knee.rotation.z) * Math.min(1, dt * 6); }
+      e.inner.rotation.z += (c.roll * 2 - e.inner.rotation.z) * Math.min(1, dt * 4);
+      e.inner.position.y = -0.45 * k - Math.max(0, c.t - 1.6) * 0.8;
+    }
+    e.inner.scale.setScalar(1 - Math.max(0, c.t - 2.2) * 1.2);
+    if (c.t > 3) { G.scene.remove(e.group); corpses.splice(i, 1); }
+  }
+}
 function killEnemy(e, owner) {
   e.dead = true;
   if ((owner === 'player' || owner === 'laser') && !G.driving) { const now = performance.now(); if (now - lastStop > 400) { lastStop = now; G.hitStop = e.boss ? 0.35 : 0.07; } }
@@ -89,7 +108,7 @@ function killEnemy(e, owner) {
   fx.debris(p, e.legs[0].children[0].material, 6, 5, 0.45 * e.scale);
   fx.debris(p, e.inner.children[1].material, 8, 6, 0.5 * e.scale);
   audio.play('kill', e.pos);
-  G.scene.remove(e.group);
+  corpses.push({ e, t: 0, vy: 0, roll: (Math.random() - 0.5) * 0.6 }); // 尸体：腿蜷缩、倒地、沉入地下
   G.stats.kills++;
   if (e.guardian) G.stats.guardKills = (G.stats.guardKills || 0) + 1;
   // 晶体残骸里含有钛
@@ -177,6 +196,7 @@ function colonyCenter() {
 }
 
 export function updateEnemies(dt) {
+  updateCorpses(dt);
   const P = G.player.pos;
   const night = G.time.night > 0.6;
   const threat = (isFree() ? (G.buildings.some(b => b.type === 'habitat') || G.time.day >= 3) : G.chapter >= THREAT_FROM) && G.terraform < 1 && D().foe > 0;
@@ -347,12 +367,21 @@ export function updateEnemies(dt) {
     e.inner.position.z *= 0.85;
     e.pos.y = getHeight(e.pos.x, e.pos.z) + e.sink;
     // 腿部动画
-    const ph = now * (moving ? 12 : 2) + e.phase;
+    // 步态：每条腿 抬起 → 向前摆 → 落地 → 向后蹬；身体随步伐起伏、侧倾
+    e.walkW = (e.walkW || 0) + ((moving ? 1 : 0) - (e.walkW || 0)) * Math.min(1, dt * 6);
+    e.gait = (e.gait || 0) + dt * (moving ? 10 + e.speed : 2);
+    const W = e.walkW, ph = e.gait + e.phase;
     for (const l of e.legs) {
-      l.rotation.x = Math.sin(ph + l.userData.phase) * (moving ? 0.5 : 0.08);
-      l.rotation.z = Math.max(0, Math.cos(ph + l.userData.phase)) * 0.25 * l.userData.side * (moving ? 1 : 0);
+      const u = l.userData, a = ph + u.phase, sw = Math.sin(a), lift = Math.max(0, Math.cos(a));
+      l.rotation.y = -u.side * sw * 0.32 * W + Math.sin(now * 1.3 + u.k) * 0.03 * (1 - W);
+      l.rotation.z = u.side * lift * 0.32 * W;
+      u.knee.rotation.z = u.side * (lift * 0.45 * W + (e.crouch || 0) * 0.5);
     }
-    e.inner.position.y = Math.abs(Math.sin(ph)) * 0.08;
+    e.inner.position.y = Math.abs(Math.sin(ph)) * 0.07 * W + Math.sin(now * 2 + e.phase) * 0.02 * (1 - W) - (e.crouch || 0) * 0.25;
+    e.inner.rotation.z = Math.sin(ph) * 0.05 * W;
+    // 扑咬前的蓄力：身体压低后猛地前冲
+    e.crouch = Math.max(0, (e.crouch || 0) - dt * 3);
+    if (t && t.kind !== 'home' && e.atk < 0.35 && e.atk > 0) e.crouch = Math.min(1, (e.crouch || 0) + dt * 8);
     if (e.flash > 0) { e.flash -= dt; e.inner.scale.setScalar(1 + e.flash * 1.2); } else if (!(e.spitter && e.spitT < 0.6)) e.inner.scale.setScalar(1);
     if (Math.random() < dt * 4) fx.trail(new THREE.Vector3(e.pos.x, e.pos.y + 1.6 * e.scale, e.pos.z), [1, 0.35, 0.1], 0.8);
   }
@@ -408,6 +437,7 @@ export function rayEnemy(origin, dir, maxDist) {
 export function clearEnemies() {
   for (const e of G.enemies) G.scene.remove(e.group);
   G.enemies.length = 0;
+  for (const c of corpses) G.scene.remove(c.e.group); corpses.length = 0;
   for (const p of projectiles) G.scene.remove(p.s);
   projectiles.length = 0;
 }

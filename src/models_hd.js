@@ -726,11 +726,18 @@ export function makeCrawlerHD(scale, crystalMat, eyeMat) {
   for (let i = 0; i < 6; i++) {
     const side = i < 3 ? -1 : 1, k = (i % 3) - 1;
     const hip = new THREE.Group(); hip.position.set(side * 0.62, 1.0, k * 0.55 + 0.1); inner.add(hip);
+    // 腿分两段：髋（基节 + 股节）与膝（胫节 + 跗节），膝关节可以折叠
     const p0 = V(0, 0, 0), p1 = V(side * 0.75, 0.45, k * 0.15), p2 = V(side * 1.35, 0.1, k * 0.25), p3 = V(side * 1.55, -0.98, k * 0.35);
-    rod(p0, p1, 0.08, cleg, hip, 14); rod(p1, p2, 0.065, cleg, hip, 14); rod(p2, p3, 0.045, cleg, hip, 14);
-    for (const p of [p1, p2]) mk(new THREE.SphereGeometry(0.09, 8, 6), joint, p.x, p.y, p.z, hip);
-    mk(new THREE.ConeGeometry(0.05, 0.18, 6), crystalMat, p3.x, p3.y - 0.05, p3.z, hip, Math.PI, 0, 0);
-    hip.userData.phase = (i % 2) * Math.PI + k * 0.5; hip.userData.side = side;
+    rod(p0, p1, 0.08, cleg, hip, 14); rod(p1, p2, 0.065, cleg, hip, 14);
+    mk(new THREE.SphereGeometry(0.09, 8, 6), joint, p1.x, p1.y, p1.z, hip);
+    const knee = new THREE.Group(); knee.position.copy(p2); hip.add(knee);
+    mk(new THREE.SphereGeometry(0.09, 8, 6), joint, 0, 0, 0, knee);
+    const q3 = p3.clone().sub(p2), q25 = q3.clone().multiplyScalar(0.55).add(V(side * 0.06, 0.05, 0));
+    rod(V(0, 0, 0), q25, 0.05, cleg, knee, 12); rod(q25, q3, 0.04, cleg, knee, 12);
+    mk(new THREE.SphereGeometry(0.055, 8, 6), joint, q25.x, q25.y, q25.z, knee);
+    mk(new THREE.ConeGeometry(0.05, 0.18, 6), crystalMat, q3.x, q3.y - 0.05, q3.z, knee, Math.PI, 0, 0);
+    // 三角步态：0、2、4 与 1、3、5 交替
+    hip.userData.phase = (i % 2 === (side > 0 ? 1 : 0)) ? 0 : Math.PI; hip.userData.side = side; hip.userData.k = k; hip.userData.knee = knee;
     legs.push(hip);
   }
   g.scale.setScalar(scale);
