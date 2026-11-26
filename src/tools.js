@@ -75,6 +75,22 @@ export function initTools(camera) {
   const scr2 = mk(new THREE.PlaneGeometry(0.29, 0.195), new THREE.MeshBasicMaterial({ map: st, transparent: true, opacity: 0.95 }), 0, -0.004, 0.01, tab);
   tab.userData.scr = scr2;
   tab.rotation.set(-0.5, 0.25, 0);
+  // 宇航服手臂：手套握住握把/前护手，前臂斜伸出画面
+  const sleeve = new THREE.MeshStandardMaterial({ color: 0xe6e0d6, roughness: 0.7 });
+  const gloveM = new THREE.MeshStandardMaterial({ color: 0x3a3d44, roughness: 0.85 });
+  const arm = (p, hand, elbow, side) => {
+    const h = new THREE.Vector3(...hand), e = new THREE.Vector3(...elbow), d = e.clone().sub(h), L = d.length();
+    const fa = mk(new THREE.CapsuleGeometry(0.042, L, 4, 12), sleeve, 0, 0, 0, p);
+    fa.position.copy(h).add(e).multiplyScalar(0.5); fa.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize());
+    const cuff = mk(new THREE.CylinderGeometry(0.047, 0.047, 0.03, 14), accent, 0, 0, 0, p);
+    cuff.position.copy(h).addScaledVector(d.clone().normalize(), 0.07); cuff.quaternion.copy(fa.quaternion);
+    const palm = mk(new THREE.BoxGeometry(0.06, 0.07, 0.075), gloveM, h.x, h.y, h.z, p); palm.rotation.set(0.25, 0, side * 0.15);
+    mk(new THREE.BoxGeometry(0.02, 0.022, 0.05), gloveM, h.x - side * 0.035, h.y + 0.03, h.z - 0.02, p).rotation.y = side * 0.4; // 拇指
+    for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.016, 0.018, 0.045), gloveM, h.x + side * 0.032, h.y + 0.02 - i * 0.022, h.z - 0.03, p);
+  };
+  arm(laser, [0, -0.09, 0.03], [0.05, -0.3, 0.36], 1); arm(laser, [-0.02, -0.055, -0.14], [-0.2, -0.27, 0.12], -1);
+  arm(rifle, [0, -0.09, 0.01], [0.05, -0.3, 0.34], 1); arm(rifle, [-0.02, -0.055, -0.22], [-0.21, -0.27, 0.05], -1);
+  arm(tab, [0.165, -0.02, 0.03], [0.24, -0.36, 0.26], 1); arm(tab, [-0.165, -0.02, 0.03], [-0.24, -0.36, 0.26], -1);
   models = { laser, rifle, build: tab };
   for (const k in models) { models[k].scale.setScalar(k === 'build' ? 0.45 : 0.6); models[k].visible = false; vmScene.add(models[k]); }
 
